@@ -1,0 +1,38 @@
+{
+  "_comment": "LoxHASP Plugin-Konfiguration. Kopiere diese Datei nach loxhasp.cfg und passe sie an.",
+
+  "miniserver": {
+    "_comment": "Bevorzugt aus der LoxBerry-Miniserver-Verwaltung (msno). host/user/pass als Fallback/Standalone. Gen2 = HTTPS mit selbstsigniertem Zertifikat -> verify_tls:false.",
+    "msno": 1,
+    "host": "10.0.0.50",
+    "user": "LenardoHome",
+    "pass": "CHANGEME",
+    "port": 443,
+    "verify_tls": false
+  },
+
+  "loxone": {
+    "_comment": "Phase-2-Live-Anbindung: Polling-Intervall in Sekunden (bis der WebSocket-Event-Stream in Phase 2b kommt).",
+    "poll_interval": 1.0
+  },
+
+  "mqtt": {
+    "_comment": "Broker fuer die Panel-Seite (Daemon <-> openHASP). Oft der LoxBerry-eigene Broker.",
+    "host": "127.0.0.1",
+    "port": 1883,
+    "user": "",
+    "pass": "",
+    "base_topic": "hasp"
+  },
+
+  "web": {
+    "_comment": "Basis-URL, unter der LoxBerry die gerasterten Icons/Cover ausliefert.",
+    "asset_base_url": "http://loxberry/plugins/loxhasp/assets"
+  },
+
+  "lms": {
+    "_comment": "Standard-LMS/MS4H fuer Musik, sofern nicht pro Player-Seite ueberschrieben.",
+    "host": "192.168.1.50",
+    "port": 9000
+  }
+}

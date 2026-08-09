@@ -1,0 +1,36 @@
+{
+  "_comment": "Farbschema der Visu. Später über das LoxBerry-Plugin bearbeitbar.",
+
+  "states": {
+    "_comment": "Zustandsfarben: aktiv/an, ok, Warnung, Alarm.",
+    "active": "#e0a24d",
+    "good":   "#52b881",
+    "warn":   "#d6a24a",
+    "crit":   "#e2695f"
+  },
+
+  "categories": {
+    "_comment": "Farbe je Kategorie (Match: Schlüssel als Teilstring des Kategorienamens, z.B. 'Beleuchtung' passt auf '1.2 Beleuchtung').",
+    "Beleuchtung":  "#e0a24d",
+    "Heizung":      "#e2695f",
+    "Alarm":        "#e2695f",
+    "Zutritt":      "#52b881",
+    "Überwachung":  "#5aa9e6",
+    "Audio":        "#a986e0",
+    "Tor":          "#5aa9e6",
+    "Beschattung":  "#5aa9e6",
+    "Rollläden":    "#5aa9e6",
+    "Verbraucher":  "#e0a24d",
+    "Klima":        "#5ad0c0",
+    "Temperatur":   "#5ad0c0"
+  },
+
+  "ui": {
+    "_comment": "Sichtbare Tabs (Reihenfolge frei), Icon-/Schriftgrößen in px, optionale Schrift.",
+    "tabs": ["favoriten", "zentral", "raeume", "kategorien"],
+    "iconSize": 38,
+    "nameSize": 20,
+    "subSize": 15,
+    "font": ""
+  }
+}

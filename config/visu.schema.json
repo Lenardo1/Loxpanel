@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxhasp.local/visu.schema.json",
+  "title": "LoxHASP Visu Definition",
+  "description": "Renderer-neutrale Beschreibung einer zusammengeklickten Loxone-Visu. Der Generator erzeugt daraus openHASP-JSONL (ESP32) und/oder eine Web-Visu (Linux-Kiosk).",
+  "type": "object",
+  "required": ["version", "panels"],
+  "properties": {
+    "version": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "created": { "type": "string", "format": "date-time" },
+        "miniserver": { "type": "string", "description": "LoxBerry-Miniserver-Nummer oder -Name" }
+      },
+      "additionalProperties": true
+    },
+    "panels": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/panel" }
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "panel": {
+      "type": "object",
+      "required": ["id", "target", "pages"],
+      "properties": {
+        "id": { "type": "string" },
+        "target": {
+          "enum": ["openhasp", "web"],
+          "description": "Render-Ziel: openHASP-ESP32 (JSONL) oder Linux-Web-Kiosk (HTML/CSS)"
+        },
+        "resolution": { "type": "string", "default": "480x480" },
+        "plate": {
+          "type": "string",
+          "description": "openHASP plate name = MQTT-Topic-Praefix (nur target=openhasp)"
+        },
+        "pages": { "type": "array", "items": { "$ref": "#/$defs/page" } }
+      },
+      "additionalProperties": false
+    },
+
+    "page": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "type": {
+          "enum": ["grid", "player", "intercom"],
+          "description": "grid = Kachelseite, player = Musik-Player, intercom = Tuersprechanlage"
+        },
+        "statusbar": { "type": "boolean", "default": true },
+        "layout": {
+          "enum": ["one", "stack-2", "grid-2x2", "list"],
+          "description": "Kachel-Layout (nur type=grid)"
+        },
+        "tiles": { "type": "array", "items": { "$ref": "#/$defs/tile" } },
+        "audio": { "$ref": "#/$defs/audio" },
+        "intercom": { "$ref": "#/$defs/intercom" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "grid" } } },
+          "then": { "required": ["layout", "tiles"] } },
+        { "if": { "properties": { "type": { "const": "player" } } },
+          "then": { "required": ["audio"] } },
+        { "if": { "properties": { "type": { "const": "intercom" } } },
+          "then": { "required": ["intercom"] } }
+      ]
+    },
+
+    "tile": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "enum": ["control", "mini-player"],
+          "description": "control = normaler Datenpunkt, mini-player = kompakter Musik-Einstieg"
+        },
+        "position": { "type": "integer", "minimum": 0, "description": "Slot-Index im Layout" },
+        "control": { "type": "string", "description": "Loxone Control-UUID" },
+        "stateUuid": { "type": "string", "description": "Anzuzeigende Zustands-UUID des Controls" },
+        "command": { "type": "string", "description": "Befehl bei Tap (z.B. on, off, pulse)" },
+        "label": { "type": "string" },
+        "unit": { "type": "string" },
+        "icon": { "$ref": "#/$defs/icon" },
+        "audioRef": { "type": "string", "description": "kind=mini-player: page.id der Voll-Player-Seite" }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "control" } } },
+          "then": { "required": ["control"] } },
+        { "if": { "properties": { "kind": { "const": "mini-player" } } },
+          "then": { "required": ["audioRef"] } }
+      ]
+    },
+
+    "icon": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "enum": ["loxone", "mdi", "none"] },
+        "uuid": { "type": "string", "description": "Loxone-Icon-UUID inkl. .svg (source=loxone)" },
+        "name": { "type": "string", "description": "MaterialDesignIcons-Name (source=mdi)" }
+      },
+      "additionalProperties": false
+    },
+
+    "audio": {
+      "type": "object",
+      "required": ["backend", "zone"],
+      "properties": {
+        "backend": {
+          "enum": ["lms", "loxone"],
+          "description": "lms = MS4H/Logitech Media Server (JSON-RPC), loxone = AudioZone ueber Miniserver"
+        },
+        "zone": { "type": "string", "description": "LMS-Player-ID (MAC) oder Loxone-AudioZone-UUID" },
+        "lmsHost": { "type": "string" },
+        "lmsPort": { "type": "integer", "default": 9000 }
+      },
+      "additionalProperties": false
+    },
+
+    "intercom": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["mobotix-t25", "generic-sip"] },
+        "videoUrl": { "type": "string", "description": "MJPEG-Stream-URL (z.B. Mobotix faststream.jpg)" },
+        "sip": {
+          "type": "object",
+          "properties": {
+            "peer": { "type": "string", "description": "SIP-URI der Tuerstation" },
+            "mode": { "enum": ["direct", "registrar"], "default": "direct" }
+          },
+          "additionalProperties": false
+        },
+        "openCommand": {
+          "type": "object",
+          "description": "Wie der Tueroeffner ausgeloest wird",
+          "properties": {
+            "via": { "enum": ["http", "loxone"] },
+            "httpUrl": { "type": "string" },
+            "loxoneUuid": { "type": "string" },
+            "loxoneCmd": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

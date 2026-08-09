@@ -1,0 +1,3 @@
+# LoxHASP Python-Abhaengigkeiten (via pip; die uebrigen kommen aus 'apt').
+# loxone-api uebernimmt Token-Auth (getkey2/getjwt), WebSocket und Struktur.
+loxone-api>=0.1.25
