@@ -1,0 +1,10 @@
+# Laufzeitdaten & Dumps (personenbezogen: enthalten die Loxone-Struktur)
+data/*
+!data/.gitkeep
+
+# Lokale Konfiguration mit Zugangsdaten (Miniserver/T25-Passwörter)
+config/loxhasp.cfg
+
+# Python
+*.pyc
+__pycache__/

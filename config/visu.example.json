@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "meta": {
+    "name": "Beispiel-Visu Wohnzimmer",
+    "miniserver": "1"
+  },
+  "panels": [
+    {
+      "id": "panel-wohnzimmer",
+      "target": "web",
+      "resolution": "480x480",
+      "pages": [
+        {
+          "id": "p-wz",
+          "title": "Wohnzimmer",
+          "type": "grid",
+          "layout": "grid-2x2",
+          "statusbar": true,
+          "tiles": [
+            {
+              "id": "t1",
+              "kind": "control",
+              "position": 0,
+              "control": "0f2b1c40-0000-0000-ffffdeadbeef0001",
+              "stateUuid": "0f2b1c40-0000-0000-ffffdeadbeef0aaa",
+              "command": "pulse",
+              "label": "Deckenlicht",
+              "icon": { "source": "loxone", "uuid": "00000000-0000-0020-2000000000000000.svg" }
+            },
+            {
+              "id": "t2",
+              "kind": "control",
+              "position": 1,
+              "control": "0f2b1c40-0000-0000-ffffdeadbeef0002",
+              "stateUuid": "0f2b1c40-0000-0000-ffffdeadbeef0bbb",
+              "command": "down",
+              "label": "Jalousie",
+              "unit": "%",
+              "icon": { "source": "mdi", "name": "blinds" }
+            },
+            {
+              "id": "t3",
+              "kind": "control",
+              "position": 2,
+              "control": "0f2b1c40-0000-0000-ffffdeadbeef0003",
+              "stateUuid": "0f2b1c40-0000-0000-ffffdeadbeef0ccc",
+              "label": "Temperatur",
+              "unit": "°C",
+              "icon": { "source": "mdi", "name": "thermometer" }
+            },
+            {
+              "id": "t4",
+              "kind": "mini-player",
+              "position": 3,
+              "audioRef": "p-musik",
+              "label": "Musik"
+            }
+          ]
+        },
+        {
+          "id": "p-musik",
+          "title": "Musik Wohnzimmer",
+          "type": "player",
+          "audio": {
+            "backend": "lms",
+            "zone": "00:04:20:aa:bb:cc",
+            "lmsHost": "192.168.1.50",
+            "lmsPort": 9000
+          }
+        },
+        {
+          "id": "p-tuer",
+          "title": "Haustuer",
+          "type": "intercom",
+          "intercom": {
+            "type": "mobotix-t25",
+            "videoUrl": "http://192.168.1.60/cgi-bin/faststream.jpg?stream=full&fps=8",
+            "sip": { "peer": "sip:door@192.168.1.60", "mode": "direct" },
+            "openCommand": { "via": "http", "httpUrl": "http://192.168.1.60/control/rcontrol?action=dooropen" }
+          }
+        }
+      ]
+    }
+  ]
+}
