@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import re
 import sys
 from pathlib import Path
@@ -76,6 +77,16 @@ def _clean(name: str) -> str:
 
 
 def _config() -> dict:
+    # Docker/12-Factor: Miniserver-Zugang per Env-Variable (kein File noetig).
+    env = os.environ
+    if env.get("LOXPANEL_MS_HOST"):
+        return {
+            "host": env["LOXPANEL_MS_HOST"],
+            "user": env.get("LOXPANEL_MS_USER", ""),
+            "pass": env.get("LOXPANEL_MS_PASS", ""),
+            "port": int(env.get("LOXPANEL_MS_PORT", "443")),
+            "verify_tls": env.get("LOXPANEL_MS_VERIFY_TLS", "false").lower() in ("1", "true", "yes"),
+        }
     base = Path(__file__).resolve().parent.parent / "config"
     f = base / "loxpanel.cfg"
     if not f.is_file():
@@ -1218,7 +1229,7 @@ async def on_cleanup(a: web.Application) -> None:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     p = argparse.ArgumentParser()
-    p.add_argument("--port", type=int, default=8099)
+    p.add_argument("--port", type=int, default=int(os.environ.get("LOXPANEL_PORT", "8099")))
     args = p.parse_args()
 
     a = web.Application()

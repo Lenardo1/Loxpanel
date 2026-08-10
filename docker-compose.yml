@@ -1,0 +1,24 @@
+# LoxPanel als Docker-Service.
+#   1) .env.example -> .env kopieren und Miniserver-Zugang eintragen
+#   2) docker compose up -d --build
+#   3) Panels zeigen auf http://<docker-host>:8099/?panel=<id>
+services:
+  loxpanel:
+    build: .
+    # Alternativ ein fertiges Image nutzen (spaeter):
+    # image: ghcr.io/lenardo1/loxpanel:latest
+    container_name: loxpanel
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      # Miniserver-Zugang (aus .env). Alternativ per config/loxpanel.cfg im Volume.
+      LOXPANEL_MS_HOST: "${LOXPANEL_MS_HOST}"
+      LOXPANEL_MS_USER: "${LOXPANEL_MS_USER}"
+      LOXPANEL_MS_PASS: "${LOXPANEL_MS_PASS}"
+      LOXPANEL_MS_PORT: "${LOXPANEL_MS_PORT:-443}"
+      LOXPANEL_MS_VERIFY_TLS: "${LOXPANEL_MS_VERIFY_TLS:-false}"
+    volumes:
+      # Persistiert panels.json (von /config geschrieben), theme.json und
+      # optional loxpanel.cfg (Intercom/T25-Login). Host-Ordner ./config.
+      - ./config:/app/config

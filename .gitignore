@@ -11,6 +11,9 @@ config/panels.json
 # Panel-lokale Kiosk-Konfig (Server-IP + Panel-ID, pro Geraet unterschiedlich)
 deploy/loxpanel-kiosk.conf
 
+# Docker-Umgebungsdatei mit Zugangsdaten
+.env
+
 # Python
 *.pyc
 __pycache__/

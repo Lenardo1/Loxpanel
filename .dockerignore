@@ -1,0 +1,10 @@
+.git
+.gitignore
+data
+config/loxpanel.cfg
+config/panels.json
+.env
+befehle_chromium.txt
+deploy
+**/__pycache__
+*.pyc
