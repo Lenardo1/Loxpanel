@@ -40,7 +40,25 @@ log = logging.getLogger("loxpanel.webvisu")
 _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
 HTML = _WEB / "panel.html"
 CONFIG_HTML = _WEB / "config.html"
-PANELS_FILE = Path(__file__).resolve().parent.parent / "config" / "panels.json"
+SETTINGS_HTML = _WEB / "settings.html"
+_CFGDIR = Path(__file__).resolve().parent.parent / "config"
+PANELS_FILE = _CFGDIR / "panels.json"
+CFG_FILE = _CFGDIR / "loxpanel.cfg"
+CFG_EXAMPLE = _CFGDIR / "loxpanel.cfg.example"
+
+
+def _load_cfg() -> dict:
+    for f in (CFG_FILE, CFG_EXAMPLE):
+        if f.is_file():
+            try:
+                return json.loads(f.read_text(encoding="utf-8"))
+            except ValueError:
+                pass
+    return {}
+
+
+def _write_cfg(cfg: dict) -> None:
+    CFG_FILE.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 LIGHT = LightControllerV2Adapter()
 JAL = JalousieAdapter()
 
@@ -77,7 +95,16 @@ def _clean(name: str) -> str:
 
 
 def _config() -> dict:
-    # Docker/12-Factor: Miniserver-Zugang per Env-Variable (kein File noetig).
+    # Reihenfolge: geschriebene loxpanel.cfg (Settings-Seite) -> Env (Docker) -> Beispiel.
+    base = Path(__file__).resolve().parent.parent / "config"
+    f = base / "loxpanel.cfg"
+    if f.is_file():
+        try:
+            ms = json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
+        except ValueError:
+            ms = {}
+        if ms.get("host"):
+            return ms
     env = os.environ
     if env.get("LOXPANEL_MS_HOST"):
         return {
@@ -87,11 +114,7 @@ def _config() -> dict:
             "port": int(env.get("LOXPANEL_MS_PORT", "443")),
             "verify_tls": env.get("LOXPANEL_MS_VERIFY_TLS", "false").lower() in ("1", "true", "yes"),
         }
-    base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxpanel.cfg"
-    if not f.is_file():
-        f = base / "loxpanel.cfg.example"
-    return json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
+    return json.loads((base / "loxpanel.cfg.example").read_text(encoding="utf-8")).get("miniserver", {})
 
 
 def _intercom_config() -> dict:
@@ -180,13 +203,14 @@ class App:
         self._bell_prev: dict[str, object] = {}
         self._pending_ring: str | None = None
 
-    async def start(self) -> None:
-        self.client = LoxoneClient(host=self.host, user=self.user, password=self.password,
-                                   port=self.port, verify_tls=self.verify_tls)
-        await self.client.__aenter__()
-        self.alg = (await self.client.getkey2()).hashAlg
-        self.jwt = await self.client.authenticate()
-        st = await self.client.load_structure()
+    def _ssl_ctx(self) -> _ssl.SSLContext:
+        ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+        if not self.verify_tls:
+            ctx.check_hostname = False
+            ctx.verify_mode = _ssl.CERT_NONE
+        return ctx
+
+    def _apply_structure(self, st: dict) -> None:
         self.controls = st.get("controls", {})
         self.rooms = st.get("rooms", {})
         self.cats = st.get("cats", {})
@@ -205,13 +229,55 @@ class App:
         log.info("Struktur: %d Controls, %d Räume, %d Kategorien, %d Intercom-Klingeln",
                  len(self.controls), len(self.rooms_with), len(self.cats_with), len(self.bell_map))
 
-        ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
-        if not self.verify_tls:
-            ctx.check_hostname = False
-            ctx.verify_mode = _ssl.CERT_NONE
-        self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=ctx))
-
+    async def start(self) -> None:
+        self.client = LoxoneClient(host=self.host, user=self.user, password=self.password,
+                                   port=self.port, verify_tls=self.verify_tls)
+        await self.client.__aenter__()
+        self.alg = (await self.client.getkey2()).hashAlg
+        self.jwt = await self.client.authenticate()
+        self._apply_structure(await self.client.load_structure())
+        self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
         await self._connect_ws()
+
+    async def reconnect(self) -> int:
+        """Verbindung mit (ge-aenderter) Config neu aufbauen. Gibt Control-Anzahl
+        zurueck; wirft bei falschen Zugangsdaten. Alte Verbindung bleibt bei
+        Fehler bestehen (neuer Client wird nur bei Erfolg uebernommen)."""
+        ms = _config()
+        newc = LoxoneClient(host=ms["host"], user=ms["user"], password=ms["pass"],
+                            port=ms.get("port", 443), verify_tls=ms.get("verify_tls", False))
+        try:
+            await newc.__aenter__()
+            alg = (await newc.getkey2()).hashAlg
+            jwt = await newc.authenticate()
+            st = await newc.load_structure()
+        except Exception:
+            try:
+                await newc.close()
+            except Exception:
+                pass
+            raise
+        # Erfolg -> uebernehmen
+        self.host, self.port = ms["host"], ms.get("port", 443)
+        self.user, self.password = ms["user"], ms["pass"]
+        self.verify_tls = ms.get("verify_tls", False)
+        old_client, self.client = self.client, newc
+        self.alg, self.jwt = alg, jwt
+        self._apply_structure(st)
+        self.states = {}
+        old_is, self.icon_session = self.icon_session, \
+            aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
+        self.icon_cache = {}
+        old_ws, self.ws = self.ws, None   # stream_task baut WS mit neuen Daten neu auf
+        self.intercom_cfg = _intercom_config()
+        self._dirty = True
+        for closer in (old_client, old_is, old_ws):
+            try:
+                if closer:
+                    await closer.close()
+            except Exception:
+                pass
+        return len(self.controls)
 
     async def _connect_ws(self) -> None:
         self.ws = LoxoneWS(host=self.host, port=self.port, user=self.user, jwt=self.jwt,
@@ -1109,6 +1175,101 @@ async def api_save_panels(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "count": len(clean)})
 
 
+async def settings_index(request: web.Request) -> web.Response:
+    return web.Response(text=SETTINGS_HTML.read_text(encoding="utf-8"), content_type="text/html")
+
+
+async def api_settings(request: web.Request) -> web.Response:
+    app: App = request.app["app"]
+    cfg = _load_cfg()
+    ms = cfg.get("miniserver", {})
+    ic = cfg.get("intercom", {})
+    env_ms = bool(os.environ.get("LOXPANEL_MS_HOST"))
+
+    def icv(uuid):
+        e = ic.get(uuid) or {}
+        if isinstance(e, str):
+            e = {"url": e}
+        return {"url": (e.get("url") or "").strip(), "user": e.get("user", ""),
+                "hasPass": bool(e.get("pass"))}
+
+    intercoms = [{"uuid": u, "name": _clean(c.get("name")), **icv(u)}
+                 for u, c in app.controls.items() if c.get("type") == "Intercom"]
+    return web.json_response({
+        "miniserver": {
+            "host": ms.get("host") or os.environ.get("LOXPANEL_MS_HOST", ""),
+            "user": ms.get("user") or os.environ.get("LOXPANEL_MS_USER", ""),
+            "port": ms.get("port", 443),
+            "verify_tls": bool(ms.get("verify_tls", False)),
+            "hasPass": bool(ms.get("pass")) or env_ms,
+        },
+        "intercoms": intercoms,
+        "connected": app.client is not None,
+        "nControls": len(app.controls),
+    })
+
+
+async def api_settings_ms(request: web.Request) -> web.Response:
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    host = str(data.get("host", "")).strip()
+    if not host:
+        return web.json_response({"ok": False, "error": "Host fehlt"}, status=400)
+    cfg = _load_cfg()
+    ms = dict(cfg.get("miniserver", {}))
+    ms["host"] = host
+    ms["user"] = str(data.get("user", "")).strip()
+    try:
+        ms["port"] = int(data.get("port") or 443)
+    except (TypeError, ValueError):
+        ms["port"] = 443
+    ms["verify_tls"] = bool(data.get("verify_tls"))
+    if data.get("pass"):                       # leer = altes Passwort behalten
+        ms["pass"] = str(data["pass"])
+    if not ms.get("pass"):
+        return web.json_response({"ok": False, "error": "Passwort fehlt"}, status=400)
+    cfg["miniserver"] = ms
+    _write_cfg(cfg)
+    try:
+        n = await app.reconnect()
+        log.info("Miniserver-Settings gespeichert, verbunden (%d Controls)", n)
+        return web.json_response({"ok": True, "connected": True, "nControls": n})
+    except Exception as err:
+        return web.json_response({"ok": False, "error": f"Verbindung fehlgeschlagen: {err}"})
+
+
+async def api_settings_intercom(request: web.Request) -> web.Response:
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    items = data.get("intercoms") or {}
+    cfg = _load_cfg()
+    ic = dict(cfg.get("intercom", {}))
+    for uuid, e in items.items():
+        if not isinstance(e, dict):
+            continue
+        cur = ic.get(uuid)
+        cur = dict(cur) if isinstance(cur, dict) else ({"url": cur} if isinstance(cur, str) else {})
+        cur["url"] = str(e.get("url", "")).strip()
+        cur["user"] = str(e.get("user", "")).strip()
+        if e.get("pass"):
+            cur["pass"] = str(e["pass"])
+        if cur.get("url"):
+            ic[uuid] = cur
+        else:
+            ic.pop(uuid, None)
+    cfg["intercom"] = ic
+    _write_cfg(cfg)
+    app.intercom_cfg = _intercom_config()
+    log.info("Intercom-Settings gespeichert (%d Einträge)", len(ic))
+    return web.json_response({"ok": True})
+
+
 async def icon_handler(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     p = request.query.get("p", "")
@@ -1236,8 +1397,12 @@ def main() -> None:
     a["app"] = App(_config())
     a.router.add_get("/", index)
     a.router.add_get("/config", config_index)
+    a.router.add_get("/settings", settings_index)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_post("/api/panels", api_save_panels)
+    a.router.add_get("/api/settings", api_settings)
+    a.router.add_post("/api/settings/miniserver", api_settings_ms)
+    a.router.add_post("/api/settings/intercom", api_settings_intercom)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
     a.router.add_get("/mjpeg", mjpeg_handler)
