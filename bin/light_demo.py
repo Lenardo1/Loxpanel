@@ -24,15 +24,15 @@ from loxone_api import LoxoneClient  # noqa: E402
 from loxone_ws import LoxoneWS  # noqa: E402
 from adapters import get_adapter  # noqa: E402
 
-log = logging.getLogger("loxhasp.lightdemo")
+log = logging.getLogger("loxpanel.lightdemo")
 DEFAULT_LIGHT = "13fd4279-02df-a7be-ffffdabd9fbb674e"  # Aussenlicht Terrasse
 
 
 def _conn() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     if not f.is_file():
-        f = base / "loxhasp.cfg.example"
+        f = base / "loxpanel.cfg.example"
     return json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
 
 

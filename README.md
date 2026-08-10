@@ -1,4 +1,4 @@
-# LoxHASP
+# LoxPanel
 
 Eine **konfigurierbare Touch-Visu für Loxone**, die direkt über den Miniserver
 läuft — ohne die Loxone-App, offen für alle Loxone-Nutzer. Ziel ist ein
@@ -48,7 +48,7 @@ Loxone Miniserver ──WebSocket(Token)──►  webvisu.py (aiohttp)
 
 ```bash
 pip install loxone-api            # zieht aiohttp mit
-cp config/loxhasp.cfg.example config/loxhasp.cfg
+cp config/loxpanel.cfg.example config/loxpanel.cfg
 #   -> Miniserver-Host/User/Pass eintragen (Datei ist gitignored)
 python bin/webvisu.py             # -> http://localhost:8099
 ```
@@ -56,10 +56,10 @@ python bin/webvisu.py             # -> http://localhost:8099
 Theme anpassen: `config/theme.json`. Deployment aufs Wandpanel: siehe `deploy/`
 (`DEPLOY.md`, systemd-Service, Chromium-Kiosk-Autostart).
 
-## Konfiguration (`config/loxhasp.cfg`, gitignored)
+## Konfiguration (`config/loxpanel.cfg`, gitignored)
 
 Enthält Zugangsdaten und wird **nicht** eingecheckt. Vorlage:
-`config/loxhasp.cfg.example`. Abschnitte: `miniserver`, `mqtt` (optional),
+`config/loxpanel.cfg.example`. Abschnitte: `miniserver`, `mqtt` (optional),
 `intercom` (T25-URL + Login).
 
 ## Roadmap

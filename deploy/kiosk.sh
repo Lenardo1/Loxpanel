@@ -1,5 +1,5 @@
 #!/bin/bash
-# LoxHASP Chromium-Kiosk fuer das PX30-Panel (480x480).
+# LoxPanel Chromium-Kiosk fuer das PX30-Panel (480x480).
 # In den vorhandenen X11-Autostart einhaengen (ersetzt die alte Loxone-App).
 # URL anpassen: localhost, wenn der Server auf dem Panel selbst laeuft,
 #               sonst http://<loxberry-oder-server-ip>:8099

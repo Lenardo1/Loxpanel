@@ -24,7 +24,7 @@ from typing import Any, Callable
 
 import aiohttp
 
-log = logging.getLogger("loxhasp.ws")
+log = logging.getLogger("loxpanel.ws")
 
 ValueCallback = Callable[[str, Any], None]
 

@@ -14,7 +14,7 @@ TYPES = {"Meter", "Slider", "InfoOnlyAnalog", "InfoOnlyText", "TextState",
 
 
 def _conn():
-    f = Path(__file__).resolve().parent.parent / "config" / "loxhasp.cfg"
+    f = Path(__file__).resolve().parent.parent / "config" / "loxpanel.cfg"
     return json.loads(f.read_text(encoding="utf-8"))["miniserver"]
 
 

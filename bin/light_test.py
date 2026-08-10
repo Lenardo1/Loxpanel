@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""LoxHASP Phase-2-Probe: ein Control auslesen und schalten.
+"""LoxPanel Phase-2-Probe: ein Control auslesen und schalten.
 
-Verbindungsdaten kommen aus config/loxhasp.cfg (Block "miniserver"), koennen
+Verbindungsdaten kommen aus config/loxpanel.cfg (Block "miniserver"), koennen
 aber per CLI ueberschrieben werden. So muss kein Passwort auf der Kommandozeile
 stehen.
 
@@ -11,7 +11,7 @@ stehen.
   - --uuid <uuid> --watch: pollt und zeigt Wertaenderungen live
 
 Beispiel:
-  python light_test.py                         # nutzt config/loxhasp.cfg
+  python light_test.py                         # nutzt config/loxpanel.cfg
   python light_test.py --uuid 13fd... --read
   python light_test.py --uuid 13fd...a7be --cmd changeTo/778
 """
@@ -27,17 +27,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from loxone_live import LoxoneLive  # noqa: E402
 
-log = logging.getLogger("loxhasp.lighttest")
+log = logging.getLogger("loxpanel.lighttest")
 
 
 def _config_file() -> Path:
     base = Path(__file__).resolve().parent.parent / "config"
-    real = base / "loxhasp.cfg"
-    return real if real.is_file() else base / "loxhasp.cfg.example"
+    real = base / "loxpanel.cfg"
+    return real if real.is_file() else base / "loxpanel.cfg.example"
 
 
 def resolve_conn(args: argparse.Namespace) -> dict:
-    """CLI-Werte haben Vorrang, sonst aus config/loxhasp.cfg (miniserver-Block)."""
+    """CLI-Werte haben Vorrang, sonst aus config/loxpanel.cfg (miniserver-Block)."""
     cfg: dict = {}
     f = _config_file()
     if f.is_file():
@@ -55,7 +55,7 @@ def resolve_conn(args: argparse.Namespace) -> dict:
     }
     missing = [k for k in ("host", "user", "password") if not conn[k]]
     if missing:
-        log.error("Fehlende Verbindungsdaten: %s (CLI oder config/loxhasp.cfg)", ", ".join(missing))
+        log.error("Fehlende Verbindungsdaten: %s (CLI oder config/loxpanel.cfg)", ", ".join(missing))
         sys.exit(2)
     return conn
 
@@ -102,7 +102,7 @@ async def run(args: argparse.Namespace, conn: dict) -> int:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    p = argparse.ArgumentParser(description="LoxHASP Phase-2-Probe")
+    p = argparse.ArgumentParser(description="LoxPanel Phase-2-Probe")
     p.add_argument("--host")
     p.add_argument("--user")
     p.add_argument("--pass", dest="password")

@@ -1,4 +1,4 @@
-# LoxHASP auf dem PX30-Wandpanel
+# LoxPanel auf dem PX30-Wandpanel
 
 Ziel: Die Web-Visu laeuft als Dienst und startet beim Booten im Chromium-Kiosk.
 Zwei Varianten fuer den Server:
@@ -22,9 +22,9 @@ pgrep -a kerberos || pgrep -a -i loxone     # womit startet die alte Loxone-App?
 
 ## 1) Dateien aufs Panel
 ```bash
-sudo mkdir -p /opt/loxhasp
+sudo mkdir -p /opt/loxpanel
 # vom Entwicklungsrechner (Beispiel scp), oder per USB/git:
-#   scp -r loxhasp/* root@<px30-ip>:/opt/loxhasp/
+#   scp -r loxpanel/* root@<px30-ip>:/opt/loxpanel/
 ```
 
 ## 2) Python-Abhaengigkeiten
@@ -36,17 +36,17 @@ sudo pip3 install --break-system-packages loxone-api    # zieht aiohttp mit
 
 ## 3) Miniserver-Zugang
 ```bash
-cp /opt/loxhasp/config/loxhasp.cfg.example /opt/loxhasp/config/loxhasp.cfg
-nano /opt/loxhasp/config/loxhasp.cfg      # host/user/pass/verify_tls eintragen
+cp /opt/loxpanel/config/loxpanel.cfg.example /opt/loxpanel/config/loxpanel.cfg
+nano /opt/loxpanel/config/loxpanel.cfg      # host/user/pass/verify_tls eintragen
 ```
 
 ## 4) Server als Dienst
 ```bash
-sudo cp /opt/loxhasp/deploy/loxhasp-webvisu.service /etc/systemd/system/
+sudo cp /opt/loxpanel/deploy/loxpanel-webvisu.service /etc/systemd/system/
 # ggf. User=/Pfade in der .service anpassen
 sudo systemctl daemon-reload
-sudo systemctl enable --now loxhasp-webvisu
-systemctl status loxhasp-webvisu           # laeuft?
+sudo systemctl enable --now loxpanel-webvisu
+systemctl status loxpanel-webvisu           # laeuft?
 curl -s localhost:8099 | head -c 60        # liefert HTML?
 ```
 
@@ -54,8 +54,8 @@ curl -s localhost:8099 | head -c 60        # liefert HTML?
 `deploy/kiosk.sh` in den vorhandenen X11-Autostart einhaengen und die alte
 Loxone-App dort entfernen. Je nach Setup:
 - **openbox:** in `~/.config/openbox/autostart` bzw. `/etc/xdg/openbox/autostart`
-  die Loxone-Zeile durch `bash /opt/loxhasp/deploy/kiosk.sh &` ersetzen.
-- **.xinitrc:** die `kerberos`/Loxone-Zeile durch `exec bash /opt/loxhasp/deploy/kiosk.sh` ersetzen.
+  die Loxone-Zeile durch `bash /opt/loxpanel/deploy/kiosk.sh &` ersetzen.
+- **.xinitrc:** die `kerberos`/Loxone-Zeile durch `exec bash /opt/loxpanel/deploy/kiosk.sh` ersetzen.
 
 Dann Panel neu starten:
 ```bash
@@ -63,6 +63,6 @@ sudo reboot
 ```
 
 ## Fehlersuche
-- Server-Log: `journalctl -u loxhasp-webvisu -f`
+- Server-Log: `journalctl -u loxpanel-webvisu -f`
 - Weisse/leere Seite: URL/Server pruefen (`curl localhost:8099`).
 - Kein Bild gedreht/skaliert: `--force-device-scale-factor` in kiosk.sh anpassen.

@@ -1,4 +1,4 @@
-"""Minimaler Loxone-Miniserver-Client fuer LoxHASP.
+"""Minimaler Loxone-Miniserver-Client fuer LoxPanel.
 
 Phase 1 implementiert den Struktur-Import ueber HTTP (data/LoxAPP3.json).
 Die Live-Werte ueber den token-authentifizierten WebSocket sind als Stub
@@ -14,7 +14,7 @@ from typing import Any
 
 import requests
 
-log = logging.getLogger("loxhasp.loxone")
+log = logging.getLogger("loxpanel.loxone")
 
 
 @dataclass

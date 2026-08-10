@@ -6,7 +6,7 @@ ein und sammelt fuer einige Sekunden alle State-Updates. Gibt danach die Werte
 der gesuchten UUIDs aus (Standard: activeMoods/moodList des Terrassenlichts).
 
 Aufruf:
-  python ws_test.py                 # nutzt config/loxhasp.cfg
+  python ws_test.py                 # nutzt config/loxpanel.cfg
   python ws_test.py --seconds 6 --uuid 13fd4279-02df-a776-ffff4a950f3ecb07
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from loxone_api import LoxoneClient  # noqa: E402
 from loxone_ws import LoxoneWS  # noqa: E402
 
-log = logging.getLogger("loxhasp.wstest")
+log = logging.getLogger("loxpanel.wstest")
 
 TARGET_DEFAULTS = [
     "13fd4279-02df-a776-ffff4a950f3ecb07",  # activeMoods Terrasse
@@ -32,9 +32,9 @@ TARGET_DEFAULTS = [
 
 def _conn() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     if not f.is_file():
-        f = base / "loxhasp.cfg.example"
+        f = base / "loxpanel.cfg.example"
     ms = json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
     return ms
 
