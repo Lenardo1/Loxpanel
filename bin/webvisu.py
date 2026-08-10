@@ -232,14 +232,28 @@ class App:
                  len(self.controls), len(self.rooms_with), len(self.cats_with), len(self.bell_map))
 
     async def start(self) -> None:
-        self.client = LoxoneClient(host=self.host, user=self.user, password=self.password,
-                                   port=self.port, verify_tls=self.verify_tls)
-        await self.client.__aenter__()
-        self.alg = (await self.client.getkey2()).hashAlg
-        self.jwt = await self.client.authenticate()
-        self._apply_structure(await self.client.load_structure())
-        self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
-        await self._connect_ws()
+        try:
+            self.client = LoxoneClient(host=self.host, user=self.user, password=self.password,
+                                       port=self.port, verify_tls=self.verify_tls)
+            await self.client.__aenter__()
+            self.alg = (await self.client.getkey2()).hashAlg
+            self.jwt = await self.client.authenticate()
+            self._apply_structure(await self.client.load_structure())
+            self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
+            await self._connect_ws()
+            log.info("Mit Miniserver verbunden (%s).", self.host)
+        except Exception:
+            await self._close_conn()   # sauber zuruecksetzen, damit Retry neu aufbaut
+            raise
+
+    async def _close_conn(self) -> None:
+        for c in (self.ws, self.icon_session, self.client):
+            try:
+                if c:
+                    await c.close()
+            except Exception:
+                pass
+        self.ws = self.icon_session = self.client = None
 
     async def reconnect(self) -> int:
         """Verbindung mit (ge-aenderter) Config neu aufbauen. Gibt Control-Anzahl
@@ -1071,28 +1085,33 @@ class App:
             self._bell_prev[uuid] = value
 
     async def stream_task(self) -> None:
-        # Dauer-Loop mit automatischem Reconnect zum Miniserver.
+        # Dauer-Loop: Erstverbindung + Reconnect zum Miniserver. Bricht NIEMALS
+        # den HTTP-Server ab — auch wenn der Miniserver (noch) nicht erreichbar
+        # oder das Passwort falsch ist (dann bleibt /settings bedienbar).
         while True:
             try:
-                if self.ws is None:
-                    await self._connect_ws()
+                if self.client is None:
+                    await self.start()          # Erstverbindung / nach hartem Reset
+                elif self.ws is None:
+                    await self._connect_ws()    # nur WS neu (z.B. nach Settings-Reconnect)
                 await self.ws.stream(self._on_value)
                 raise ConnectionError("WS-Stream regulär beendet")
             except asyncio.CancelledError:
                 raise
             except Exception as err:
-                log.warning("Loxone-WS unterbrochen (%s) — Reconnect in 5s", err)
+                log.warning("Miniserver nicht verbunden (%s) — neuer Versuch in 10s", err)
                 try:
                     if self.ws:
                         await self.ws.close()
                 except Exception:
                     pass
                 self.ws = None
-                await asyncio.sleep(5)
                 try:
-                    await self._reauth()
-                except Exception as e2:
-                    log.warning("Re-Auth fehlgeschlagen: %s", e2)
+                    if self.client:
+                        await self._reauth()    # Token erneuern, Client behalten
+                except Exception:
+                    await self._close_conn()    # Client kaputt -> harter Reset (start() baut neu)
+                await asyncio.sleep(10)
 
     async def broadcaster(self) -> None:
         while True:
@@ -1428,8 +1447,10 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
 
 
 async def on_startup(a: web.Application) -> None:
+    # HTTP-Server startet SOFORT; die Miniserver-Verbindung baut stream_task im
+    # Hintergrund auf (mit Retry) — so ist /settings auch ohne/mit falschen
+    # Zugangsdaten erreichbar.
     app: App = a["app"]
-    await app.start()
     a["tasks"] = [asyncio.create_task(app.stream_task()),
                   asyncio.create_task(app.broadcaster())]
 
