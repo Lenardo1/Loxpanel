@@ -146,6 +146,18 @@
     display:grid;place-items:center;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;
     background:rgba(255,255,255,.06);}
   .moreb:active{transform:scale(.92);}
+  .pinov{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.6);display:grid;place-items:center;}
+  .pinbox{background:var(--screen);border:1px solid var(--line);border-radius:16px;padding:20px;width:78%;max-width:300px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:12px;}
+  .pinttl{font-weight:600;font-size:16px;text-align:center;}
+  .pinin{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:12px;font-size:22px;text-align:center;letter-spacing:.3em;outline:none;}
+  .pinin:focus{border-color:var(--glow);}
+  .pinmsg{color:var(--crit);font-size:13px;text-align:center;min-height:16px;}
+  .pinrow{display:flex;gap:10px;}
+  .pinbtn{flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;user-select:none;font-weight:600;border:1px solid var(--line);}
+  .pinbtn.ok{background:var(--glow);color:#181008;border-color:transparent;}
+  .pinbtn:active{transform:scale(.97);}
 </style>
 </head>
 <body>
@@ -200,6 +212,26 @@ function nav(route){ stack.push(route); send({t:'nav',route}); }
 function goTab(tab){ stack=[{view:'tab',tab}]; send({t:'nav',route:stack[0]}); }
 function back(){ if(stack.length>1){ stack.pop(); send({t:'nav',route:stack[stack.length-1]}); } }
 
+let pendingSecure=null;
+function askPin(cb,msg){
+  const s=document.querySelector('.screen'); let ov=s.querySelector('.pinov'); if(ov)ov.remove();
+  ov=document.createElement('div'); ov.className='pinov';
+  ov.innerHTML='<div class="pinbox"><div class="pinttl">PIN / Passwort</div>'+
+    '<input type="password" inputmode="numeric" class="pinin" autocomplete="off">'+
+    '<div class="pinmsg">'+(msg||'')+'</div>'+
+    '<div class="pinrow"><div class="pinbtn cancel">Abbrechen</div><div class="pinbtn ok">OK</div></div></div>';
+  s.appendChild(ov);
+  const inp=ov.querySelector('.pinin'); setTimeout(()=>inp.focus(),60);
+  const done=v=>{ ov.remove(); cb(v); };
+  ov.querySelector('.cancel').onclick=()=>done(null);
+  ov.querySelector('.ok').onclick=()=>done(inp.value);
+  inp.addEventListener('keydown',e=>{ if(e.key==='Enter')done(inp.value); else if(e.key==='Escape')done(null); });
+}
+function doSecure(uuid,cmd,msg){
+  askPin(pin=>{ if(pin==null){pendingSecure=null;return;} pendingSecure={uuid,cmd}; send({t:'cmd',uuid,cmd,pin}); }, msg);
+}
+function sendCmd(uuid,cmd,secured){ if(secured) doSecure(uuid,cmd,''); else send({t:'cmd',uuid,cmd}); }
+
 let holdRelease=null;
 let videoTimer=null;
 function stopVideo(){ if(videoTimer){ clearInterval(videoTimer); videoTimer=null; } }
@@ -248,7 +280,7 @@ function renderPanel(blocks){
     b.cells.forEach((c,ci)=>{ const btn=rowEl.querySelector('[data-c="'+ci+'"]'); if(!btn)return;
       bindCell(btn,c);
       btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
-        if(btn._cmd) send({t:'cmd',uuid:btn._cmd.uuid,cmd:btn._cmd.cmd});
+        if(btn._cmd) sendCmd(btn._cmd.uuid,btn._cmd.cmd,view&&view.secured);
         if(btn._hold) holdRelease=btn._release||null;
       });
     });
@@ -339,11 +371,11 @@ function render(){
       n.querySelectorAll('.tctrls .tb').forEach(b=>{
         const c = it.controls[+b.dataset.c];
         b.addEventListener('pointerdown', ev=>{ ev.preventDefault();
-          if(c.cmd) send({t:'cmd',uuid:c.cmd.uuid,cmd:c.cmd.cmd}); });
+          if(c.cmd) sendCmd(c.cmd.uuid,c.cmd.cmd,it.secured); });
       });
     }
     n.onclick=(e)=>{ if(e.target.closest('.tctrls')) return;
-      if(it.nav) nav(it.nav); else if(it.cmd) send({t:'cmd',uuid:it.cmd.uuid,cmd:it.cmd.cmd}); };
+      if(it.nav) nav(it.nav); else if(it.cmd) sendCmd(it.cmd.uuid,it.cmd.cmd,(view&&view.secured)||it.secured); };
   });
   renderTabs();
 }
@@ -372,6 +404,7 @@ function connect(){
       if(msg.title) document.title=msg.title;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
+    if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
     const same = view && key(view.route)===key(msg.route);
