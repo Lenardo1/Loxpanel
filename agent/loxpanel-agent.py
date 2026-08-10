@@ -45,12 +45,19 @@ def load_conf():
 
 
 CFG = load_conf()
-SERVER = CFG.get("SERVER", "localhost:8099")
-PORT = int(CFG.get("AGENT_PORT", "8130"))
-NAME = CFG.get("AGENT_NAME") or socket.gethostname()
+
+
+def _cfg(key, default=""):
+    # Env (LOXPANEL_<KEY>) hat Vorrang vor der Conf-Datei.
+    return os.environ.get("LOXPANEL_" + key) or CFG.get(key) or default
+
+
+SERVER = _cfg("SERVER", "localhost:8099")
+PORT = int(_cfg("AGENT_PORT", "8130"))
+NAME = _cfg("AGENT_NAME") or socket.gethostname()
 
 _proc = None
-_cur_panel = CFG.get("PANEL", "")
+_cur_panel = _cfg("PANEL", "")
 _lock = threading.Lock()
 
 
