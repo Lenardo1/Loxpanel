@@ -23,6 +23,7 @@ import logging
 import os
 import re
 import sys
+import time
 from pathlib import Path
 
 import ssl as _ssl
@@ -202,6 +203,7 @@ class App:
         self.bell_map: dict[str, str] = {}
         self._bell_prev: dict[str, object] = {}
         self._pending_ring: str | None = None
+        self.agents: dict[str, dict] = {}   # ip -> Panel-Agent (Fernstart)
 
     def _ssl_ctx(self) -> _ssl.SSLContext:
         ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
@@ -1270,6 +1272,57 @@ async def api_settings_intercom(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+# ---- Panel-Agenten (Fernstart der Displays) ----
+async def api_agent_announce(request: web.Request) -> web.Response:
+    """Panel-Agent meldet sich periodisch (Auto-Discovery)."""
+    app: App = request.app["app"]
+    try:
+        d = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        d = {}
+    ip = request.remote or "?"
+    app.agents[ip] = {"ip": ip, "name": str(d.get("name") or ip)[:60],
+                      "panel": str(d.get("panel") or ""), "port": int(d.get("port") or 8130),
+                      "kiosk": bool(d.get("kiosk")), "ts": time.time()}
+    return web.json_response({"ok": True})
+
+
+async def api_agents(request: web.Request) -> web.Response:
+    app: App = request.app["app"]
+    now = time.time()
+    out = [{**a, "online": (now - a["ts"]) < 60}
+           for a in app.agents.values() if (now - a["ts"]) < 600]
+    out.sort(key=lambda a: a["name"])
+    return web.json_response({"agents": out})
+
+
+async def api_agent_command(request: web.Request) -> web.Response:
+    """Leitet Start/Reload/Stop an den Panel-Agenten weiter."""
+    app: App = request.app["app"]
+    try:
+        d = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein JSON"}, status=400)
+    ip = str(d.get("ip", ""))
+    action = str(d.get("action", ""))
+    a = app.agents.get(ip)
+    if not a:
+        return web.json_response({"ok": False, "error": "Panel nicht bekannt"}, status=404)
+    if action not in ("start", "reload", "stop"):
+        return web.json_response({"ok": False, "error": "unbekannte Aktion"}, status=400)
+    url = f"http://{a['ip']}:{a['port']}/{action}"
+    payload = {"panel": str(d.get("panel") or "")} if action == "start" else {}
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=8)) as r:
+                body = await r.text()
+                log.info("Agent %s %s -> %s", ip, action, r.status)
+                return web.json_response({"ok": r.status == 200, "status": r.status,
+                                          "body": body[:200]})
+    except Exception as err:
+        return web.json_response({"ok": False, "error": str(err)})
+
+
 async def icon_handler(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     p = request.query.get("p", "")
@@ -1403,6 +1456,9 @@ def main() -> None:
     a.router.add_get("/api/settings", api_settings)
     a.router.add_post("/api/settings/miniserver", api_settings_ms)
     a.router.add_post("/api/settings/intercom", api_settings_intercom)
+    a.router.add_post("/api/agent/announce", api_agent_announce)
+    a.router.add_get("/api/agents", api_agents)
+    a.router.add_post("/api/agent/command", api_agent_command)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
     a.router.add_get("/mjpeg", mjpeg_handler)

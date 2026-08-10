@@ -1,0 +1,18 @@
+[Unit]
+Description=LoxPanel Panel-Agent (Kiosk-Fernsteuerung)
+After=graphical.target network-online.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+# X-Display des Panels. User/XAUTHORITY an die Autologin-Session anpassen,
+# damit der Agent Chromium auf dem Display starten darf:
+Environment=DISPLAY=:0
+# Environment=XAUTHORITY=/home/<user>/.Xauthority
+# User=<autologin-user>
+ExecStart=/usr/bin/python3 /opt/loxpanel/agent/loxpanel-agent.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
