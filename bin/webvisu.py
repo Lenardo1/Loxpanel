@@ -745,7 +745,12 @@ class App:
                 "layout": layout, "items": [self._control_item(u, prof) for u in uuids]}
 
     def _view_sources(self, uuid: str) -> dict:
-        """Quellen/Favoriten einer AudioZone, gruppiert (Radio/Spotify/Playlists)."""
+        """Musikauswahl einer AudioZone: feste Rubriken (immer sichtbar, auch leer).
+
+        'Favoriten' = die Zonen-Favoriten (roomfavs, vom Miniserver). 'Playlisten'
+        ist vorerst ein Platzhalter (Bibliothek/Playlisten liegen im Audioserver
+        und werden noch nicht abgefragt).
+        """
         c = self.controls.get(uuid, {})
         ua = c.get("uuidAction")
         favs = self._audio_favs(c)
@@ -756,21 +761,12 @@ class App:
                  "cover": ("/cover?u=" + quote(f["cover"], safe="")) if f["cover"] else ""}
                 for f in items]}
 
-        blocks = [{"k": "title", "text": _clean(c.get("name")), "sub": "Quellen"}]
-        used = set()
-        for label, types in (("Radio", {"tunein", "local", "radio", ""}),
-                             ("Spotify", {"spotify"})):
-            grp = [f for f in favs if f.get("type") in types]
-            used.update(id(f) for f in grp)
-            if grp:
-                blocks.append({"k": "status", "text": label})
-                blocks.append(strip(grp))
-        rest = [f for f in favs if id(f) not in used]
-        if rest:
-            blocks.append({"k": "status", "text": "Playlists"})
-            blocks.append(strip(rest))
-        if len(blocks) == 1:
-            blocks.append({"k": "status", "text": "Keine Quellen konfiguriert"})
+        empty = {"k": "status", "text": "noch keine – im Tablet / der App anlegen"}
+        blocks = [{"k": "title", "text": _clean(c.get("name")), "sub": "Musikauswahl"},
+                  {"k": "head", "text": "Favoriten"},
+                  strip(favs) if favs else dict(empty),
+                  {"k": "head", "text": "Playlisten"},
+                  dict(empty)]
         return {"t": "view", "title": _clean(c.get("name")),
                 "route": {"view": "sources", "id": uuid}, "blocks": blocks}
 

@@ -47,6 +47,7 @@
   .tile .ico .rawico{width:var(--ico-size,38px);height:var(--ico-size,38px);object-fit:contain;display:block;}
   .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
   .favs.wrap{flex-wrap:wrap;overflow-x:visible;justify-content:flex-start;gap:12px;}
+  .phead{font-weight:650;font-size:15px;margin:10px 2px 2px;padding-bottom:6px;border-bottom:1px solid var(--line);text-align:left;}
   .fav{flex:0 0 auto;width:88px;cursor:pointer;text-align:center;}
   .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--muted);}
   .favc img{width:100%;height:100%;object-fit:cover;}
@@ -284,6 +285,7 @@ function renderPanel(blocks){
     else if(b.k==='value') html+='<div class="pbar">'+esc(b.text||'')+'</div>';
     else if(b.k==='slider') html+='<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'" value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
     else if(b.k==='row') html+='<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+'">'+b.cells.map(cellHtml).join('')+'</div>';
+    else if(b.k==='head') html+='<div class="phead">'+esc(b.text||'')+'</div>';
     else if(b.k==='favs') html+='<div class="favs'+(b.wrap?' wrap':'')+'">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
   }
   g.innerHTML=html;
