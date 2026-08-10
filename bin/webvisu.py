@@ -256,6 +256,7 @@ class App:
                 if slot is None:
                     continue
                 out.append({"slot": slot, "cover": it.get("coverurl") or "",
+                            "type": (it.get("type") or "").lower(),
                             "name": unquote(str(it.get("name") or it.get("title") or f"Favorit {slot}"))})
         return out
 
@@ -598,7 +599,7 @@ class App:
                                 else ("Anwesend" if on else "Abwesend")))
         elif t == "WindowMonitor":
             op = int(self._state(c, "numOpen") or 0) + int(self._state(c, "numTilted") or 0)
-            it.update(icon="blind", on=op > 0,
+            it.update(icon="blind", on=op > 0, nav={"view": "control", "id": uuid},
                       sublabel=(f"{op} offen" if op else "Alle geschlossen"))
         elif t == "Alarm":
             armed = bool(self._state(c, "armed"))
@@ -737,6 +738,36 @@ class App:
         return {"t": "view", "title": title, "tab": tab, "route": route,
                 "layout": layout, "items": [self._control_item(u, prof) for u in uuids]}
 
+    def _view_sources(self, uuid: str) -> dict:
+        """Quellen/Favoriten einer AudioZone, gruppiert (Radio/Spotify/Playlists)."""
+        c = self.controls.get(uuid, {})
+        ua = c.get("uuidAction")
+        favs = self._audio_favs(c)
+
+        def strip(items):
+            return {"k": "favs", "items": [
+                {"label": f["name"], "cmd": {"uuid": ua, "cmd": f"roomfav/play/{f['slot']}"},
+                 "cover": ("/cover?u=" + quote(f["cover"], safe="")) if f["cover"] else ""}
+                for f in items]}
+
+        blocks = [{"k": "title", "text": _clean(c.get("name")), "sub": "Quellen"}]
+        used = set()
+        for label, types in (("Radio", {"tunein", "local", "radio", ""}),
+                             ("Spotify", {"spotify"})):
+            grp = [f for f in favs if f.get("type") in types]
+            used.update(id(f) for f in grp)
+            if grp:
+                blocks.append({"k": "status", "text": label})
+                blocks.append(strip(grp))
+        rest = [f for f in favs if id(f) not in used]
+        if rest:
+            blocks.append({"k": "status", "text": "Playlists"})
+            blocks.append(strip(rest))
+        if len(blocks) == 1:
+            blocks.append({"k": "status", "text": "Keine Quellen konfiguriert"})
+        return {"t": "view", "title": _clean(c.get("name")),
+                "route": {"view": "sources", "id": uuid}, "blocks": blocks}
+
     def _view_control(self, uuid: str) -> dict:
         c = self.controls.get(uuid, {})
         t = c.get("type")
@@ -771,6 +802,35 @@ class App:
             for sid in sorted(scenes):
                 items.append({"id": f"{uuid}:{sid}", "label": scenes[sid], "on": asc == sid,
                               "icon": "mood", "cmd": {"uuid": ua, "cmd": str(sid)}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "layout": "list", "items": items}
+        if t == "WindowMonitor":
+            windows = (c.get("details") or {}).get("windows") or []
+            codes = [x for x in str(self._state(c, "windowStates") or "").split(",") if x != ""]
+
+            def wtext(b):
+                parts = []
+                if b & 1:
+                    parts.append("geschlossen")
+                if b & 2:
+                    parts.append("gekippt")
+                if b & 4:
+                    parts.append("offen")
+                if b & 8:
+                    parts.append("verriegelt")
+                if b & 32:
+                    parts.append("offline")
+                return ", ".join(parts) or "–"
+
+            items = []
+            for i, w in enumerate(windows):
+                try:
+                    b = int(float(codes[i])) if i < len(codes) else 0
+                except (ValueError, TypeError):
+                    b = 0
+                items.append({"id": f"{uuid}:{i}", "icon": "blind", "on": bool(b & 6),
+                              "label": _clean(w.get("name") or f"Fenster {i + 1}"),
+                              "sublabel": wtext(b)})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "layout": "list", "items": items}
         if t == "Jalousie":
@@ -821,12 +881,8 @@ class App:
                 {"k": "slider", "icon": "vol", "value": vol, "min": 0, "max": 100,
                  "cmd": {"uuid": ua, "tmpl": "volume/{v}"}},
             ]
-            favs = self._audio_favs(c)
-            if favs:
-                blocks.append({"k": "favs", "items": [
-                    {"label": f["name"], "cmd": {"uuid": ua, "cmd": f"roomfav/play/{f['slot']}"},
-                     "cover": ("/cover?u=" + quote(f["cover"], safe="")) if f["cover"] else ""}
-                    for f in favs]})
+            if self._audio_favs(c):   # Quellen (Radio/Playlist/Spotify) auf Unterseite
+                blocks.append({"k": "more", "route": {"view": "sources", "id": uuid}})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Gate":
             ua = c.get("uuidAction")
@@ -883,6 +939,8 @@ class App:
             return self._view_group(route, prof)
         if v == "control":
             return self._view_control(route.get("id"))
+        if v == "sources":
+            return self._view_sources(route.get("id"))
         return self._view_tab(route.get("tab", "favoriten"), prof)
 
     async def command(self, uuid: str, cmd: str) -> None:
