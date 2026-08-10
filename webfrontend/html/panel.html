@@ -158,6 +158,14 @@
   .pinbtn{flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;user-select:none;font-weight:600;border:1px solid var(--line);}
   .pinbtn.ok{background:var(--glow);color:#181008;border-color:transparent;}
   .pinbtn:active{transform:scale(.97);}
+  .pindisp{font-size:26px;text-align:center;letter-spacing:.35em;min-height:38px;padding:8px 6px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);}
+  .pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .pinkey{padding:15px 0;text-align:center;font-size:22px;border:1px solid var(--line);border-radius:12px;
+    cursor:pointer;user-select:none;background:var(--tile);}
+  .pinkey:active{background:rgba(255,255,255,.14);transform:scale(.97);}
+  .pinkey.ok{background:var(--glow);color:#181008;border-color:transparent;font-weight:700;}
+  .pinkey.del{font-size:20px;}
 </style>
 </head>
 <body>
@@ -216,16 +224,28 @@ let pendingSecure=null;
 function askPin(cb,msg){
   const s=document.querySelector('.screen'); let ov=s.querySelector('.pinov'); if(ov)ov.remove();
   ov=document.createElement('div'); ov.className='pinov';
+  let val='';
+  const keys=['1','2','3','4','5','6','7','8','9','del','0','ok'];
   ov.innerHTML='<div class="pinbox"><div class="pinttl">PIN / Passwort</div>'+
-    '<input type="password" inputmode="numeric" class="pinin" autocomplete="off">'+
+    '<div class="pindisp" id="pindisp"></div>'+
     '<div class="pinmsg">'+(msg||'')+'</div>'+
-    '<div class="pinrow"><div class="pinbtn cancel">Abbrechen</div><div class="pinbtn ok">OK</div></div></div>';
+    '<div class="pinpad">'+keys.map(k=>{
+      const cls='pinkey'+(k==='ok'?' ok':'')+(k==='del'?' del':'');
+      const lbl=k==='del'?'⌫':(k==='ok'?'OK':k);
+      return '<div class="'+cls+'" data-k="'+k+'">'+lbl+'</div>';
+    }).join('')+'</div>'+
+    '<div class="pinbtn cancel">Abbrechen</div></div>';
   s.appendChild(ov);
-  const inp=ov.querySelector('.pinin'); setTimeout(()=>inp.focus(),60);
+  const disp=ov.querySelector('#pindisp');
+  const draw=()=>{ disp.textContent='•'.repeat(val.length); };
   const done=v=>{ ov.remove(); cb(v); };
+  ov.querySelectorAll('.pinkey').forEach(b=>{ b.onclick=()=>{
+    const k=b.dataset.k;
+    if(k==='ok') done(val);
+    else if(k==='del'){ val=val.slice(0,-1); draw(); }
+    else if(val.length<12){ val+=k; draw(); }
+  };});
   ov.querySelector('.cancel').onclick=()=>done(null);
-  ov.querySelector('.ok').onclick=()=>done(inp.value);
-  inp.addEventListener('keydown',e=>{ if(e.key==='Enter')done(inp.value); else if(e.key==='Escape')done(null); });
 }
 function doSecure(uuid,cmd,msg){
   askPin(pin=>{ if(pin==null){pendingSecure=null;return;} pendingSecure={uuid,cmd}; send({t:'cmd',uuid,cmd,pin}); }, msg);
