@@ -745,7 +745,7 @@ class App:
         favs = self._audio_favs(c)
 
         def strip(items):
-            return {"k": "favs", "items": [
+            return {"k": "favs", "wrap": True, "items": [
                 {"label": f["name"], "cmd": {"uuid": ua, "cmd": f"roomfav/play/{f['slot']}"},
                  "cover": ("/cover?u=" + quote(f["cover"], safe="")) if f["cover"] else ""}
                 for f in items]}
