@@ -8,6 +8,9 @@ config/loxpanel.cfg
 # Panel-Profile mit der konkreten Raum-/Kategorie-Aufteilung (personenbezogen)
 config/panels.json
 
+# Panel-lokale Kiosk-Konfig (Server-IP + Panel-ID, pro Geraet unterschiedlich)
+deploy/loxpanel-kiosk.conf
+
 # Python
 *.pyc
 __pycache__/

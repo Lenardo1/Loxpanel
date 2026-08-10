@@ -51,7 +51,19 @@ curl -s localhost:8099 | head -c 60        # liefert HTML?
 ```
 
 ## 5) Kiosk-Autostart
-`deploy/kiosk.sh` in den vorhandenen X11-Autostart einhaengen und die alte
+
+Erst Server-Adresse + Panel-ID in die panel-lokale Konfig (keine IP im Startbefehl):
+```bash
+cp /opt/loxpanel/deploy/loxpanel-kiosk.conf.example /opt/loxpanel/deploy/loxpanel-kiosk.conf
+nano /opt/loxpanel/deploy/loxpanel-kiosk.conf   # SERVER=<ip:port>, PANEL=<profil-id>
+```
+`kiosk.sh` liest daraus die URL (`http://<SERVER>/?panel=<PANEL>`). Server-IP
+aendern = nur diese Datei anpassen, Autostart bleibt unveraendert. Test von Hand:
+```bash
+DISPLAY=:0 bash /opt/loxpanel/deploy/kiosk.sh
+```
+
+Dann `deploy/kiosk.sh` in den vorhandenen X11-Autostart einhaengen und die alte
 Loxone-App dort entfernen. Je nach Setup:
 - **openbox:** in `~/.config/openbox/autostart` bzw. `/etc/xdg/openbox/autostart`
   die Loxone-Zeile durch `bash /opt/loxpanel/deploy/kiosk.sh &` ersetzen.
