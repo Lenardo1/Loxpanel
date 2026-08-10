@@ -93,6 +93,26 @@ def load_theme() -> dict:
     return theme
 
 
+def load_panels() -> dict:
+    """Panel-Profile aus config/panels.json (Auswahl per URL ?panel=<id>).
+
+    Jedes Profil kann Theme-Overrides (ui/states) + Sichtbarkeits-Whitelists
+    (rooms/cats als UUID ODER Name) + Tab-Auswahl tragen. Leere/fehlende
+    Whitelist = alles sichtbar. Wird später von der LoxBerry-Config-Seite
+    befuellt (Räume/Kategorien anklickbar pro Gerät).
+    """
+    f = Path(__file__).resolve().parent.parent / "config" / "panels.json"
+    if f.is_file():
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            p = data.get("panels")
+            if isinstance(p, dict):
+                return {k: v for k, v in p.items() if not k.startswith("_")}
+        except ValueError:
+            pass
+    return {}
+
+
 class App:
     def __init__(self, ms: dict):
         self.host, self.port = ms["host"], ms.get("port", 443)
@@ -108,6 +128,8 @@ class App:
         self.rooms_with: list[str] = []
         self.cats_with: list[str] = []
         self.conn_route: dict[web.WebSocketResponse, dict] = {}
+        self.conn_prof: dict[web.WebSocketResponse, dict] = {}
+        self.panels = load_panels()
         self._dirty = True
         self.jwt: str | None = None
         self.alg: str = "SHA1"
@@ -241,6 +263,66 @@ class App:
                 return color
         return None
 
+    # ---- Panel-Profile ----
+    def _resolve_ids(self, entries, table: dict):
+        """Whitelist-Einträge (UUID ODER Name) auf UUID-Menge abbilden.
+
+        Leer/fehlend -> None (= keine Einschränkung, alles sichtbar). Namen
+        matchen exakt oder als Teilstring (Loxone-Räume haben Präfixe wie
+        „1.0.2 Terrasse" -> Eintrag „Terrasse" genügt).
+        """
+        if not entries:
+            return None
+        names = {k: _clean(v.get("name", "")).lower() for k, v in table.items()}
+        out = set()
+        for e in entries:
+            e = str(e).strip()
+            if not e:
+                continue
+            if e in table:                       # exakte UUID
+                out.add(e)
+                continue
+            el = _clean(e).lower()
+            exact = [k for k, n in names.items() if n == el]
+            if exact:
+                out.update(exact)
+            elif el:                             # Teilstring-Treffer
+                out.update(k for k, n in names.items() if el in n)
+        return out
+
+    @staticmethod
+    def _theme_vars(states: dict, ui: dict) -> dict:
+        v = {"--glow": states.get("active"), "--good": states.get("good"),
+             "--crit": states.get("crit"), "--warn": states.get("warn"),
+             "--ico-size": f"{ui.get('iconSize', 38)}px",
+             "--name-size": f"{ui.get('nameSize', 18)}px",
+             "--sub-size": f"{ui.get('subSize', 15)}px"}
+        if ui.get("font"):
+            v["--font"] = ui["font"]
+        return {k: val for k, val in v.items() if val}
+
+    def resolve_profile(self, pid: str | None) -> dict:
+        """Aufgeloestes Panel-Profil: Theme-Vars, Tabs, Raum-/Kategorie-Filter."""
+        prof = self.panels.get(pid or "") or self.panels.get("default") or {}
+        ui = {**self.theme.get("ui", {}), **(prof.get("ui") or {})}
+        states = {**self.theme.get("states", {}), **(prof.get("states") or {})}
+        tabs = prof.get("tabs") or ui.get("tabs") or \
+            ["favoriten", "zentral", "raeume", "kategorien"]
+        return {
+            "id": pid or "default",
+            "title": prof.get("title") or "LoxPanel",
+            "tabs": list(tabs),
+            "rooms": self._resolve_ids(prof.get("rooms"), self.rooms),
+            "cats": self._resolve_ids(prof.get("cats"), self.cats),
+            "vars": self._theme_vars(states, ui),
+        }
+
+    def _room_ok(self, uuid: str, prof: dict | None) -> bool:
+        ar = prof.get("rooms") if prof else None
+        if ar is None:
+            return True
+        return self.controls.get(uuid, {}).get("room") in ar
+
     async def fetch_icon(self, path: str) -> tuple[bytes, str] | None:
         if path in self.icon_cache:
             return self.icon_cache[path]
@@ -356,35 +438,47 @@ class App:
         return it
 
     # ---- Views ----
-    def _view_tab(self, tab: str) -> dict:
+    def _view_tab(self, tab: str, prof: dict | None = None) -> dict:
+        ar = prof.get("rooms") if prof else None
+        ac = prof.get("cats") if prof else None
         if tab == "favoriten":
-            items = [self._control_item(u) for u, c in self.controls.items() if c.get("isFavorite")]
+            items = [self._control_item(u) for u, c in self.controls.items()
+                     if c.get("isFavorite") and self._room_ok(u, prof)]
             title = "Favoriten"
         elif tab == "zentral":
             items = [self._control_item(u) for u, c in self.controls.items()
                      if (c.get("type") or "").startswith("Central")]
             title = "Zentral"
         elif tab == "raeume":
+            rooms = [ru for ru in self.rooms_with if ar is None or ru in ar]
             items = [{"id": ru, "label": _clean(self.rooms[ru].get("name")), "icon": "folder",
                       "iconUrl": self._icon_url(self.rooms[ru].get("image")),
                       "on": False, "nav": {"view": "group", "kind": "room", "id": ru}}
-                     for ru in self.rooms_with]
+                     for ru in rooms]
             title = "Räume"
         else:
+            if ac is not None:
+                cats = [cu for cu in self.cats_with if cu in ac]
+            elif ar is not None:
+                present = {c.get("cat") for c in self.controls.values() if c.get("room") in ar}
+                cats = [cu for cu in self.cats_with if cu in present]
+            else:
+                cats = list(self.cats_with)
             items = [{"id": cu, "label": _clean(self.cats[cu].get("name")), "icon": "folder",
                       "iconUrl": self._icon_url(self.cats[cu].get("image")),
                       "color": self._cat_color(cu),
                       "on": False, "nav": {"view": "group", "kind": "cat", "id": cu}}
-                     for cu in self.cats_with]
+                     for cu in cats]
             title = "Kategorien"
         return {"t": "view", "title": title, "tab": tab, "route": {"view": "tab", "tab": tab},
                 "items": items}
 
-    def _view_group(self, route: dict) -> dict:
+    def _view_group(self, route: dict, prof: dict | None = None) -> dict:
         kind, gid = route.get("kind"), route.get("id")
         layout = None
         if kind == "cat":
-            uuids = [u for u, c in self.controls.items() if c.get("cat") == gid]
+            uuids = [u for u, c in self.controls.items()
+                     if c.get("cat") == gid and self._room_ok(u, prof)]
             title = _clean(self.cats.get(gid, {}).get("name")); tab = "kategorien"
         elif kind == "room":
             uuids = [u for u, c in self.controls.items() if c.get("room") == gid]
@@ -513,13 +607,13 @@ class App:
         return {"t": "view", "title": _clean(c.get("name")), "route": route,
                 "items": [self._control_item(uuid)]}
 
-    def render(self, route: dict) -> dict:
+    def render(self, route: dict, prof: dict | None = None) -> dict:
         v = (route or {}).get("view", "tab")
         if v == "group":
-            return self._view_group(route)
+            return self._view_group(route, prof)
         if v == "control":
             return self._view_control(route.get("id"))
-        return self._view_tab(route.get("tab", "favoriten"))
+        return self._view_tab(route.get("tab", "favoriten"), prof)
 
     async def command(self, uuid: str, cmd: str) -> None:
         if self.client and uuid and cmd:
@@ -576,9 +670,10 @@ class App:
                 self._dirty = False
                 for ws, route in list(self.conn_route.items()):
                     try:
-                        await ws.send_json(self.render(route))
+                        await ws.send_json(self.render(route, self.conn_prof.get(ws)))
                     except ConnectionError:
                         self.conn_route.pop(ws, None)
+                        self.conn_prof.pop(ws, None)
 
     async def close(self) -> None:
         if self.ws:
@@ -665,19 +760,16 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     app: App = request.app["app"]
     ws = web.WebSocketResponse()
     await ws.prepare(request)
-    app.conn_route[ws] = {"view": "tab", "tab": "favoriten"}
-    _s = app.theme.get("states", {})
-    _u = app.theme.get("ui", {})
-    _vars = {"--glow": _s.get("active"), "--good": _s.get("good"),
-             "--crit": _s.get("crit"), "--warn": _s.get("warn"),
-             "--ico-size": f"{_u.get('iconSize', 38)}px",
-             "--name-size": f"{_u.get('nameSize', 18)}px",
-             "--sub-size": f"{_u.get('subSize', 15)}px"}
-    if _u.get("font"):
-        _vars["--font"] = _u["font"]
-    await ws.send_json({"t": "theme", "vars": {k: v for k, v in _vars.items() if v},
-                        "tabs": _u.get("tabs") or ["favoriten", "zentral", "raeume", "kategorien"]})
-    await ws.send_json(app.render(app.conn_route[ws]))
+    prof = app.resolve_profile(request.query.get("panel", ""))
+    app.conn_prof[ws] = prof
+    first_tab = prof["tabs"][0] if prof["tabs"] else "favoriten"
+    app.conn_route[ws] = {"view": "tab", "tab": first_tab}
+    log.info("Panel verbunden: '%s' (Tabs %s, Räume %s, Kategorien %s)", prof["id"],
+             prof["tabs"], "alle" if prof["rooms"] is None else len(prof["rooms"]),
+             "alle" if prof["cats"] is None else len(prof["cats"]))
+    await ws.send_json({"t": "theme", "vars": prof["vars"], "tabs": prof["tabs"],
+                        "title": prof["title"]})
+    await ws.send_json(app.render(app.conn_route[ws], prof))
     try:
         async for msg in ws:
             if msg.type != WSMsgType.TEXT:
@@ -688,11 +780,12 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 continue
             if data.get("t") == "nav" and isinstance(data.get("route"), dict):
                 app.conn_route[ws] = data["route"]
-                await ws.send_json(app.render(data["route"]))
+                await ws.send_json(app.render(data["route"], prof))
             elif data.get("t") == "cmd":
                 await app.command(data.get("uuid"), data.get("cmd"))
     finally:
         app.conn_route.pop(ws, None)
+        app.conn_prof.pop(ws, None)
     return ws
 
 

@@ -319,16 +319,23 @@ g.addEventListener('touchend',e=>{
   if(dx>60 && Math.abs(dy)<45) back();
 });
 
+let booted=false;
+const PANEL_ID = new URLSearchParams(location.search).get('panel') || '';
 function connect(){
-  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws');
-  ws.onopen=()=>{ el('conn').classList.add('ok'); send({t:'nav',route:stack[stack.length-1]}); };
+  ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
+                   +(PANEL_ID?('?panel='+encodeURIComponent(PANEL_ID)):''));
+  // Erststart: Startseite kommt vom Server (erster Tab des Profils). Nach einem
+  // Reconnect stattdessen die zuletzt betrachtete Seite wiederherstellen.
+  ws.onopen=()=>{ el('conn').classList.add('ok'); if(booted) send({t:'nav',route:stack[stack.length-1]}); };
   ws.onclose=()=>{ el('conn').classList.remove('ok'); setTimeout(connect,1500); };
   ws.onmessage=e=>{
     const msg=JSON.parse(e.data);
     if(msg.t==='theme'){ const v=msg.vars||{}; for(const k in v){ if(v[k]) document.documentElement.style.setProperty(k,v[k]); }
+      if(msg.title) document.title=msg.title;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
     if(msg.t!=='view') return;
+    if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
     const same = view && key(view.route)===key(msg.route);
     if(msg.blocks){
       view=msg;

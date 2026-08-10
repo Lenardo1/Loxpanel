@@ -1,0 +1,27 @@
+{
+  "_comment": "Panel-Profile. Kopiere diese Datei nach config/panels.json und passe sie an. Jedes Panel oeffnet die Visu mit ?panel=<id>, z.B. http://loxberry:8099/?panel=erdgeschoss . Ohne panels.json verhaelt sich jedes Panel wie 'default' (alle Raeume/Kategorien/Tabs). Felder pro Profil: title (Fenstertitel), tabs (welche/Reihenfolge der unteren Leiste: favoriten|zentral|raeume|kategorien), rooms/cats (Whitelist welche Raeume/Kategorien das Panel zeigt - UUID ODER Name, Teilstring genuegt; leer/fehlt = alle), ui (Theme-Override: iconSize|nameSize|subSize|font), states (Zustandsfarben-Override: active|good|warn|crit). Die LoxBerry-Config-Seite schreibt diese Datei spaeter (Raeume/Kategorien anklickbar).",
+
+  "panels": {
+    "default": {
+      "title": "LoxPanel",
+      "tabs": ["favoriten", "zentral", "raeume", "kategorien"],
+      "rooms": [],
+      "cats": []
+    },
+
+    "erdgeschoss": {
+      "title": "Erdgeschoss",
+      "tabs": ["favoriten", "raeume", "kategorien"],
+      "rooms": ["Küche", "Esszimmer", "Wohnzimmer", "Terrasse"],
+      "cats": [],
+      "ui": { "iconSize": 44, "nameSize": 24 }
+    },
+
+    "obergeschoss": {
+      "title": "Obergeschoss",
+      "tabs": ["favoriten", "raeume"],
+      "rooms": ["Schlafzimmer", "Kinderzimmer", "Bad"],
+      "cats": []
+    }
+  }
+}
