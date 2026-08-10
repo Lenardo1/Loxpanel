@@ -10,3 +10,9 @@ SERVER=10.0.110.54:8099
 # Panel-Profil-ID (leer = Standardansicht). IDs anlegen/sehen auf der
 # Konfig-Seite:  http://<SERVER>/config     z. B. erdgeschoss
 PANEL=
+
+# --- nur fuer den Panel-Agenten (agent/loxpanel-agent.py) ---
+# HTTP-Port des Agenten (Server steuert das Panel darueber). Default 8130.
+AGENT_PORT=8130
+# Anzeigename in der Settings-Seite (Default: Hostname).
+# AGENT_NAME=Panel Erdgeschoss

@@ -41,6 +41,17 @@
   .ic:first-child{border-top:none;padding-top:0;margin-top:0;}
   .ic .icname{font-weight:600;margin-bottom:10px;}
   .muted{color:var(--muted);}
+  select{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:8px 10px;font:inherit;}
+  select:focus{outline:none;border-color:var(--accent);}
+  .ag{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding:12px 0;}
+  .ag:first-child{border-top:none;}
+  .ag .dot{width:9px;height:9px;border-radius:50%;background:var(--crit);flex:none;}
+  .ag .dot.on{background:var(--good);}
+  .ag .agn{font-weight:600;}
+  .ag .agip{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace;}
+  .ag .sp{flex:1;min-width:8px;}
+  .btn.sm{padding:8px 13px;font-size:13px;}
+  .btn.ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
 </style>
 </head>
 <body>
@@ -68,6 +79,13 @@
     <p class="note">Video-URL (MJPEG) und Login der Türstation(en). Wird für das Kamerabild im Intercom-Popup gebraucht. Liste kommt aus dem Miniserver.</p>
     <div id="ic_list"><div class="muted">…</div></div>
     <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save">Speichern</button><span class="toast" id="ic_toast"></span></div>
+  </div>
+
+  <div class="card">
+    <h3>Displays (Panels)</h3>
+    <p class="note">Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
+    <div id="ag_list"><div class="muted">Suche Panels…</div></div>
+    <div class="toast" id="ag_toast" style="margin-top:8px"></div>
   </div>
 </div>
 <script>
@@ -127,7 +145,46 @@ $('#ic_save').onclick=async()=>{
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
 
+// ---- Displays (Panel-Agenten) ----
+let PANEL_IDS=[];
+async function loadPanelIds(){
+  try{ const r=await fetch('/api/meta'); const m=await r.json(); PANEL_IDS=Object.keys(m.panels||{}); }catch(e){ PANEL_IDS=[]; }
+}
+function agentRow(a,sel){
+  const cur = (sel!==undefined)?sel:a.panel;
+  const opts=['<option value="">(Standard)</option>'].concat(
+    PANEL_IDS.map(id=>'<option value="'+esc(id)+'"'+(cur===id?' selected':'')+'>'+esc(id)+'</option>')).join('');
+  return '<div class="ag" data-ip="'+esc(a.ip)+'">'+
+    '<span class="dot'+(a.online?' on':'')+'"></span>'+
+    '<span class="agn">'+esc(a.name)+'</span>'+
+    '<span class="agip">'+esc(a.ip)+(a.kiosk?' · Kiosk läuft':'')+'</span>'+
+    '<span class="sp"></span>'+
+    '<select class="agsel">'+opts+'</select>'+
+    '<button class="btn sm" data-act="start">Start</button>'+
+    '<button class="btn sm ghost" data-act="reload">Reload</button>'+
+    '<button class="btn sm ghost" data-act="stop">Stop</button></div>';
+}
+function renderAgents(agents){
+  const box=$('#ag_list');
+  const prev={}; box.querySelectorAll('.ag').forEach(n=>{ prev[n.dataset.ip]=n.querySelector('.agsel')?n.querySelector('.agsel').value:undefined; });
+  if(!agents.length){ box.innerHTML='<div class="muted">Noch kein Panel gefunden. Agent auf dem Panel starten (agent/loxpanel-agent.py).</div>'; return; }
+  box.innerHTML=agents.map(a=>agentRow(a,prev[a.ip])).join('');
+  box.querySelectorAll('.ag').forEach(n=>{
+    const ip=n.dataset.ip;
+    n.querySelectorAll('button[data-act]').forEach(b=>{ b.onclick=()=>agentCmd(ip,b.dataset.act,n.querySelector('.agsel').value); });
+  });
+}
+async function agentCmd(ip,action,panel){
+  try{
+    const r=await fetch('/api/agent/command',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ip,action,panel})});
+    const j=await r.json();
+    flash($('#ag_toast'), j.ok?('✓ '+action+' gesendet'):('Fehler: '+(j.error||('HTTP '+j.status))), j.ok);
+  }catch(e){ flash($('#ag_toast'),'Fehler: '+e,false); }
+}
+async function pollAgents(){ try{ const r=await fetch('/api/agents'); const j=await r.json(); renderAgents(j.agents||[]); }catch(e){} }
+
 load().catch(e=>{ $('#conn').innerHTML='Konnte Einstellungen nicht laden: '+esc(e); });
+loadPanelIds().then(()=>{ pollAgents(); setInterval(pollAgents,6000); });
 </script>
 </body>
 </html>

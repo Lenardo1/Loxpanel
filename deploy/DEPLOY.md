@@ -74,6 +74,31 @@ Dann Panel neu starten:
 sudo reboot
 ```
 
+## 6) Panel-Agent (empfohlen: Fernstart aus der Settings-Seite)
+
+Statt `kiosk.sh` direkt zu starten, den **Agenten** starten — er startet den
+Kiosk selbst UND meldet das Panel beim Server, sodass du es unter
+`http://<SERVER>/settings` findest und dort **Start / Reload / Ansicht wechseln**
+kannst. Nutzt dieselbe `loxpanel-kiosk.conf` (zusaetzlich optional `AGENT_PORT`,
+`AGENT_NAME`); nur Python-Standardlib, keine Extra-Pakete.
+
+Im X11-Autostart die `kiosk.sh`-Zeile ersetzen durch:
+```bash
+python3 /opt/loxpanel/agent/loxpanel-agent.py &
+```
+Oder als systemd-Dienst (User/XAUTHORITY an die Autologin-Session anpassen):
+```bash
+sudo cp /opt/loxpanel/agent/loxpanel-agent.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now loxpanel-agent
+```
+Der Agent hoert auf Port **8130** (Server steuert darueber). Test von Hand:
+```bash
+DISPLAY=:0 python3 /opt/loxpanel/agent/loxpanel-agent.py
+```
+
+> Docker-Hinweis: Der Agent meldet sich **per HTTP** beim Server (kein UDP-
+> Broadcast) — funktioniert daher auch mit dem Server im Docker-Bridge-Netz.
+
 ## Fehlersuche
 - Server-Log: `journalctl -u loxpanel-webvisu -f`
 - Weisse/leere Seite: URL/Server pruefen (`curl localhost:8099`).
