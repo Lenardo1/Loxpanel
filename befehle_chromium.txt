@@ -1,0 +1,4 @@
+DISPLAY=:0 chromium --kiosk --user-data-dir=/tmp/kiosk_profile --noerrdialogs --disable-infobars https://10.0.110.54:8099
+
+DISPLAY=:0 chromium --kiosk --user-data-dir=/tmp/kiosk_profile --noerrdialogs --disable-infobars http://10.0.110.54:8099
+
