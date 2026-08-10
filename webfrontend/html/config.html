@@ -110,6 +110,11 @@
   .iopt svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
   .iopt .loxi{width:24px;height:24px;background:var(--fg);-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .iopt.clear{font-size:20px;color:var(--muted);}
+  .tgl{display:inline-grid;place-items:center;width:34px;height:32px;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--muted);font-weight:700;user-select:none;}
+  .tgl.it{font-style:italic;font-family:Georgia,serif;font-weight:600;}
+  .tgl.on{border-color:var(--accent);color:var(--fg);background:rgba(224,162,77,.14);}
+  select{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:8px 10px;font:inherit;max-width:220px;}
+  select:focus{outline:none;border-color:var(--accent);}
   .muted{color:var(--muted);padding:12px;}
   @media(max-width:720px){ .wrap{grid-template-columns:1fr;} .side{border-right:none;border-bottom:1px solid var(--line);} .main{max-height:none;} }
 </style>
@@ -148,6 +153,21 @@ const BICONS = {
   thermo:'<path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/>',
   cam:'<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3z"/>',
 };
+const FONTS = [
+  {label:'Standard (global)', v:''},
+  {label:'Inter', v:'Inter, sans-serif'},
+  {label:'Roboto', v:'Roboto, sans-serif'},
+  {label:'System (Sans)', v:'system-ui, sans-serif'},
+  {label:'Arial', v:'Arial, Helvetica, sans-serif'},
+  {label:'Verdana', v:'Verdana, Geneva, sans-serif'},
+  {label:'Tahoma', v:'Tahoma, sans-serif'},
+  {label:'Trebuchet MS', v:'"Trebuchet MS", sans-serif'},
+  {label:'Georgia (Serif)', v:'Georgia, serif'},
+  {label:'Times (Serif)', v:'"Times New Roman", Times, serif'},
+  {label:'Monospace', v:'ui-monospace, "Courier New", monospace'},
+];
+const sameFont=(f,v)=>((f||'')===(v||''));
+const customFont=(f)=>!!f && !FONTS.some(x=>x.v===f);
 
 async function load(){
   const r = await fetch('/api/meta'); META = await r.json();
@@ -336,7 +356,13 @@ function renderTileEditor(){
     '<div class="tctrl">'+
       colorRow('Hintergrund','bg',ov)+colorRow('Rahmen','border',ov)+
       colorRow('Icon-Farbe','iconColor',ov)+colorRow('Textfarbe','textColor',ov)+
-      '<div class="frow"><label class="lbl">Schrift</label><input type="text" id="tfont" value="'+esc(ov.font||'')+'" placeholder="global" style="flex:1"></div>'+
+      '<div class="frow"><label class="lbl">Schrift</label>'+
+        '<select id="tfontSel">'+FONTS.map(f=>'<option value="'+esc(f.v)+'"'+(sameFont(ov.font,f.v)?' selected':'')+'>'+esc(f.label)+'</option>').join('')+
+          '<option value="__custom"'+(customFont(ov.font)?' selected':'')+'>Eigene…</option></select>'+
+        '<span class="tgl'+(ov.bold?' on':'')+'" id="tBold" title="Fett">B</span>'+
+        '<span class="tgl it'+(ov.italic?' on':'')+'" id="tItalic" title="Kursiv">I</span></div>'+
+      '<div class="frow" id="tfontCustomRow"'+(customFont(ov.font)?'':' style="display:none"')+'>'+
+        '<label class="lbl"></label><input type="text" id="tfontCustom" value="'+esc(customFont(ov.font)?ov.font:'')+'" placeholder="z. B. Pacifico, cursive" style="flex:1"></div>'+
       '<div class="frow"><label class="lbl">Icon</label><div class="itabs">'+
         '<span class="itab on" data-src="builtin">Eingebaut</span>'+
         '<span class="itab" data-src="loxone">Loxone ('+(((META.icons||{}).loxone)||[]).length+')</span>'+
@@ -345,7 +371,12 @@ function renderTileEditor(){
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
   bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
-  $('#tfont').oninput=e=>setTile('font', e.target.value.trim());
+  const fsel=$('#tfontSel'), fcustRow=$('#tfontCustomRow'), fcust=$('#tfontCustom');
+  fsel.onchange=()=>{ if(fsel.value==='__custom'){ fcustRow.style.display=''; setTile('font', fcust.value.trim()); }
+                      else { fcustRow.style.display='none'; setTile('font', fsel.value); } };
+  fcust.oninput=()=>setTile('font', fcust.value.trim());
+  $('#tBold').onclick=()=>{ const ov=tileOv(); if(ov.bold)delete ov.bold; else ov.bold=true; pruneTile(); $('#tBold').classList.toggle('on'); markDirty(); drawPrev(); renderTileList(); };
+  $('#tItalic').onclick=()=>{ const ov=tileOv(); if(ov.italic)delete ov.italic; else ov.italic=true; pruneTile(); $('#tItalic').classList.toggle('on'); markDirty(); drawPrev(); renderTileList(); };
   host.querySelectorAll('.itab[data-src]').forEach(t=>t.onclick=()=>{
     host.querySelectorAll('.itab').forEach(x=>x.classList.remove('on')); t.classList.add('on'); renderIconPick(t.dataset.src); });
   $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
@@ -369,14 +400,16 @@ function drawPrev(){
   const c=(META.controls||[]).find(x=>x.uuid===tileSel)||{};
   const ov=((PANELS[cur].tiles||{})[tileSel])||{};
   const sv=[]; if(ov.bg)sv.push('background:'+ov.bg); if(ov.border)sv.push('border-color:'+ov.border);
-  if(ov.textColor)sv.push('color:'+ov.textColor); if(ov.font)sv.push('font-family:'+ov.font);
   el.setAttribute('style', sv.join(';'));
+  const nsv=[]; if(ov.textColor)nsv.push('color:'+ov.textColor); if(ov.font)nsv.push('font-family:'+ov.font);
+  if(ov.bold)nsv.push('font-weight:700'); if(ov.italic)nsv.push('font-style:italic');
+  const nst=nsv.length?' style="'+esc(nsv.join(';'))+'"':'';
   const col=ov.iconColor||'var(--accent)', ic=ov.icon; let ih;
   if(ic&&ic.src==='builtin') ih='<span class="pico" style="color:'+col+'">'+svg(BICONS[ic.id]||BICONS.info)+'</span>';
   else if(ic&&ic.src==='loxone') ih='<span class="pico img" style="--u:url(\'/icon?p='+encodeURIComponent(ic.p)+'\');background:'+col+'"></span>';
   else if(c.iconUrl) ih='<span class="pico img" style="--u:url(\''+esc(c.iconUrl)+'\');background:'+col+'"></span>';
   else ih='<span class="pico" style="color:'+col+'">'+svg(BICONS.info)+'</span>';
-  el.innerHTML=ih+'<div class="pnm">'+esc(c.name||'')+'</div>';
+  el.innerHTML=ih+'<div class="pnm"'+nst+'>'+esc(c.name||'')+'</div>';
 }
 function renderIconPick(src){
   const box=$('#ipick'); if(!box) return; box.innerHTML='';
