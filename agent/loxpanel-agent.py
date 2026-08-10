@@ -64,6 +64,23 @@ _cur_panel = _cfg("PANEL", "")
 _lock = threading.Lock()
 
 
+def local_ip():
+    """Eigene LAN-IP (die zum Server routet) — wichtig hinter Docker-NAT,
+    wo der Server sonst nur das Docker-Gateway als Absender saehe."""
+    host = SERVER.split("//")[-1].split(":")[0]
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect((host, 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return ""
+
+
+MY_IP = local_ip()
+
+
 def kiosk_url(panel):
     return "http://%s/" % SERVER + ("?panel=%s" % panel if panel else "")
 
@@ -112,7 +129,7 @@ def announce_loop():
     url = "http://%s/api/agent/announce" % SERVER
     while True:
         try:
-            data = json.dumps({"name": NAME, "panel": _cur_panel,
+            data = json.dumps({"name": NAME, "panel": _cur_panel, "ip": MY_IP,
                                "port": PORT, "kiosk": running()}).encode()
             req = urlreq.Request(url, data=data, headers={"Content-Type": "application/json"})
             urlreq.urlopen(req, timeout=6).read()
