@@ -1,5 +1,5 @@
 {
-  "_comment": "LoxHASP Plugin-Konfiguration. Kopiere diese Datei nach loxhasp.cfg und passe sie an.",
+  "_comment": "LoxPanel Plugin-Konfiguration. Kopiere diese Datei nach loxpanel.cfg und passe sie an.",
 
   "miniserver": {
     "_comment": "Bevorzugt aus der LoxBerry-Miniserver-Verwaltung (msno). host/user/pass als Fallback/Standalone. Gen2 = HTTPS mit selbstsigniertem Zertifikat -> verify_tls:false.",
@@ -27,7 +27,7 @@
 
   "web": {
     "_comment": "Basis-URL, unter der LoxBerry die gerasterten Icons/Cover ausliefert.",
-    "asset_base_url": "http://loxberry/plugins/loxhasp/assets"
+    "asset_base_url": "http://loxberry/plugins/loxpanel/assets"
   },
 
   "lms": {

@@ -22,7 +22,7 @@ S = {
 
 def _conn():
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     return json.loads(f.read_text(encoding="utf-8"))["miniserver"]
 
 

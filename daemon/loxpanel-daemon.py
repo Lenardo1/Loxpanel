@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LoxHASP Runtime-Daemon - Geruest (Phase 1).
+"""LoxPanel Runtime-Daemon - Geruest (Phase 1).
 
 Bruecke Loxone <-> Panels. Aktuell nur das Grundgeruest: Config laden, MQTT
 verbinden, sauberer Lebenszyklus. Die eigentliche Sync-Logik (Loxone-WebSocket,
@@ -22,7 +22,7 @@ try:
 except ImportError:  # Standalone ohne MQTT-Lib
     mqtt = None
 
-log = logging.getLogger("loxhasp.daemon")
+log = logging.getLogger("loxpanel.daemon")
 _running = True
 
 
@@ -35,8 +35,8 @@ def _stop(*_):  # SIGTERM/SIGINT
 def config_path() -> Path:
     lbpconfig = os.environ.get("LBPCONFIG")
     if lbpconfig:
-        return Path(lbpconfig) / "loxhasp" / "loxhasp.cfg"
-    return Path(__file__).resolve().parent.parent / "config" / "loxhasp.cfg.example"
+        return Path(lbpconfig) / "loxpanel" / "loxpanel.cfg"
+    return Path(__file__).resolve().parent.parent / "config" / "loxpanel.cfg.example"
 
 
 def load_config() -> dict:
@@ -52,7 +52,7 @@ def connect_mqtt(cfg: dict):
         log.warning("paho-mqtt nicht installiert - MQTT deaktiviert")
         return None
     m = cfg.get("mqtt", {})
-    client = mqtt.Client(client_id="loxhasp-daemon")
+    client = mqtt.Client(client_id="loxpanel-daemon")
     if m.get("user"):
         client.username_pw_set(m["user"], m.get("pass", ""))
 
@@ -84,7 +84,7 @@ def main() -> int:
     signal.signal(signal.SIGINT, _stop)
 
     cfg = load_config()
-    log.info("LoxHASP-Daemon startet")
+    log.info("LoxPanel-Daemon startet")
 
     client = connect_mqtt(cfg)
 
@@ -102,7 +102,7 @@ def main() -> int:
     if client is not None:
         client.loop_stop()
         client.disconnect()
-    log.info("LoxHASP-Daemon beendet")
+    log.info("LoxPanel-Daemon beendet")
     return 0
 
 

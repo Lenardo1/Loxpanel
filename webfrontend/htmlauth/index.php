@@ -1,6 +1,6 @@
 <?php
 /*
- * LoxHASP - Designer-Frontend (Phase 1)
+ * LoxPanel - Designer-Frontend (Phase 1)
  * Zeigt den aus LoxAPP3.json importierten Raum/Kategorie/Control-Baum.
  * Das eigentliche Zusammenklicken (Kachel-Zuordnung, Layout, Icon-Wahl)
  * folgt in Phase 4.
@@ -9,7 +9,7 @@
 require_once "loxberry_system.php";
 require_once "loxberry_web.php";
 
-$template_title = "LoxHASP - Designer";
+$template_title = "LoxPanel - Designer";
 $helplink = "https://github.com/"; // TODO: echte Doku-URL
 $helptemplate = "help.html";
 

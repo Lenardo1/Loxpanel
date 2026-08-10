@@ -16,7 +16,7 @@ DOWN = "14c86344-00a5-a42e-ffffb84256f3c2d0"
 
 
 def _conn():
-    f = Path(__file__).resolve().parent.parent / "config" / "loxhasp.cfg"
+    f = Path(__file__).resolve().parent.parent / "config" / "loxpanel.cfg"
     return json.loads(f.read_text(encoding="utf-8"))["miniserver"]
 
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://loxhasp.local/visu.schema.json",
-  "title": "LoxHASP Visu Definition",
+  "$id": "https://loxpanel.local/visu.schema.json",
+  "title": "LoxPanel Visu Definition",
   "description": "Renderer-neutrale Beschreibung einer zusammengeklickten Loxone-Visu. Der Generator erzeugt daraus openHASP-JSONL (ESP32) und/oder eine Web-Visu (Linux-Kiosk).",
   "type": "object",
   "required": ["version", "panels"],

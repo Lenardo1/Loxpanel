@@ -18,9 +18,9 @@ from loxone_api import LoxoneClient  # noqa: E402
 
 def _conn() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     if not f.is_file():
-        f = base / "loxhasp.cfg.example"
+        f = base / "loxpanel.cfg.example"
     return json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
 
 

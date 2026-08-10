@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LoxHASP Live-Web-Visu (Phase 3) — Navigations-Shell.
+"""LoxPanel Live-Web-Visu (Phase 3) — Navigations-Shell.
 
 Baut die Loxone-App-Navigation nach, aber aufgeraeumt fuers 480x480-Panel:
 kompakter Kopf (Titel + Uhr), 2x2-Kacheln, unten 4 Tabs
@@ -33,7 +33,7 @@ from loxone_api import LoxoneClient  # noqa: E402
 from loxone_ws import LoxoneWS  # noqa: E402
 from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 
-log = logging.getLogger("loxhasp.webvisu")
+log = logging.getLogger("loxpanel.webvisu")
 HTML = Path(__file__).resolve().parent.parent / "webfrontend" / "html" / "panel.html"
 LIGHT = LightControllerV2Adapter()
 JAL = JalousieAdapter()
@@ -49,17 +49,17 @@ def _clean(name: str) -> str:
 
 def _config() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     if not f.is_file():
-        f = base / "loxhasp.cfg.example"
+        f = base / "loxpanel.cfg.example"
     return json.loads(f.read_text(encoding="utf-8")).get("miniserver", {})
 
 
 def _intercom_config() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
-    f = base / "loxhasp.cfg"
+    f = base / "loxpanel.cfg"
     if not f.is_file():
-        f = base / "loxhasp.cfg.example"
+        f = base / "loxpanel.cfg.example"
     try:
         cfg = json.loads(f.read_text(encoding="utf-8")).get("intercom", {})
     except ValueError:
@@ -506,7 +506,7 @@ class App:
                       "cmd": {"uuid": sc.get("uuidAction"), "cmd": "pulse"}}
                      for sc in subs.values()]
             blocks = [{"k": "video", "src": f"/mjpeg?id={quote(uuid)}"}] if has_url else \
-                     [{"k": "status", "text": "Kein Video konfiguriert (loxhasp.cfg → intercom)"}]
+                     [{"k": "status", "text": "Kein Video konfiguriert (loxpanel.cfg → intercom)"}]
             if cells:
                 blocks.append({"k": "row", "cells": cells})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}

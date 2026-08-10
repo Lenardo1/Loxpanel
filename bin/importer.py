@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LoxHASP Importer - Phase 1.
+"""LoxPanel Importer - Phase 1.
 
 Laedt die Loxone-Struktur (LoxAPP3.json) und schreibt eine normalisierte
 structure.json, die das Designer-Frontend als Navigationsbaum anzeigt.
@@ -22,22 +22,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import loxone_client as lox  # noqa: E402
 
-log = logging.getLogger("loxhasp.importer")
+log = logging.getLogger("loxpanel.importer")
 
 
 def data_dir() -> Path:
-    """Datenordner: auf LoxBerry $LBPDATA/loxhasp, sonst ./data."""
+    """Datenordner: auf LoxBerry $LBPDATA/loxpanel, sonst ./data."""
     lbpdata = os.environ.get("LBPDATA")
     if lbpdata:
-        return Path(lbpdata) / "loxhasp"
+        return Path(lbpdata) / "loxpanel"
     return Path(__file__).resolve().parent.parent / "data"
 
 
 def config_path() -> Path:
     lbpconfig = os.environ.get("LBPCONFIG")
     if lbpconfig:
-        return Path(lbpconfig) / "loxhasp" / "loxhasp.cfg"
-    return Path(__file__).resolve().parent.parent / "config" / "loxhasp.cfg.example"
+        return Path(lbpconfig) / "loxpanel" / "loxpanel.cfg"
+    return Path(__file__).resolve().parent.parent / "config" / "loxpanel.cfg.example"
 
 
 def miniserver_from_loxberry(msno: int = 1) -> dict | None:
@@ -124,7 +124,7 @@ def normalize(struct: lox.Structure) -> dict:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
-    p = argparse.ArgumentParser(description="LoxHASP Struktur-Importer")
+    p = argparse.ArgumentParser(description="LoxPanel Struktur-Importer")
     p.add_argument("--host")
     p.add_argument("--user", default="admin")
     p.add_argument("--pass", dest="password", default="")

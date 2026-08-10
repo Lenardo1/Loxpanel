@@ -3,7 +3,7 @@ data/*
 !data/.gitkeep
 
 # Lokale Konfiguration mit Zugangsdaten (Miniserver/T25-Passwörter)
-config/loxhasp.cfg
+config/loxpanel.cfg
 
 # Python
 *.pyc
