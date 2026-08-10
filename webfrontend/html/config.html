@@ -75,6 +75,42 @@
   .toast.show{opacity:1;}
   .toast.err{color:var(--crit);}
   .empty{color:var(--muted);padding:40px 0;}
+  /* Kachel-Liste */
+  .tlist{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:6px;}
+  .trow{display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent;}
+  .trow:hover{background:var(--panel2);}
+  .trow.active{background:var(--panel2);border-color:var(--accent);}
+  .trow .tico{width:22px;height:22px;background:var(--muted);flex:none;-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .trow .tico.gen{background:#3a3f49;border-radius:5px;-webkit-mask:none;mask:none;}
+  .trow .tnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .trow .trm{color:var(--muted);font-size:12px;}
+  .trow .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;}
+  /* Kachel-Editor */
+  .tedit{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;}
+  .tprev{width:150px;height:110px;flex:none;border:1px solid var(--line);border-radius:12px;background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;padding:12px;overflow:hidden;}
+  .tprev .pico{width:34px;height:34px;color:var(--accent);}
+  .tprev .pico svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+  .tprev .pico.img{display:inline-block;width:34px;height:34px;background:var(--accent);-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .tprev .pnm{font-weight:550;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .tctrl{flex:1;min-width:280px;display:flex;flex-direction:column;gap:9px;}
+  .crow{display:flex;align-items:center;gap:10px;}
+  .crow .lbl{width:92px;flex:none;}
+  .crow input[type=color]{width:40px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer;}
+  .crow .cval{font-family:ui-monospace,monospace;font-size:12px;color:var(--muted);flex:1;}
+  .frow{display:flex;align-items:center;gap:10px;}
+  .frow .lbl{width:92px;flex:none;}
+  .itabs{display:flex;gap:6px;flex-wrap:wrap;}
+  .itab{padding:5px 11px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-size:13px;color:var(--muted);}
+  .itab.on{border-color:var(--accent);color:var(--fg);background:rgba(224,162,77,.14);}
+  .itab.dis{opacity:.45;cursor:default;}
+  .ipick{display:grid;grid-template-columns:repeat(auto-fill,minmax(42px,1fr));gap:6px;max-height:180px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px;}
+  .iopt{display:grid;place-items:center;height:38px;border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--fg);}
+  .iopt:hover{border-color:var(--accent);}
+  .iopt.sel{border-color:var(--accent);background:rgba(224,162,77,.14);}
+  .iopt svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+  .iopt .loxi{width:24px;height:24px;background:var(--fg);-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .iopt.clear{font-size:20px;color:var(--muted);}
+  .muted{color:var(--muted);padding:12px;}
   @media(max-width:720px){ .wrap{grid-template-columns:1fr;} .side{border-right:none;border-bottom:1px solid var(--line);} .main{max-height:none;} }
 </style>
 </head>
@@ -91,7 +127,27 @@
 </div>
 <script>
 const $ = (s,r=document)=>r.querySelector(s);
-let META=null, PANELS={}, cur=null, dirty=false;
+let META=null, PANELS={}, cur=null, dirty=false, tileSel=null;
+function svg(inner){return '<svg viewBox="0 0 24 24">'+inner+'</svg>';}
+const BICONS = {
+  folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  bulb:'<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.8 1 1.4 1 2.5h6c0-1.1.3-1.7 1-2.5A6 6 0 0 0 12 3Z"/>',
+  switch:'<rect x="3" y="7" width="18" height="10" rx="5"/><circle cx="8" cy="12" r="2.5"/>',
+  mood:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>',
+  central:'<path d="M3 11 12 4l9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-9"/>',
+  info:'<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/>',
+  blind:'<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 9h16M4 13h16M4 17h16"/>',
+  up:'<path d="m6 15 6-6 6 6"/>', down:'<path d="m6 9 6 6 6-6"/>',
+  stop:'<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  vol:'<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8a5 5 0 0 1 0 8"/>',
+  prev:'<path d="M6 6h2v12H6zM20 6v12l-9-6z"/>', next:'<path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/>',
+  play:'<path d="M8 5v14l11-7z"/>', pause:'<path d="M7 5h3v14H7zM14 5h3v14h-3z"/>',
+  alarm:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  gate:'<path d="M3 10 12 4l9 6v11H3z"/><path d="M6 21v-7h12v7"/><path d="M6 17.5h12"/>',
+  thermo:'<path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0Z"/>',
+  cam:'<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3z"/>',
+};
 
 async function load(){
   const r = await fetch('/api/meta'); META = await r.json();
@@ -108,7 +164,7 @@ function renderList(){
     const d=document.createElement('div');
     d.className='pitem'+(id===cur?' active':'');
     d.innerHTML='<span class="pn">'+esc(p.title||id)+'</span><span class="pid">?panel='+esc(id)+'</span>';
-    d.onclick=()=>{ cur=id; renderList(); renderEditor(); };
+    d.onclick=()=>{ cur=id; tileSel=null; renderList(); renderEditor(); };
     box.appendChild(d);
   }
 }
@@ -143,6 +199,12 @@ function renderEditor(){
        '<button class="minibtn" id="clrCats">Alle abwählen</button></div>'+
      '<div class="grid" id="cats"></div></div>'+
 
+   '<div class="card"><h3>Kacheln gestalten</h3>'+
+     '<p class="note">Klicke eine Kachel an und ändere <b>Farben, Schrift und Icon nur für diese Kachel</b> (auf diesem Panel). Farbiger Punkt = schon angepasst.</p>'+
+     '<input type="text" id="tileSearch" placeholder="Kachel suchen…" style="max-width:280px;margin-bottom:10px">'+
+     '<div class="tlist" id="tiles"></div>'+
+     '<div id="tileEditor"></div></div>'+
+
    '<div class="card"><h3>Darstellung (optional)</h3>'+
      '<p class="note">Überschreibt das globale Theme nur für dieses Panel. Leer = global.</p>'+
      '<div class="sizes">'+
@@ -163,7 +225,9 @@ function renderEditor(){
   $('#fFont').oninput=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.font=e.target.value:delete p.ui.font; markDirty(); };
 
   renderChips(p); renderChecklist(p,'rooms'); renderChecklist(p,'cats');
-  $('#clrRooms').onclick=()=>{ p.rooms=[]; renderChecklist(p,'rooms'); markDirty(); };
+  renderTileList(); renderTileEditor();
+  const tsr=$('#tileSearch'); if(tsr) tsr.oninput=()=>renderTileList();
+  $('#clrRooms').onclick=()=>{ p.rooms=[]; renderChecklist(p,'rooms'); renderTileList(); markDirty(); };
   $('#clrCats').onclick=()=>{ p.cats=[]; renderChecklist(p,'cats'); markDirty(); };
   $('#saveBtn').onclick=save;
   const del=$('#delBtn'); if(del) del.onclick=()=>{ if(confirm('Panel „'+cur+'" löschen?')){ delete PANELS[cur]; cur='default'; renderList(); renderEditor(); markDirty(); } };
@@ -237,13 +301,110 @@ async function save(){
   setTimeout(()=>{ if(t) t.classList.remove('show'); }, 4000);
 }
 
+// ---- Kachel-Editor ----
+function panelControls(p){
+  const rs=p.rooms||[];
+  return (META.controls||[]).filter(c=> rs.length ? rs.includes(c.room) : true);
+}
+function renderTileList(){
+  const box=$('#tiles'); if(!box) return;
+  const p=PANELS[cur]; const q=(($('#tileSearch')||{}).value||'').toLowerCase();
+  const list=panelControls(p).filter(c=>c.name.toLowerCase().includes(q)||(c.roomName||'').toLowerCase().includes(q));
+  box.innerHTML='';
+  if(!list.length){ box.innerHTML='<div class="muted">'+((p.rooms&&p.rooms.length)?'keine Kacheln in den gewählten Räumen':'nichts gefunden')+'</div>'; return; }
+  list.slice(0,400).forEach(c=>{
+    const has=p.tiles&&p.tiles[c.uuid];
+    const d=document.createElement('div'); d.className='trow'+(c.uuid===tileSel?' active':'');
+    const ic=c.iconUrl?'<span class="tico" style="--u:url(\''+esc(c.iconUrl)+'\')"></span>':'<span class="tico gen"></span>';
+    d.innerHTML=ic+'<span class="tnm">'+esc(c.name)+'</span><span class="trm">'+esc(c.roomName||'')+'</span>'+(has?'<span class="dot"></span>':'');
+    d.onclick=()=>{ tileSel=c.uuid; renderTileList(); renderTileEditor(); };
+    box.appendChild(d);
+  });
+}
+function tileOv(){ const p=PANELS[cur]; p.tiles=p.tiles||{}; p.tiles[tileSel]=p.tiles[tileSel]||{}; return p.tiles[tileSel]; }
+function pruneTile(){ const p=PANELS[cur]; if(p.tiles&&p.tiles[tileSel]&&!Object.keys(p.tiles[tileSel]).length) delete p.tiles[tileSel]; }
+function setTile(k,v){ const ov=tileOv(); if(v==null||v==='') delete ov[k]; else ov[k]=v; pruneTile(); markDirty(); drawPrev(); renderTileList(); }
+function setTileIcon(ic){ const ov=tileOv(); if(ic) ov.icon=ic; else delete ov.icon; pruneTile(); markDirty(); drawPrev(); renderTileList(); }
+function renderTileEditor(){
+  const host=$('#tileEditor'); if(!host) return;
+  if(!tileSel){ host.innerHTML=''; return; }
+  const c=(META.controls||[]).find(x=>x.uuid===tileSel);
+  if(!c){ host.innerHTML=''; return; }
+  const ov=((PANELS[cur].tiles||{})[tileSel])||{};
+  host.innerHTML=
+   '<div class="tedit"><div class="tprev" id="tprev"></div>'+
+    '<div class="tctrl">'+
+      colorRow('Hintergrund','bg',ov)+colorRow('Rahmen','border',ov)+
+      colorRow('Icon-Farbe','iconColor',ov)+colorRow('Textfarbe','textColor',ov)+
+      '<div class="frow"><label class="lbl">Schrift</label><input type="text" id="tfont" value="'+esc(ov.font||'')+'" placeholder="global" style="flex:1"></div>'+
+      '<div class="frow"><label class="lbl">Icon</label><div class="itabs">'+
+        '<span class="itab on" data-src="builtin">Eingebaut</span>'+
+        '<span class="itab" data-src="loxone">Loxone ('+(((META.icons||{}).loxone)||[]).length+')</span>'+
+        '<span class="itab dis" title="folgt in Stufe 2/3">Google · Upload</span></div></div>'+
+      '<div class="ipick" id="ipick"></div>'+
+      '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
+    '</div></div>';
+  bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
+  $('#tfont').oninput=e=>setTile('font', e.target.value.trim());
+  host.querySelectorAll('.itab[data-src]').forEach(t=>t.onclick=()=>{
+    host.querySelectorAll('.itab').forEach(x=>x.classList.remove('on')); t.classList.add('on'); renderIconPick(t.dataset.src); });
+  $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
+  renderIconPick('builtin'); drawPrev();
+}
+function colorRow(label,key,ov){
+  const v=ov[key]||'';
+  return '<div class="crow"><label class="lbl">'+label+'</label>'+
+    '<input type="color" data-ck="'+key+'" value="'+(v&&v[0]==='#'?esc(v):'#888888')+'">'+
+    '<span class="cval" data-cv="'+key+'">'+esc(v||'Standard')+'</span>'+
+    '<button class="minibtn" data-cc="'+key+'">Standard</button></div>';
+}
+function bindColor(key){
+  const inp=document.querySelector('[data-ck="'+key+'"]'), clr=document.querySelector('[data-cc="'+key+'"]'),
+        cv=document.querySelector('[data-cv="'+key+'"]');
+  if(inp) inp.oninput=()=>{ setTile(key,inp.value); if(cv)cv.textContent=inp.value; };
+  if(clr) clr.onclick=()=>{ setTile(key,null); if(cv)cv.textContent='Standard'; };
+}
+function drawPrev(){
+  const el=$('#tprev'); if(!el) return;
+  const c=(META.controls||[]).find(x=>x.uuid===tileSel)||{};
+  const ov=((PANELS[cur].tiles||{})[tileSel])||{};
+  const sv=[]; if(ov.bg)sv.push('background:'+ov.bg); if(ov.border)sv.push('border-color:'+ov.border);
+  if(ov.textColor)sv.push('color:'+ov.textColor); if(ov.font)sv.push('font-family:'+ov.font);
+  el.setAttribute('style', sv.join(';'));
+  const col=ov.iconColor||'var(--accent)', ic=ov.icon; let ih;
+  if(ic&&ic.src==='builtin') ih='<span class="pico" style="color:'+col+'">'+svg(BICONS[ic.id]||BICONS.info)+'</span>';
+  else if(ic&&ic.src==='loxone') ih='<span class="pico img" style="--u:url(\'/icon?p='+encodeURIComponent(ic.p)+'\');background:'+col+'"></span>';
+  else if(c.iconUrl) ih='<span class="pico img" style="--u:url(\''+esc(c.iconUrl)+'\');background:'+col+'"></span>';
+  else ih='<span class="pico" style="color:'+col+'">'+svg(BICONS.info)+'</span>';
+  el.innerHTML=ih+'<div class="pnm">'+esc(c.name||'')+'</div>';
+}
+function renderIconPick(src){
+  const box=$('#ipick'); if(!box) return; box.innerHTML='';
+  const ov=((PANELS[cur].tiles||{})[tileSel])||{}, cic=ov.icon||{};
+  const clr=document.createElement('span'); clr.className='iopt clear'+(!ov.icon?' sel':''); clr.title='Standard-Icon'; clr.textContent='✕';
+  clr.onclick=()=>{ setTileIcon(null); renderIconPick(src); }; box.appendChild(clr);
+  if(src==='builtin'){
+    Object.keys(BICONS).forEach(id=>{
+      const b=document.createElement('span'); b.className='iopt'+(cic.src==='builtin'&&cic.id===id?' sel':''); b.title=id;
+      b.innerHTML=svg(BICONS[id]);
+      b.onclick=()=>{ setTileIcon({src:'builtin',id}); renderIconPick(src); }; box.appendChild(b);
+    });
+  } else if(src==='loxone'){
+    ((((META.icons||{}).loxone))||[]).forEach(p=>{
+      const b=document.createElement('span'); b.className='iopt'+(cic.src==='loxone'&&cic.p===p?' sel':''); b.title=p;
+      b.innerHTML='<span class="loxi" style="--u:url(\'/icon?p='+encodeURIComponent(p)+'\')"></span>';
+      b.onclick=()=>{ setTileIcon({src:'loxone',p}); renderIconPick(src); }; box.appendChild(b);
+    });
+  }
+}
+
 $('#addBtn').onclick=()=>{
   let id=prompt('ID des neuen Panels (klein, ohne Leerzeichen), z. B. wohnzimmer:');
   if(!id) return; id=id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
   if(!id){ alert('Ungültige ID.'); return; }
   if(PANELS[id]){ alert('Panel „'+id+'" gibt es schon.'); return; }
-  PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
-  cur=id; renderList(); renderEditor(); markDirty();
+  PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}, tiles:{}};
+  cur=id; tileSel=null; renderList(); renderEditor(); markDirty();
 };
 
 window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });

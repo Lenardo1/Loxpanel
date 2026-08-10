@@ -40,8 +40,9 @@
     border-color:rgba(224,162,77,.55);}
   .tile .head{display:flex;justify-content:space-between;align-items:flex-start;}
   .tile .ico{color:var(--ico,var(--muted));}
-  .tile.on .ico{color:var(--glow);}
+  .tile.on .ico{color:var(--ico-fixed,var(--glow));}
   .tile .ico svg{width:var(--ico-size,38px);height:var(--ico-size,38px);}
+  .tile .ico .rawico{width:var(--ico-size,38px);height:var(--ico-size,38px);object-fit:contain;display:block;}
   .tile .ico.img{display:inline-block;width:var(--ico-size,38px);height:var(--ico-size,38px);background-color:currentColor;
     -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .tile .chev{color:var(--muted);opacity:.55;}
@@ -280,13 +281,22 @@ function render(){
   if(!items.length){ g.innerHTML='<div class="empty">nichts hier</div>'; renderTabs(); return; }
   let html='';
   for(const it of items){
-    const icoHtml = it.iconUrl
+    const icoHtml = it.iconImg
+      ? '<span class="ico"><img class="rawico" src="'+esc(it.iconImg)+'" alt=""></span>'
+      : it.iconUrl
       ? '<span class="ico img" style="--u:url(\''+esc(it.iconUrl)+'\')"></span>'
       : '<span class="ico">'+svg(ICONS[it.icon]||ICONS.info)+'</span>';
     const chev = (it.nav && !it.controls) ? '<span class="chev">'+svg('<path d="m9 6 6 6-6 6"/>')+'</span>' : '';
     const ctrls = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
     const tone = it.tone==='good'?' good':(it.tone==='crit'?' crit':(it.on?' on':''));
-    const st = it.color?' style="--ico:'+esc(it.color)+'"':'';
+    const sv=[]; const ts=it.style||{};
+    if(it.colorFixed){ sv.push('--ico:'+it.colorFixed); sv.push('--ico-fixed:'+it.colorFixed); }
+    else if(it.color) sv.push('--ico:'+it.color);
+    if(ts.bg) sv.push('background:'+ts.bg);
+    if(ts.border) sv.push('border-color:'+ts.border);
+    if(ts.txt) sv.push('color:'+ts.txt);
+    if(ts.font) sv.push('font-family:'+ts.font);
+    const st = sv.length?' style="'+esc(sv.join(';'))+'"':'';
     html += '<div class="tile'+tone+'" data-id="'+esc(it.id)+'"'+st+'>'+
               '<div class="head">'+icoHtml+chev+'</div>'+
               '<div class="body"><div class="name">'+esc(it.label)+'</div>'+
