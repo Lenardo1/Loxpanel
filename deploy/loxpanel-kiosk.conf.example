@@ -1,0 +1,12 @@
+# LoxPanel Kiosk — panel-lokale Konfiguration.
+# Nach loxpanel-kiosk.conf (neben kiosk.sh) ODER /etc/loxpanel/kiosk.conf kopieren.
+# kiosk.sh liest daraus Server-Adresse und Panel-Profil.
+
+# Adresse des LoxPanel-Servers (host:port). Beispiele:
+#   10.0.110.54:8099    -> Server laeuft auf dem PC/LoxBerry im LAN
+#   localhost:8099      -> Server laeuft auf dem Panel selbst (Variante A)
+SERVER=10.0.110.54:8099
+
+# Panel-Profil-ID (leer = Standardansicht). IDs anlegen/sehen auf der
+# Konfig-Seite:  http://<SERVER>/config     z. B. erdgeschoss
+PANEL=
