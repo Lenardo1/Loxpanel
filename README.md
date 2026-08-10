@@ -10,6 +10,32 @@ Browser (Wandpanel / Tablet / Handy), z. B. als Chromium-Kiosk auf einem
 > WebSocket mit dem Miniserver (Token-Auth), liefert eine 480×480-Oberfläche und
 > steuert live.
 
+## Screenshots
+
+**Visu am Panel** — Favoriten mit Status, Musik-Player, Musikauswahl, PIN-geschützte Tür, Intercom-Livebild, Räume:
+
+![Visu](docs/screenshots/kiosk1.png)
+
+**Am Wandpanel** (Linux-Panel im Chromium-Kiosk):
+
+![Wandpanel](docs/screenshots/kiosk2.png)
+
+**Konfiguration im Browser** — Panel-Profile: pro Gerät Räume, Kategorien und Tabs an-/abwählen:
+
+![Panel-Profile](docs/screenshots/panel.png)
+
+**Pro Kachel gestalten** — Hintergrund, Rahmen, Icon- und Textfarbe, Schrift und Icon (eingebaut / Loxone) je Kachel:
+
+![Kachel-Editor](docs/screenshots/kacheln.png)
+
+**Einstellungen** — Miniserver und Intercom eintragen, **Displays (Panels) automatisch finden und den Kiosk fernstarten**:
+
+![Einstellungen](docs/screenshots/intercom.png)
+
+**Layout-Varianten** je Detailseite (einzeln / gestapelt / 2×2 / Liste):
+
+![Layouts](docs/screenshots/kacheln2.png)
+
 ## Funktionen
 
 - **Navigation** wie die Loxone-App: Tabs **Favoriten / Zentral / Räume / Kategorien**, scrollbare Kacheln, Detailseiten.
