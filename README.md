@@ -56,6 +56,18 @@ python bin/webvisu.py             # -> http://localhost:8099
 Theme anpassen: `config/theme.json`. Deployment aufs Wandpanel: siehe `deploy/`
 (`DEPLOY.md`, systemd-Service, Chromium-Kiosk-Autostart).
 
+## Docker
+
+```bash
+cp .env.example .env            # Miniserver-Host/User/Pass eintragen
+docker compose up -d --build    # -> http://<docker-host>:8099
+```
+
+Miniserver-Zugang per Env (`LOXPANEL_MS_*`) oder `config/loxpanel.cfg` im
+gemounteten `./config`-Volume; `panels.json`/`theme.json` persistieren dort.
+Details: `deploy/DOCKER.md`. (Kein Umweg zum LoxBerry-Plugin — gleiche Server-
+Basis, LoxBerry kann Docker-Plugins direkt einbinden.)
+
 ## Konfiguration (`config/loxpanel.cfg`, gitignored)
 
 Enthält Zugangsdaten und wird **nicht** eingecheckt. Vorlage:
