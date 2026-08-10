@@ -43,6 +43,28 @@ JAL = JalousieAdapter()
 
 SWITCHY = {"Switch", "TimedSwitch"}
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
+_COLOR_RE = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|[a-zA-Z]{3,20})$")
+
+
+def _color_ok(v) -> bool:
+    return isinstance(v, str) and bool(_COLOR_RE.match(v.strip()))
+
+
+def _clean_icon(ic):
+    """Icon-Referenz einer Kachel validieren (Quelle + sicherer Bezeichner)."""
+    if not isinstance(ic, dict):
+        return None
+    s = ic.get("src")
+    if s == "builtin" and isinstance(ic.get("id"), str) and re.match(r"^[A-Za-z0-9_]{1,32}$", ic["id"]):
+        return {"src": "builtin", "id": ic["id"]}
+    if s == "loxone" and isinstance(ic.get("p"), str) and ".." not in ic["p"] \
+            and (ic["p"].endswith(".svg") or ic["p"].endswith(".png")):
+        return {"src": "loxone", "p": ic["p"]}
+    if s == "google" and isinstance(ic.get("name"), str) and re.match(r"^[a-z0-9_]{1,48}$", ic["name"]):
+        return {"src": "google", "name": ic["name"]}
+    if s == "custom" and isinstance(ic.get("file"), str) and re.match(r"^[A-Za-z0-9._-]{1,80}$", ic["file"]):
+        return {"src": "custom", "file": ic["file"]}
+    return None
 _NUMFMT = re.compile(r"^(%[-+ 0-9.]*[dfeg])(.*)$")
 _PREFIX = ["k", "M", "G", "T"]
 
@@ -319,6 +341,7 @@ class App:
             "rooms": self._resolve_ids(prof.get("rooms"), self.rooms),
             "cats": self._resolve_ids(prof.get("cats"), self.cats),
             "vars": self._theme_vars(states, ui),
+            "tiles": prof.get("tiles") or {},
         }
 
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
@@ -343,7 +366,26 @@ class App:
                    if k in ("iconSize", "nameSize", "subSize", "font")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
+            "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
         }
+
+    def _loxone_icons(self) -> list:
+        """Alle im Struktur-Baum referenzierten Loxone-Icon-Pfade (für den Picker)."""
+        paths = set()
+        for c in self.controls.values():
+            di = (c.get("details") or {}).get("image")
+            if isinstance(di, str):
+                paths.add(di)
+            elif isinstance(di, dict):
+                for v in (di.get("on"), di.get("off")):
+                    if isinstance(v, str):
+                        paths.add(v)
+        for table in (self.cats, self.rooms):
+            for v in table.values():
+                im = v.get("image")
+                if isinstance(im, str):
+                    paths.add(im)
+        return sorted(p for p in paths if p.endswith(".svg") or p.endswith(".png"))
 
     @staticmethod
     def _sanitize_panels(panels: dict) -> dict:
@@ -370,6 +412,25 @@ class App:
                    if isinstance(st.get(k), str)}
             if cst:
                 e["states"] = cst
+            tiles = p.get("tiles")
+            if isinstance(tiles, dict):
+                ct = {}
+                for cu, ov in tiles.items():
+                    if not isinstance(cu, str) or not isinstance(ov, dict):
+                        continue
+                    e2 = {}
+                    for k in ("iconColor", "textColor", "bg", "border"):
+                        if _color_ok(ov.get(k)):
+                            e2[k] = ov[k].strip()
+                    if ov.get("font"):
+                        e2["font"] = str(ov["font"])[:120]
+                    icc = _clean_icon(ov.get("icon"))
+                    if icc:
+                        e2["icon"] = icc
+                    if e2:
+                        ct[cu] = e2
+                if ct:
+                    e["tiles"] = ct
             out[pid] = e
         return out
 
@@ -412,7 +473,7 @@ class App:
             return None
 
     # ---- Kachel fuer ein Control ----
-    def _control_item(self, uuid: str) -> dict:
+    def _control_item(self, uuid: str, prof: dict | None = None) -> dict:
         c = self.controls.get(uuid)
         if not c:
             return {"id": uuid, "label": "?", "icon": "info", "on": False}
@@ -494,6 +555,41 @@ class App:
                 it["sublabel"] = f"Spielt in {n} Räumen" if n else "Aus"
             it.update(icon="central", on=(n > 0),
                       nav={"view": "group", "kind": "central", "id": uuid})
+        return self._apply_tile_style(it, uuid, prof)
+
+    def _apply_tile_style(self, it: dict, uuid: str, prof: dict | None) -> dict:
+        """Pro-Kachel-Overrides (Farben/Icon/Schrift) aus dem Panel-Profil."""
+        ov = (prof.get("tiles") if prof else {}).get(uuid) if prof else None
+        if not isinstance(ov, dict):
+            return it
+        if ov.get("iconColor"):
+            it["color"] = ov["iconColor"]           # Icon-Farbe (--ico)
+            it["colorFixed"] = ov["iconColor"]      # gewinnt auch im Aktiv-Zustand
+        style = {}
+        for src, dst in (("bg", "bg"), ("border", "border"),
+                         ("textColor", "txt"), ("font", "font")):
+            if ov.get(src):
+                style[dst] = ov[src]
+        if style:
+            it["style"] = style
+        ic = ov.get("icon")
+        if isinstance(ic, dict):
+            s = ic.get("src")
+            if s == "builtin" and ic.get("id"):
+                it["icon"] = ic["id"]
+                it.pop("iconUrl", None)
+                it.pop("iconImg", None)
+            elif s == "loxone" and ic.get("p"):
+                u = self._icon_url(ic["p"])
+                if u:
+                    it["iconUrl"] = u
+                    it.pop("iconImg", None)
+            elif s == "google" and ic.get("name"):
+                it["iconUrl"] = "/gicon?name=" + quote(str(ic["name"]))
+                it.pop("iconImg", None)
+            elif s == "custom" and ic.get("file"):
+                it["iconImg"] = "/uicon?f=" + quote(str(ic["file"]))
+                it.pop("iconUrl", None)
         return it
 
     # ---- Views ----
@@ -501,11 +597,11 @@ class App:
         ar = prof.get("rooms") if prof else None
         ac = prof.get("cats") if prof else None
         if tab == "favoriten":
-            items = [self._control_item(u) for u, c in self.controls.items()
+            items = [self._control_item(u, prof) for u, c in self.controls.items()
                      if c.get("isFavorite") and self._room_ok(u, prof)]
             title = "Favoriten"
         elif tab == "zentral":
-            items = [self._control_item(u) for u, c in self.controls.items()
+            items = [self._control_item(u, prof) for u, c in self.controls.items()
                      if (c.get("type") or "").startswith("Central")]
             title = "Zentral"
         elif tab == "raeume":
@@ -552,7 +648,7 @@ class App:
         else:
             uuids, title, tab = [], "", None
         return {"t": "view", "title": title, "tab": tab, "route": route,
-                "layout": layout, "items": [self._control_item(u) for u in uuids]}
+                "layout": layout, "items": [self._control_item(u, prof) for u in uuids]}
 
     def _view_control(self, uuid: str) -> dict:
         c = self.controls.get(uuid, {})
@@ -757,8 +853,20 @@ async def api_meta(request: web.Request) -> web.Response:
     rooms = [{"uuid": ru, "name": _clean(app.rooms[ru].get("name", ""))} for ru in app.rooms_with]
     cats = [{"uuid": cu, "name": _clean(app.cats[cu].get("name", ""))} for cu in app.cats_with]
     panels = {pid: app._panel_export(raw) for pid, raw in app.panels.items()}
+    controls = []
+    for u, c in app.controls.items():
+        if not c.get("name"):
+            continue
+        room = c.get("room")
+        controls.append({
+            "uuid": u, "name": _clean(c.get("name")), "type": c.get("type"),
+            "room": room,
+            "roomName": _clean((app.rooms.get(room) or {}).get("name", "")) if room else "",
+            "iconUrl": app._control_icon_url(c),
+        })
     return web.json_response({
-        "rooms": rooms, "cats": cats,
+        "rooms": rooms, "cats": cats, "controls": controls,
+        "icons": {"loxone": app._loxone_icons()},
         "tabs": [{"tab": "favoriten", "label": "Favoriten"},
                  {"tab": "zentral", "label": "Zentral"},
                  {"tab": "raeume", "label": "Räume"},
