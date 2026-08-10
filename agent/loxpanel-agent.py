@@ -55,6 +55,9 @@ def _cfg(key, default=""):
 SERVER = _cfg("SERVER", "localhost:8099")
 PORT = int(_cfg("AGENT_PORT", "8130"))
 NAME = _cfg("AGENT_NAME") or socket.gethostname()
+# AUTOSTART=0 -> Kiosk NICHT beim Start oeffnen, nur auf /start aus der
+# Settings-Seite warten.
+AUTOSTART = _cfg("AUTOSTART", "1").lower() not in ("0", "false", "no", "off")
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -158,11 +161,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if os.environ.get("DISPLAY") or os.path.exists("/tmp/.X11-unix/X0"):
+    if AUTOSTART and (os.environ.get("DISPLAY") or os.path.exists("/tmp/.X11-unix/X0")):
         start_kiosk(_cur_panel)
     threading.Thread(target=announce_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    print("LoxPanel-Agent auf :%d, Server=%s, Panel=%s" % (PORT, SERVER, _cur_panel or "(default)"))
+    print("LoxPanel-Agent auf :%d, Server=%s, Panel=%s, Autostart=%s"
+          % (PORT, SERVER, _cur_panel or "(default)", "an" if AUTOSTART else "aus"))
     srv.serve_forever()
 
 
