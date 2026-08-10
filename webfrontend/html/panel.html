@@ -297,9 +297,15 @@ function render(){
     if(ts.txt) sv.push('color:'+ts.txt);
     if(ts.font) sv.push('font-family:'+ts.font);
     const st = sv.length?' style="'+esc(sv.join(';'))+'"':'';
+    const nsv=[];
+    if(ts.txt) nsv.push('color:'+ts.txt);
+    if(ts.font) nsv.push('font-family:'+ts.font);
+    if(ts.weight) nsv.push('font-weight:'+ts.weight);
+    if(ts.italic) nsv.push('font-style:italic');
+    const nst = nsv.length?' style="'+esc(nsv.join(';'))+'"':'';
     html += '<div class="tile'+tone+'" data-id="'+esc(it.id)+'"'+st+'>'+
               '<div class="head">'+icoHtml+chev+'</div>'+
-              '<div class="body"><div class="name">'+esc(it.label)+'</div>'+
+              '<div class="body"><div class="name"'+nst+'>'+esc(it.label)+'</div>'+
               (it.sublabel?'<div class="sub">'+esc(it.sublabel)+'</div>':'')+'</div>'+
               ctrls+
             '</div>';

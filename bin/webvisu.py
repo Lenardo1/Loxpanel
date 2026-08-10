@@ -424,6 +424,9 @@ class App:
                             e2[k] = ov[k].strip()
                     if ov.get("font"):
                         e2["font"] = str(ov["font"])[:120]
+                    for bk in ("bold", "italic"):
+                        if ov.get(bk) is True:
+                            e2[bk] = True
                     icc = _clean_icon(ov.get("icon"))
                     if icc:
                         e2["icon"] = icc
@@ -570,6 +573,10 @@ class App:
                          ("textColor", "txt"), ("font", "font")):
             if ov.get(src):
                 style[dst] = ov[src]
+        if ov.get("bold"):
+            style["weight"] = 700
+        if ov.get("italic"):
+            style["italic"] = True
         if style:
             it["style"] = style
         ic = ov.get("icon")
