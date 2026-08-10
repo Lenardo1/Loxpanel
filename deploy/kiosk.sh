@@ -42,4 +42,5 @@ exec "$CHROME" --kiosk \
   --check-for-update-interval=31536000 \
   --force-device-scale-factor=1 \
   --autoplay-policy=no-user-gesture-required \
+  --disable-features=HttpsUpgrades,HttpsFirstBalancedMode,HttpsFirstModeV2 \
   "$URL"
