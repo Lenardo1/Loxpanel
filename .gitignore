@@ -5,6 +5,9 @@ data/*
 # Lokale Konfiguration mit Zugangsdaten (Miniserver/T25-Passwörter)
 config/loxpanel.cfg
 
+# Panel-Profile mit der konkreten Raum-/Kategorie-Aufteilung (personenbezogen)
+config/panels.json
+
 # Python
 *.pyc
 __pycache__/

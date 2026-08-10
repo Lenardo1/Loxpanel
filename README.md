@@ -62,6 +62,25 @@ Enthält Zugangsdaten und wird **nicht** eingecheckt. Vorlage:
 `config/loxpanel.cfg.example`. Abschnitte: `miniserver`, `mqtt` (optional),
 `intercom` (T25-URL + Login).
 
+## Panel-Profile (`config/panels.json`, gitignored)
+
+**Ein** Server versorgt beliebig viele Panels — jedes Gerät kann eine **eigene
+Visu** zeigen. Der Kiosk ruft die Seite mit `?panel=<id>` auf
+(z. B. `http://loxberry:8099/?panel=erdgeschoss`); der Server lädt dann das
+passende Profil aus `config/panels.json`. Pro Profil einstellbar:
+
+- `tabs` — welche/Reihenfolge der unteren Leiste (`favoriten`/`zentral`/`raeume`/`kategorien`)
+- `rooms` / `cats` — Whitelist, **welche** Räume/Kategorien das Panel zeigt
+  (UUID **oder** Name, Teilstring genügt; leer = alle). So zeigt das EG-Panel
+  z. B. nur Küche/Wohnzimmer/Terrasse, das OG-Panel nur die Schlafräume. Die
+  Kategorie-Ansicht wird passend auf die erlaubten Räume mitgefiltert.
+- `ui` — Theme-Override (`iconSize`/`nameSize`/`subSize`/`font`)
+- `states` — Zustandsfarben-Override
+
+Ohne `panels.json` verhält sich jedes Panel wie `default` (alles sichtbar).
+Vorlage: `config/panels.json.example`. Die spätere LoxBerry-Config-Seite
+schreibt genau diese Datei (Räume/Kategorien anklickbar pro Gerät).
+
 ## Roadmap
 
 - LoxBerry-Plugin (Server + grafisches Konfig-UI, Server läuft auf LoxBerry).
