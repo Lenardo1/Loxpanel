@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import re
@@ -313,6 +315,8 @@ class App:
             img = None
         if not img:
             img = (self.cats.get(c.get("cat")) or {}).get("image")
+        if not img:
+            img = c.get("defaultIcon")
         return self._icon_url(img)
 
     def _cat_color(self, cat_uuid: str | None) -> str | None:
@@ -518,6 +522,8 @@ class App:
         t = c.get("type")
         name = _clean(c.get("name"))
         it: dict = {"id": uuid, "label": name, "on": False, "icon": "info"}
+        if c.get("isSecured"):
+            it["secured"] = True
         iu = self._control_icon_url(c)
         if iu:
             it["iconUrl"] = iu
@@ -582,12 +588,9 @@ class App:
             it.update(icon="alarm", sublabel=("Alles ok" if ok else "Alarm!"),
                       tone=("good" if ok else "crit"))
         elif t == "Radio":
-            # Radio-Baustein ist bei Loxone meist eine STATUS-Anzeige (z.B. Tür
-            # offen/geschlossen, vom Programm gesetzt) -> nicht schaltbar
-            # (Miniserver quittiert Set-Befehle mit HTTP 500). Nur Status zeigen.
             outs = (c.get("details") or {}).get("outputs") or {}
             aoi = int(self._state(c, "activeOutput") or 0)
-            it.update(icon="info",
+            it.update(icon="switch", nav={"view": "control", "id": uuid},
                       sublabel=(outs.get(str(aoi)) or ("–" if aoi == 0 else f"Ausgang {aoi}")))
         elif t == "LightController":
             scenes = self._lc_scenes(c)
@@ -772,6 +775,12 @@ class App:
                 "route": {"view": "sources", "id": uuid}, "blocks": blocks}
 
     def _view_control(self, uuid: str) -> dict:
+        v = self._view_control_inner(uuid)
+        if self.controls.get(uuid, {}).get("isSecured"):
+            v["secured"] = True   # Client fragt vor Befehlen die Visu-PIN ab
+        return v
+
+    def _view_control_inner(self, uuid: str) -> dict:
         c = self.controls.get(uuid, {})
         t = c.get("type")
         route = {"view": "control", "id": uuid}
@@ -785,6 +794,20 @@ class App:
             r = LIGHT.render(cu, self.states)
             return {"t": "view", "title": _clean(c.get("name")), "subtitle": r["label"],
                     "route": route, "layout": "list", "items": items}
+        if t == "Radio":
+            ua = c.get("uuidAction")
+            det = c.get("details") or {}
+            outs = det.get("outputs") or {}
+            ao = int(self._state(c, "activeOutput") or 0)
+            items = []
+            if det.get("allOff"):
+                items.append({"id": f"{uuid}:0", "label": det["allOff"], "on": ao == 0,
+                              "icon": "stop", "cmd": {"uuid": ua, "cmd": "reset"}})
+            for k in sorted(outs, key=lambda x: int(x)):
+                items.append({"id": f"{uuid}:{k}", "label": outs[k], "on": ao == int(k),
+                              "icon": "mood", "cmd": {"uuid": ua, "cmd": str(k)}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "layout": "list", "items": items}
         if t == "LightController":
             ua = c.get("uuidAction")
             scenes = self._lc_scenes(c)
@@ -935,13 +958,34 @@ class App:
             return self._view_sources(route.get("id"))
         return self._view_tab(route.get("tab", "favoriten"), prof)
 
-    async def command(self, uuid: str, cmd: str) -> None:
-        if self.client and uuid and cmd:
+    async def command(self, uuid: str, cmd: str, pin: str | None = None) -> str | None:
+        """Fuehrt einen Befehl aus. Mit pin: gesicherter Befehl (Visu-Passwort)."""
+        if not (self.client and uuid and cmd):
+            return None
+        try:
+            if pin is not None:
+                return await self._secured_command(uuid, cmd, pin)
             log.info("cmd %s/%s", uuid, cmd)
-            try:
-                await self.client.jdev_get(f"sps/io/{uuid}/{cmd}")
-            except Exception as err:  # Befehl darf den Server nicht killen
-                log.warning("cmd fehlgeschlagen: %s", err)
+            await self.client.jdev_get(f"sps/io/{uuid}/{cmd}")
+            return "200"
+        except Exception as err:  # Befehl darf den Server nicht killen
+            log.warning("cmd fehlgeschlagen: %s", err)
+            return None
+
+    async def _secured_command(self, uuid: str, cmd: str, pin: str) -> str | None:
+        """Loxone secured-command: getvisusalt -> Hash(visuPw:salt) -> HMAC(key) -> ios."""
+        r = await self.client.jdev_get(f"sys/getvisusalt/{quote(self.user)}")
+        val = (r.get("LL") or {}).get("value") or {}
+        key, salt = val.get("key", ""), val.get("salt", "")
+        alg = (val.get("hashAlg") or "SHA1").upper()
+        digest = hashlib.sha256 if alg == "SHA256" else hashlib.sha1
+        pwhash = digest(f"{pin}:{salt}".encode()).hexdigest().upper()
+        h = hmac.new(bytes.fromhex(key), pwhash.encode(), digest).hexdigest()
+        resp = await self.client.jdev_get(f"sps/ios/{h}/{uuid}/{cmd}")
+        ll = resp.get("LL") or {}
+        code = str(ll.get("Code") or ll.get("code") or "")
+        log.info("secured cmd %s/%s -> Code %s", uuid, cmd, code)
+        return code
 
     def _on_value(self, uuid: str, value: object) -> None:
         self.states[uuid] = value
@@ -1152,7 +1196,10 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 app.conn_route[ws] = data["route"]
                 await ws.send_json(app.render(data["route"], prof))
             elif data.get("t") == "cmd":
-                await app.command(data.get("uuid"), data.get("cmd"))
+                pin = data.get("pin")
+                code = await app.command(data.get("uuid"), data.get("cmd"), pin)
+                if pin is not None:
+                    await ws.send_json({"t": "cmdresult", "ok": code == "200"})
     finally:
         app.conn_route.pop(ws, None)
         app.conn_prof.pop(ws, None)
