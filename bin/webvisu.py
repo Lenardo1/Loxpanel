@@ -225,6 +225,40 @@ class App:
         s = self._text(control, "songName")
         return "" if s.startswith(("http://", "https://")) else s
 
+    def _lc_scenes(self, c: dict) -> dict:
+        """LightController-V1 sceneList (Loxone-Format id=\"name\") -> {id:name}."""
+        raw = str(self._state(c, "sceneList") or "")
+        return {int(m.group(1)): m.group(2) for m in re.finditer(r'(\d+)="([^"]*)"', raw)}
+
+    def _json_list_map(self, c: dict, name: str) -> dict:
+        """State-Wert = JSON-Array [{id,name}] -> {id:name}."""
+        raw = self._state(c, name)
+        try:
+            arr = json.loads(raw) if isinstance(raw, str) else raw
+        except (ValueError, TypeError):
+            return {}
+        return {int(x["id"]): x.get("name") for x in (arr or [])
+                if isinstance(x, dict) and x.get("id") is not None}
+
+    def _audio_favs(self, c: dict) -> list:
+        """Raum-Favoriten (Radio/Playlist/Spotify) aus dem sourceList-State."""
+        raw = self._state(c, "sourceList")
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            return []
+        out = []
+        for grp in data.get("getroomfavs_result", []):
+            for it in grp.get("items", []):
+                slot = it.get("slot")
+                if slot is None:
+                    continue
+                out.append({"slot": slot, "cover": it.get("coverurl") or "",
+                            "name": unquote(str(it.get("name") or it.get("title") or f"Favorit {slot}"))})
+        return out
+
     def _fmt_num(self, value, fmt: str) -> str:
         """Loxone-Formatstring anwenden, Einheiten skalieren (kWh→MWh), Komma-Dezimal."""
         try:
@@ -546,6 +580,44 @@ class App:
             ok = (self._state(c, "level") or 0) == 0
             it.update(icon="alarm", sublabel=("Alles ok" if ok else "Alarm!"),
                       tone=("good" if ok else "crit"))
+        elif t == "Radio":
+            outs = (c.get("details") or {}).get("outputs") or {}
+            aoi = int(self._state(c, "activeOutput") or 0)
+            it.update(icon="switch", on=aoi > 0, nav={"view": "control", "id": uuid},
+                      sublabel=(outs.get(str(aoi)) or ("Aus" if aoi == 0 else f"Ausgang {aoi}")))
+        elif t == "LightController":
+            scenes = self._lc_scenes(c)
+            asc = int(self._state(c, "activeScene") or 0)
+            it.update(icon="bulb", on=asc != 0, nav={"view": "control", "id": uuid},
+                      sublabel=(scenes.get(asc) or ("Aus" if asc == 0 else f"Szene {asc}")))
+        elif t == "PresenceDetector":
+            on = bool(self._state(c, "active"))
+            itxt = self._text(c, "infoText")
+            it.update(icon="info", on=on,
+                      sublabel=(itxt if itxt and itxt.lower() not in ("on", "off")
+                                else ("Anwesend" if on else "Abwesend")))
+        elif t == "WindowMonitor":
+            op = int(self._state(c, "numOpen") or 0) + int(self._state(c, "numTilted") or 0)
+            it.update(icon="blind", on=op > 0,
+                      sublabel=(f"{op} offen" if op else "Alle geschlossen"))
+        elif t == "Alarm":
+            armed = bool(self._state(c, "armed"))
+            lvl = self._state(c, "level") or 0
+            it.update(icon="alarm", on=armed, tone=("crit" if lvl else None),
+                      sublabel=("Alarm!" if lvl else ("Scharf" if armed else "Unscharf")))
+        elif t == "AcControl":
+            modes = self._json_list_map(c, "operatingModes")
+            tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
+            it.update(icon="thermo", on=(self._state(c, "status") or 0) != 0,
+                      sublabel=(" · ".join(x for x in (modes.get(int(self._state(c, "mode") or 0)),
+                                                       (tt + " °C" if tt else "")) if x) or "Klima"))
+        elif t == "ClimateControllerUS":
+            it.update(icon="thermo", sublabel="Klimasteuerung")
+        elif t == "SystemScheme":
+            it.update(icon="info", sublabel="Anlagenschema")
+        elif t == "Hourcounter":
+            it["sublabel"] = ("Wartung fällig" if self._state(c, "overdue")
+                              else self._fmt_num(self._state(c, "total"), "%.0f h"))
         elif (t or "").startswith("Central"):
             muuids = [m.get("uuid") for m in ((c.get("details") or {}).get("controls") or [])
                       if m.get("uuid") in self.controls]
@@ -556,6 +628,14 @@ class App:
             elif t == "CentralAudioZone":
                 n = sum(1 for mu in muuids if self._state(self.controls[mu], "playState") == 2)
                 it["sublabel"] = f"Spielt in {n} Räumen" if n else "Aus"
+            elif t == "CentralGate":
+                n = sum(1 for mu in muuids if (self._state(self.controls[mu], "position") or 0) > 0)
+                it["sublabel"] = f"{n} offen" if n else "Alle geschlossen"
+            elif t == "CentralJalousie":
+                it["sublabel"] = "Beschattung"
+            elif t == "CentralAlarm":
+                it["sublabel"] = "Alarmzentrale"
+            it.setdefault("sublabel", "Zentral")
             it.update(icon="central", on=(n > 0),
                       nav={"view": "group", "kind": "central", "id": uuid})
         return self._apply_tile_style(it, uuid, prof)
@@ -671,6 +751,28 @@ class App:
             r = LIGHT.render(cu, self.states)
             return {"t": "view", "title": _clean(c.get("name")), "subtitle": r["label"],
                     "route": route, "layout": "list", "items": items}
+        if t == "Radio":
+            ua = c.get("uuidAction")
+            outs = (c.get("details") or {}).get("outputs") or {}
+            ao = int(self._state(c, "activeOutput") or 0)
+            items = [{"id": f"{uuid}:0", "label": "Aus", "on": ao == 0, "icon": "stop",
+                      "cmd": {"uuid": ua, "cmd": "reset"}}]
+            for k in sorted(outs, key=lambda x: int(x)):
+                items.append({"id": f"{uuid}:{k}", "label": outs[k], "on": ao == int(k),
+                              "icon": "mood", "cmd": {"uuid": ua, "cmd": str(k)}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "layout": "list", "items": items}
+        if t == "LightController":
+            ua = c.get("uuidAction")
+            scenes = self._lc_scenes(c)
+            asc = int(self._state(c, "activeScene") or 0)
+            items = [{"id": f"{uuid}:0", "label": "Aus", "on": asc == 0, "icon": "stop",
+                      "cmd": {"uuid": ua, "cmd": "0"}}]
+            for sid in sorted(scenes):
+                items.append({"id": f"{uuid}:{sid}", "label": scenes[sid], "on": asc == sid,
+                              "icon": "mood", "cmd": {"uuid": ua, "cmd": str(sid)}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "layout": "list", "items": items}
         if t == "Jalousie":
             ua = c.get("uuidAction")
             cu = self._with_uuid(uuid)
@@ -719,6 +821,12 @@ class App:
                 {"k": "slider", "icon": "vol", "value": vol, "min": 0, "max": 100,
                  "cmd": {"uuid": ua, "tmpl": "volume/{v}"}},
             ]
+            favs = self._audio_favs(c)
+            if favs:
+                blocks.append({"k": "favs", "items": [
+                    {"label": f["name"], "cmd": {"uuid": ua, "cmd": f"roomfav/play/{f['slot']}"},
+                     "cover": ("/cover?u=" + quote(f["cover"], safe="")) if f["cover"] else ""}
+                    for f in favs]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Gate":
             ua = c.get("uuidAction")

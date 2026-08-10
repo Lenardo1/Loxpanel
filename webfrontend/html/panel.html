@@ -43,6 +43,12 @@
   .tile.on .ico{color:var(--ico-fixed,var(--glow));}
   .tile .ico svg{width:var(--ico-size,38px);height:var(--ico-size,38px);}
   .tile .ico .rawico{width:var(--ico-size,38px);height:var(--ico-size,38px);object-fit:contain;display:block;}
+  .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
+  .fav{flex:0 0 auto;width:88px;cursor:pointer;text-align:center;}
+  .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--muted);}
+  .favc img{width:100%;height:100%;object-fit:cover;}
+  .favc svg{width:34px;height:34px;}
+  .favn{font-size:12px;margin-top:5px;line-height:1.15;max-height:2.4em;overflow:hidden;}
   .tile .ico.img{display:inline-block;width:var(--ico-size,38px);height:var(--ico-size,38px);background-color:currentColor;
     -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .tile .chev{color:var(--muted);opacity:.55;}
@@ -215,6 +221,7 @@ function renderPanel(blocks){
     else if(b.k==='value') html+='<div class="pbar">'+esc(b.text||'')+'</div>';
     else if(b.k==='slider') html+='<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'" value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
     else if(b.k==='row') html+='<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+'">'+b.cells.map(cellHtml).join('')+'</div>';
+    else if(b.k==='favs') html+='<div class="favs">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
   }
   g.innerHTML=html;
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img){img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
@@ -235,6 +242,9 @@ function renderPanel(blocks){
       });
     });
   }
+  const fb=blocks.find(b=>b.k==='favs'); const fe=g.querySelector('.favs');
+  if(fb&&fe){ fe.querySelectorAll('.fav').forEach(n=>{ const f=fb.items[+n.dataset.f]; if(!f)return;
+    n.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(f.cmd) send({t:'cmd',uuid:f.cmd.uuid,cmd:f.cmd.cmd}); }); }); }
   renderTabs();
 }
 function updatePanel(blocks){
