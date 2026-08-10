@@ -1280,7 +1280,7 @@ async def api_agent_announce(request: web.Request) -> web.Response:
         d = await request.json()
     except (ValueError, aiohttp.ContentTypeError):
         d = {}
-    ip = request.remote or "?"
+    ip = str(d.get("ip") or "").strip() or request.remote or "?"
     app.agents[ip] = {"ip": ip, "name": str(d.get("name") or ip)[:60],
                       "panel": str(d.get("panel") or ""), "port": int(d.get("port") or 8130),
                       "kiosk": bool(d.get("kiosk")), "ts": time.time()}
