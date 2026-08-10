@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoxPanel — Konfiguration</title>
+<style>
+  :root{
+    --bg:#16181c; --panel:#1c1f24; --panel2:#212530; --line:#2a2e35;
+    --fg:#e7e9ec; --muted:#9aa0a8; --accent:#e0a24d; --good:#52b881; --crit:#e2695f;
+    --radius:12px;
+    --font:"Inter","Roboto","Segoe UI Variable Text",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;}
+  body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;}
+  a{color:var(--accent);text-decoration:none;}
+  .wrap{display:grid;grid-template-columns:260px 1fr;min-height:100vh;}
+  /* Sidebar */
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:18px 16px;display:flex;flex-direction:column;gap:14px;}
+  .brand{font-size:20px;font-weight:600;letter-spacing:.2px;}
+  .brand small{display:block;color:var(--muted);font-size:12px;font-weight:400;letter-spacing:.4px;text-transform:uppercase;margin-top:2px;}
+  .plist{display:flex;flex-direction:column;gap:6px;}
+  .pitem{display:flex;flex-direction:column;gap:1px;padding:9px 11px;border-radius:10px;border:1px solid transparent;cursor:pointer;}
+  .pitem:hover{background:var(--panel2);}
+  .pitem.active{background:var(--panel2);border-color:var(--accent);}
+  .pitem .pn{font-weight:550;}
+  .pitem .pid{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace;}
+  .addbtn{margin-top:2px;background:transparent;color:var(--accent);border:1px dashed #3a3f49;border-radius:10px;padding:9px;cursor:pointer;font:inherit;}
+  .addbtn:hover{border-color:var(--accent);}
+  .hint{margin-top:auto;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px;}
+  .hint code{background:var(--panel2);padding:1px 6px;border-radius:6px;font-size:12px;}
+  /* Main */
+  .main{padding:26px 30px;overflow-y:auto;max-height:100vh;}
+  .ehead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
+  .ehead h2{margin:0;font-size:22px;font-weight:600;}
+  .badge{font-family:ui-monospace,monospace;font-size:12px;background:var(--panel2);border:1px solid var(--line);color:var(--muted);padding:2px 8px;border-radius:999px;}
+  .url{color:var(--muted);font-size:13px;margin-bottom:22px;}
+  .url code{color:var(--fg);}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;}
+  .card h3{margin:0 0 4px;font-size:15px;font-weight:600;}
+  .card .note{color:var(--muted);font-size:13px;margin:0 0 14px;}
+  .field{display:flex;flex-direction:column;gap:6px;max-width:420px;}
+  label.lbl{font-size:13px;color:var(--muted);}
+  input[type=text],input[type=number]{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:9px 11px;font:inherit;}
+  input:focus{outline:none;border-color:var(--accent);}
+  .sizes{display:flex;gap:16px;flex-wrap:wrap;}
+  .sizes .field{max-width:120px;}
+  /* chips (tabs) */
+  .chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;user-select:none;font-size:14px;}
+  .chip.on{background:rgba(224,162,77,.14);border-color:var(--accent);color:var(--fg);}
+  .chip .star{color:var(--accent);font-size:11px;margin-left:6px;}
+  /* checklist */
+  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .count{color:var(--muted);font-size:13px;}
+  .count b{color:var(--fg);}
+  .minibtn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;}
+  .minibtn:hover{border-color:var(--accent);}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}
+  .opt{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;user-select:none;}
+  .opt:hover{border-color:#3a3f49;}
+  .opt.on{border-color:var(--accent);background:rgba(224,162,77,.08);}
+  .opt .box{width:18px;height:18px;border-radius:5px;border:1.5px solid #454b55;display:grid;place-items:center;flex:none;color:var(--bg);font-size:12px;font-weight:700;}
+  .opt.on .box{background:var(--accent);border-color:var(--accent);}
+  .opt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* footer actions */
+  .actions{position:sticky;bottom:0;display:flex;gap:12px;align-items:center;padding:16px 0 6px;background:linear-gradient(transparent,var(--bg) 40%);}
+  .btn{border:none;border-radius:10px;padding:11px 20px;font:inherit;font-weight:600;cursor:pointer;}
+  .btn.save{background:var(--accent);color:#1a1205;}
+  .btn.save:hover{filter:brightness(1.06);}
+  .btn.del{background:transparent;color:var(--crit);border:1px solid #45343a;}
+  .btn.del:hover{border-color:var(--crit);}
+  .toast{margin-left:auto;color:var(--good);font-size:14px;opacity:0;transition:opacity .25s;}
+  .toast.show{opacity:1;}
+  .toast.err{color:var(--crit);}
+  .empty{color:var(--muted);padding:40px 0;}
+  @media(max-width:720px){ .wrap{grid-template-columns:1fr;} .side{border-right:none;border-bottom:1px solid var(--line);} .main{max-height:none;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="side">
+    <div class="brand">LoxPanel<small>Konfiguration</small></div>
+    <div class="plist" id="plist"></div>
+    <button class="addbtn" id="addBtn">＋ Neues Panel</button>
+    <div class="hint">Auf jedem Wandpanel die Visu mit <code>?panel=&lt;id&gt;</code> öffnen.
+      <br><br><a href="/" target="_blank">↗ Visu öffnen</a></div>
+  </aside>
+  <main class="main" id="main"><div class="empty">lädt …</div></main>
+</div>
+<script>
+const $ = (s,r=document)=>r.querySelector(s);
+let META=null, PANELS={}, cur=null, dirty=false;
+
+async function load(){
+  const r = await fetch('/api/meta'); META = await r.json();
+  PANELS = JSON.parse(JSON.stringify(META.panels||{}));
+  if(!PANELS.default) PANELS.default = {title:'LoxPanel', tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
+  cur = PANELS.default ? 'default' : Object.keys(PANELS)[0];
+  renderList(); renderEditor();
+}
+
+function renderList(){
+  const box=$('#plist'); box.innerHTML='';
+  for(const id of Object.keys(PANELS)){
+    const p=PANELS[id];
+    const d=document.createElement('div');
+    d.className='pitem'+(id===cur?' active':'');
+    d.innerHTML='<span class="pn">'+esc(p.title||id)+'</span><span class="pid">?panel='+esc(id)+'</span>';
+    d.onclick=()=>{ cur=id; renderList(); renderEditor(); };
+    box.appendChild(d);
+  }
+}
+
+function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function renderEditor(){
+  const p=PANELS[cur]; if(!p){ $('#main').innerHTML='<div class="empty">Kein Panel gewählt.</div>'; return; }
+  const urlTxt = cur==='default' ? '/  (Standard, ohne Parameter)' : '/?panel='+cur;
+  const m=$('#main');
+  m.innerHTML =
+   '<div class="ehead"><h2 id="hTitle">'+esc(p.title||cur)+'</h2><span class="badge">'+esc(cur)+'</span></div>'+
+   '<div class="url">Kiosk-URL: <code>'+esc(urlTxt)+'</code></div>'+
+
+   '<div class="card"><h3>Titel</h3><p class="note">Fenstertitel des Panels.</p>'+
+     '<div class="field"><input type="text" id="fTitle" value="'+esc(p.title||'')+'" placeholder="'+esc(cur)+'"></div></div>'+
+
+   '<div class="card"><h3>Untere Leiste (Tabs)</h3>'+
+     '<p class="note">Welche Tabs erscheinen — der <b>erste aktive</b> ist die Startseite (★).</p>'+
+     '<div class="chips" id="chips"></div></div>'+
+
+   '<div class="card"><h3>Räume</h3>'+
+     '<p class="note">Welche Räume dieses Panel zeigt. <b>Nichts angehakt = alle Räume.</b></p>'+
+     '<div class="toolbar"><span class="count" id="cntRooms"></span>'+
+       '<button class="minibtn" id="clrRooms">Alle abwählen</button></div>'+
+     '<div class="grid" id="rooms"></div></div>'+
+
+   '<div class="card"><h3>Kategorien</h3>'+
+     '<p class="note">Welche Kategorien im Tab „Kategorien" erscheinen. <b>Nichts angehakt = alle.</b> '+
+       'Bei gesetzter Raum-Auswahl werden Kategorien zusätzlich auf diese Räume gefiltert.</p>'+
+     '<div class="toolbar"><span class="count" id="cntCats"></span>'+
+       '<button class="minibtn" id="clrCats">Alle abwählen</button></div>'+
+     '<div class="grid" id="cats"></div></div>'+
+
+   '<div class="card"><h3>Darstellung (optional)</h3>'+
+     '<p class="note">Überschreibt das globale Theme nur für dieses Panel. Leer = global.</p>'+
+     '<div class="sizes">'+
+       sizeField('Icon-Größe','iconSize',p.ui)+
+       sizeField('Name-Größe','nameSize',p.ui)+
+       sizeField('Sub-Größe','subSize',p.ui)+
+       '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
+         '<input type="text" id="fFont" value="'+esc((p.ui||{}).font||'')+'" placeholder="Inter, Roboto, …"></div>'+
+     '</div></div>'+
+
+   '<div class="actions">'+
+     '<button class="btn save" id="saveBtn">Speichern</button>'+
+     (cur==='default'?'':'<button class="btn del" id="delBtn">Panel löschen</button>')+
+     '<span class="toast" id="toast"></span></div>';
+
+  // Titel live
+  $('#fTitle').oninput=e=>{ p.title=e.target.value; $('#hTitle').textContent=e.target.value||cur; markDirty(); };
+  $('#fFont').oninput=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.font=e.target.value:delete p.ui.font; markDirty(); };
+
+  renderChips(p); renderChecklist(p,'rooms'); renderChecklist(p,'cats');
+  $('#clrRooms').onclick=()=>{ p.rooms=[]; renderChecklist(p,'rooms'); markDirty(); };
+  $('#clrCats').onclick=()=>{ p.cats=[]; renderChecklist(p,'cats'); markDirty(); };
+  $('#saveBtn').onclick=save;
+  const del=$('#delBtn'); if(del) del.onclick=()=>{ if(confirm('Panel „'+cur+'" löschen?')){ delete PANELS[cur]; cur='default'; renderList(); renderEditor(); markDirty(); } };
+}
+
+function sizeField(label,key,ui){
+  const v=(ui||{})[key];
+  return '<div class="field"><label class="lbl">'+label+'</label>'+
+    '<input type="number" min="8" max="80" data-ui="'+key+'" value="'+(v==null?'':v)+'" placeholder="—"></div>';
+}
+
+function renderChips(p){
+  const box=$('#chips'); box.innerHTML='';
+  META.tabs.forEach(t=>{
+    const on=p.tabs.includes(t.tab);
+    const first = p.tabs.length && p.tabs.indexOf(t.tab)===firstTabIndex(p);
+    const c=document.createElement('div');
+    c.className='chip'+(on?' on':'');
+    c.innerHTML=esc(t.label)+(on&&first?'<span class="star">★ Start</span>':'');
+    c.onclick=()=>{ toggleTab(p,t.tab); renderChips(p); markDirty(); };
+    box.appendChild(c);
+  });
+  // Größen-Inputs binden
+  document.querySelectorAll('input[data-ui]').forEach(inp=>{
+    inp.oninput=()=>{ p.ui=p.ui||{}; const k=inp.dataset.ui;
+      if(inp.value==='') delete p.ui[k]; else p.ui[k]=Number(inp.value); markDirty(); };
+  });
+}
+function firstTabIndex(p){ // kleinster Index in kanonischer Reihenfolge
+  const order=META.tabs.map(t=>t.tab);
+  let best=99,bt=null; p.tabs.forEach(tb=>{const i=order.indexOf(tb); if(i>-1&&i<best){best=i;bt=tb;}});
+  return p.tabs.indexOf(bt);
+}
+function toggleTab(p,tab){
+  const i=p.tabs.indexOf(tab);
+  if(i>-1){ if(p.tabs.length>1) p.tabs.splice(i,1); }   // mind. 1 Tab behalten
+  else { // in kanonischer Reihenfolge einsortieren
+    const order=META.tabs.map(t=>t.tab);
+    p.tabs.push(tab); p.tabs.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
+  }
+}
+
+function renderChecklist(p,kind){
+  const list=META[kind]||[], sel=p[kind]||[];
+  const box=$('#'+kind); box.innerHTML='';
+  list.forEach(o=>{
+    const on=sel.includes(o.uuid);
+    const d=document.createElement('div');
+    d.className='opt'+(on?' on':'');
+    d.innerHTML='<span class="box">'+(on?'✓':'')+'</span><span class="nm">'+esc(o.name)+'</span>';
+    d.onclick=()=>{ const i=p[kind].indexOf(o.uuid); if(i>-1)p[kind].splice(i,1); else p[kind].push(o.uuid);
+      renderChecklist(p,kind); markDirty(); };
+    box.appendChild(d);
+  });
+  const cnt=$('#'+(kind==='rooms'?'cntRooms':'cntCats'));
+  if(cnt) cnt.innerHTML = sel.length? ('<b>'+sel.length+'</b> von '+list.length+' ausgewählt')
+                                    : ('<b>alle</b> '+list.length+' sichtbar');
+}
+
+function markDirty(){ dirty=true; const t=$('#toast'); if(t){ t.className='toast'; t.textContent=''; } renderList(); }
+
+async function save(){
+  const t=$('#toast');
+  try{
+    const r=await fetch('/api/panels',{method:'POST',headers:{'Content-Type':'application/json'},
+                          body:JSON.stringify({panels:PANELS})});
+    const j=await r.json();
+    if(j.ok){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels neu laden zum Übernehmen'; }
+    else { t.className='toast show err'; t.textContent='Fehler: '+(j.error||'?'); }
+  }catch(e){ t.className='toast show err'; t.textContent='Fehler: '+e; }
+  setTimeout(()=>{ if(t) t.classList.remove('show'); }, 4000);
+}
+
+$('#addBtn').onclick=()=>{
+  let id=prompt('ID des neuen Panels (klein, ohne Leerzeichen), z. B. wohnzimmer:');
+  if(!id) return; id=id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  if(!id){ alert('Ungültige ID.'); return; }
+  if(PANELS[id]){ alert('Panel „'+id+'" gibt es schon.'); return; }
+  PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
+  cur=id; renderList(); renderEditor(); markDirty();
+};
+
+window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+load().catch(e=>{ $('#main').innerHTML='<div class="empty">Konnte Daten nicht laden: '+esc(e)+'</div>'; });
+</script>
+</body>
+</html>

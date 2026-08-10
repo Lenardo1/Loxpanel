@@ -78,8 +78,12 @@ passende Profil aus `config/panels.json`. Pro Profil einstellbar:
 - `states` — Zustandsfarben-Override
 
 Ohne `panels.json` verhält sich jedes Panel wie `default` (alles sichtbar).
-Vorlage: `config/panels.json.example`. Die spätere LoxBerry-Config-Seite
-schreibt genau diese Datei (Räume/Kategorien anklickbar pro Gerät).
+Vorlage: `config/panels.json.example`.
+
+**Konfig-Oberfläche:** `http://localhost:8099/config` — listet alle Räume und
+Kategorien der Anlage als **anklickbare Liste**; pro Panel Tabs, sichtbare
+Räume/Kategorien und Schrift/Größe wählen, „Speichern" schreibt `panels.json`.
+Diese Seite wandert später als PHP-Frontend ins LoxBerry-Plugin.
 
 ## Roadmap
 

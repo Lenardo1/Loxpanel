@@ -34,11 +34,15 @@ from loxone_ws import LoxoneWS  # noqa: E402
 from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 
 log = logging.getLogger("loxpanel.webvisu")
-HTML = Path(__file__).resolve().parent.parent / "webfrontend" / "html" / "panel.html"
+_WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
+HTML = _WEB / "panel.html"
+CONFIG_HTML = _WEB / "config.html"
+PANELS_FILE = Path(__file__).resolve().parent.parent / "config" / "panels.json"
 LIGHT = LightControllerV2Adapter()
 JAL = JalousieAdapter()
 
 SWITCHY = {"Switch", "TimedSwitch"}
+VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
 _NUMFMT = re.compile(r"^(%[-+ 0-9.]*[dfeg])(.*)$")
 _PREFIX = ["k", "M", "G", "T"]
 
@@ -322,6 +326,61 @@ class App:
         if ar is None:
             return True
         return self.controls.get(uuid, {}).get("room") in ar
+
+    # ---- Config-Seite (Panel-Editor) ----
+    def _panel_export(self, raw: dict) -> dict:
+        """Rohes Profil aus der Datei -> UI-Form (rooms/cats als UUID-Listen,
+        in Anzeige-Reihenfolge; leere Liste = alle)."""
+        r = self._resolve_ids(raw.get("rooms"), self.rooms)
+        c = self._resolve_ids(raw.get("cats"), self.cats)
+        tabs = [t for t in (raw.get("tabs") or VALID_TABS) if t in VALID_TABS]
+        return {
+            "title": raw.get("title") or "",
+            "tabs": tabs or list(VALID_TABS),
+            "rooms": [u for u in self.rooms_with if r and u in r],
+            "cats": [u for u in self.cats_with if c and u in c],
+            "ui": {k: v for k, v in (raw.get("ui") or {}).items()
+                   if k in ("iconSize", "nameSize", "subSize", "font")},
+            "states": {k: v for k, v in (raw.get("states") or {}).items()
+                       if k in ("active", "good", "warn", "crit")},
+        }
+
+    @staticmethod
+    def _sanitize_panels(panels: dict) -> dict:
+        out: dict = {}
+        for pid, p in panels.items():
+            if not isinstance(pid, str) or not pid or pid.startswith("_") or not isinstance(p, dict):
+                continue
+            e: dict = {}
+            if p.get("title"):
+                e["title"] = str(p["title"])[:40]
+            tabs = [t for t in (p.get("tabs") or []) if t in VALID_TABS]
+            e["tabs"] = tabs or list(VALID_TABS)
+            e["rooms"] = [str(x) for x in (p.get("rooms") or []) if isinstance(x, str)]
+            e["cats"] = [str(x) for x in (p.get("cats") or []) if isinstance(x, str)]
+            ui = p.get("ui") or {}
+            cui = {k: ui[k] for k in ("iconSize", "nameSize", "subSize")
+                   if isinstance(ui.get(k), (int, float))}
+            if ui.get("font"):
+                cui["font"] = str(ui["font"])[:120]
+            if cui:
+                e["ui"] = cui
+            st = p.get("states") or {}
+            cst = {k: str(st[k]) for k in ("active", "good", "warn", "crit")
+                   if isinstance(st.get(k), str)}
+            if cst:
+                e["states"] = cst
+            out[pid] = e
+        return out
+
+    def _write_panels(self, panels: dict) -> None:
+        doc = {"_comment": "Von der LoxPanel-Konfigurationsseite (/config) verwaltet. "
+                           "Jedes Panel oeffnet die Visu mit ?panel=<id>. "
+                           "rooms/cats leer = alle sichtbar.",
+               "panels": panels}
+        PANELS_FILE.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                               encoding="utf-8")
+        self.panels = load_panels()
 
     async def fetch_icon(self, path: str) -> tuple[bytes, str] | None:
         if path in self.icon_cache:
@@ -688,6 +747,44 @@ async def index(request: web.Request) -> web.Response:
     return web.Response(text=HTML.read_text(encoding="utf-8"), content_type="text/html")
 
 
+async def config_index(request: web.Request) -> web.Response:
+    return web.Response(text=CONFIG_HTML.read_text(encoding="utf-8"), content_type="text/html")
+
+
+async def api_meta(request: web.Request) -> web.Response:
+    """Alle Räume/Kategorien der Anlage + aktuelle Profile (für den Editor)."""
+    app: App = request.app["app"]
+    rooms = [{"uuid": ru, "name": _clean(app.rooms[ru].get("name", ""))} for ru in app.rooms_with]
+    cats = [{"uuid": cu, "name": _clean(app.cats[cu].get("name", ""))} for cu in app.cats_with]
+    panels = {pid: app._panel_export(raw) for pid, raw in app.panels.items()}
+    return web.json_response({
+        "rooms": rooms, "cats": cats,
+        "tabs": [{"tab": "favoriten", "label": "Favoriten"},
+                 {"tab": "zentral", "label": "Zentral"},
+                 {"tab": "raeume", "label": "Räume"},
+                 {"tab": "kategorien", "label": "Kategorien"}],
+        "panels": panels,
+    })
+
+
+async def api_save_panels(request: web.Request) -> web.Response:
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    panels = data.get("panels")
+    if not isinstance(panels, dict):
+        return web.json_response({"ok": False, "error": "Feld 'panels' fehlt"}, status=400)
+    clean = App._sanitize_panels(panels)
+    try:
+        app._write_panels(clean)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
+    log.info("panels.json gespeichert: %d Profile", len(clean))
+    return web.json_response({"ok": True, "count": len(clean)})
+
+
 async def icon_handler(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     p = request.query.get("p", "")
@@ -811,6 +908,9 @@ def main() -> None:
     a = web.Application()
     a["app"] = App(_config())
     a.router.add_get("/", index)
+    a.router.add_get("/config", config_index)
+    a.router.add_get("/api/meta", api_meta)
+    a.router.add_post("/api/panels", api_save_panels)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
     a.router.add_get("/mjpeg", mjpeg_handler)
