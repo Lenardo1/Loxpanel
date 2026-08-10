@@ -62,7 +62,7 @@
   <div class="card">
     <h3>Miniserver</h3>
     <p class="note">Zugang zum Loxone Miniserver. Nach dem Speichern verbindet der Server sofort neu.</p>
-    <div class="field"><label class="lbl">Host / IP</label><input type="text" id="ms_host" placeholder="10.0.0.50"></div>
+    <div class="field"><label class="lbl">Host / IP</label><input type="text" id="ms_host" placeholder="192.168.1.50"></div>
     <div class="row2">
       <div class="field"><label class="lbl">Benutzer</label><input type="text" id="ms_user" autocomplete="off"></div>
       <div class="field"><label class="lbl">Passwort</label><input type="password" id="ms_pass" autocomplete="new-password" placeholder="unverändert lassen"></div>
@@ -108,7 +108,7 @@ async function load(){
   else {
     box.innerHTML=META.intercoms.map(ic=>
       '<div class="ic" data-uuid="'+esc(ic.uuid)+'"><div class="icname">'+esc(ic.name)+'</div>'+
-      '<div class="field"><label class="lbl">Video-URL (MJPEG)</label><input type="text" class="ic_url" value="'+esc(ic.url)+'" placeholder="http://10.0.0.201/cgi-bin/faststream.jpg?stream=full&fps=8"></div>'+
+      '<div class="field"><label class="lbl">Video-URL (MJPEG)</label><input type="text" class="ic_url" value="'+esc(ic.url)+'" placeholder="http://192.168.1.201/cgi-bin/faststream.jpg?stream=full&fps=8"></div>'+
       '<div class="row2"><div class="field"><label class="lbl">Benutzer</label><input type="text" class="ic_user" value="'+esc(ic.user)+'" autocomplete="off"></div>'+
       '<div class="field"><label class="lbl">Passwort</label><input type="password" class="ic_pass" autocomplete="new-password" placeholder="'+(ic.hasPass?'unverändert lassen':'')+'"></div></div></div>'
     ).join('');
