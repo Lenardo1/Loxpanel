@@ -4,8 +4,8 @@
   "miniserver": {
     "_comment": "Bevorzugt aus der LoxBerry-Miniserver-Verwaltung (msno). host/user/pass als Fallback/Standalone. Gen2 = HTTPS mit selbstsigniertem Zertifikat -> verify_tls:false.",
     "msno": 1,
-    "host": "10.0.0.50",
-    "user": "LenardoHome",
+    "host": "192.168.1.50",
+    "user": "LoxoneUser",
     "pass": "CHANGEME",
     "port": 443,
     "verify_tls": false
