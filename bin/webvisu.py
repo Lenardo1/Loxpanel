@@ -582,10 +582,13 @@ class App:
             it.update(icon="alarm", sublabel=("Alles ok" if ok else "Alarm!"),
                       tone=("good" if ok else "crit"))
         elif t == "Radio":
+            # Radio-Baustein ist bei Loxone meist eine STATUS-Anzeige (z.B. Tür
+            # offen/geschlossen, vom Programm gesetzt) -> nicht schaltbar
+            # (Miniserver quittiert Set-Befehle mit HTTP 500). Nur Status zeigen.
             outs = (c.get("details") or {}).get("outputs") or {}
             aoi = int(self._state(c, "activeOutput") or 0)
-            it.update(icon="switch", on=aoi > 0, nav={"view": "control", "id": uuid},
-                      sublabel=(outs.get(str(aoi)) or ("Aus" if aoi == 0 else f"Ausgang {aoi}")))
+            it.update(icon="info",
+                      sublabel=(outs.get(str(aoi)) or ("–" if aoi == 0 else f"Ausgang {aoi}")))
         elif t == "LightController":
             scenes = self._lc_scenes(c)
             asc = int(self._state(c, "activeScene") or 0)
@@ -782,17 +785,6 @@ class App:
             r = LIGHT.render(cu, self.states)
             return {"t": "view", "title": _clean(c.get("name")), "subtitle": r["label"],
                     "route": route, "layout": "list", "items": items}
-        if t == "Radio":
-            ua = c.get("uuidAction")
-            outs = (c.get("details") or {}).get("outputs") or {}
-            ao = int(self._state(c, "activeOutput") or 0)
-            items = [{"id": f"{uuid}:0", "label": "Aus", "on": ao == 0, "icon": "stop",
-                      "cmd": {"uuid": ua, "cmd": "reset"}}]
-            for k in sorted(outs, key=lambda x: int(x)):
-                items.append({"id": f"{uuid}:{k}", "label": outs[k], "on": ao == int(k),
-                              "icon": "mood", "cmd": {"uuid": ua, "cmd": str(k)}})
-            return {"t": "view", "title": _clean(c.get("name")), "route": route,
-                    "layout": "list", "items": items}
         if t == "LightController":
             ua = c.get("uuidAction")
             scenes = self._lc_scenes(c)
