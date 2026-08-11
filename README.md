@@ -82,17 +82,49 @@ python bin/webvisu.py             # -> http://localhost:8099
 Theme anpassen: `config/theme.json`. Deployment aufs Wandpanel: siehe `deploy/`
 (`DEPLOY.md`, systemd-Service, Chromium-Kiosk-Autostart).
 
-## Docker
+## Installation (Docker)
+
+Fertiges Multi-Arch-Image (amd64 / arm64 / **armv7** – läuft auch auf dem
+Raspberry Pi) unter `ghcr.io/lenardo1/loxpanel:latest`.
+
+### Portainer (Stack – empfohlen)
+
+**Stacks → Add stack → Web editor**, einfügen und deployen:
+
+```yaml
+services:
+  loxpanel:
+    image: ghcr.io/lenardo1/loxpanel:latest
+    container_name: loxpanel
+    restart: unless-stopped
+    ports:
+      - "8099:8099"
+    environment:
+      LOXPANEL_MS_HOST: "192.168.1.50"     # Miniserver-IP
+      LOXPANEL_MS_USER: "LoxoneUser"
+      LOXPANEL_MS_PASS: "dein-passwort"
+      LOXPANEL_MS_PORT: "443"
+      LOXPANEL_MS_VERIFY_TLS: "false"       # Gen2 selbstsigniert -> false
+    volumes:
+      - loxpanel_config:/app/config          # panels.json / theme.json / loxpanel.cfg persistent
+volumes:
+  loxpanel_config:
+```
+
+Danach: Visu `http://<host>:8099`, Konfig `…/config`, Einstellungen `…/settings`.
+Zugangsdaten hier per Env **oder** leer lassen und in `/settings` eintragen.
+(Privates GHCR-Package: auf *public* stellen oder in Portainer unter *Registries*
+`ghcr.io` + Token hinterlegen.)
+
+### docker compose (aus dem Repo)
 
 ```bash
 cp .env.example .env            # Miniserver-Host/User/Pass eintragen
-docker compose up -d --build    # -> http://<docker-host>:8099
+docker compose up -d            # -> http://<docker-host>:8099
 ```
 
-Miniserver-Zugang per Env (`LOXPANEL_MS_*`) oder `config/loxpanel.cfg` im
-gemounteten `./config`-Volume; `panels.json`/`theme.json` persistieren dort.
-Details: `deploy/DOCKER.md`. (Kein Umweg zum LoxBerry-Plugin — gleiche Server-
-Basis, LoxBerry kann Docker-Plugins direkt einbinden.)
+Details & Panel-Kiosk: `deploy/DOCKER.md` / `deploy/DEPLOY.md`. (Kein Umweg zum
+LoxBerry-Plugin — gleiche Server-Basis, LoxBerry kann Docker-Plugins direkt einbinden.)
 
 ## Konfiguration (`config/loxpanel.cfg`, gitignored)
 
