@@ -23,3 +23,7 @@ AGENT_PORT=8130
 # Fensterposition (negativ = nach links). Leer/0 = kein Versatz. Nach Aendern:
 # Agent neu laden (Settings -> Displays -> Reload) bzw. neu booten.
 # X=-8
+# DPMS_OFF = Sekunden bis das Display komplett abschaltet (Backlight aus), wenn
+# nichts angetippt wird. 0 = nie. Antippen weckt es sofort. Default 180 (3 min).
+# Der Web-Screensaver (Uhr) erscheint schon nach 60 s; danach schaltet DPMS ab.
+# DPMS_OFF=180
