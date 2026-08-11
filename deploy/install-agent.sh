@@ -220,6 +220,20 @@ command -v python3 >/dev/null || echo "   WARN: python3 fehlt  -> sudo apt insta
 command -v chromium >/dev/null || command -v chromium-browser >/dev/null \
   || echo "   WARN: chromium fehlt -> sudo apt install -y chromium"
 
+echo "==> Chromium-Policies (kein Sign-in / Sync / Promo)"
+for pol in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
+  sudo mkdir -p "$pol"
+  sudo tee "$pol/loxpanel.json" >/dev/null <<'JSONEOF'
+{
+  "BrowserSignin": 0,
+  "SyncDisabled": true,
+  "MetricsReportingEnabled": false,
+  "PromotionalTabsEnabled": false,
+  "DefaultBrowserSettingEnabled": false
+}
+JSONEOF
+done
+
 echo "==> 5/5 Autostart via ~/.xsession"
 # Robust fuer LightDM/GDM (Default-Xsession fuehrt ~/.xsession aus) und startx.
 # Der Kiosk laeuft ohne extra Fenstermanager (wie eine dedizierte Kiosk-Session).
