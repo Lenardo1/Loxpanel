@@ -14,6 +14,7 @@ SERVER="${SERVER:-192.168.1.10:8099}"    # IP:Port deines LoxPanel-Servers (Dock
 AGENT_NAME="${AGENT_NAME:-$(hostname)}"  # Anzeigename in /settings
 PANEL="${PANEL:-}"                       # Panel-Profil-ID (leer = Standardansicht)
 AUTOSTART="${AUTOSTART:-1}"              # 1 = Kiosk beim Booten; 0 = nur Agent, Start aus /settings
+TIMEZONE="${TIMEZONE:-Europe/Vienna}"   # Systemzeitzone (Screensaver-Uhr); leer = unveraendert lassen
 # ================================================================================
 
 AGENT_DIR="/opt/loxpanel/agent"
@@ -214,6 +215,12 @@ AGENT_NAME=$AGENT_NAME
 AGENT_PORT=8130
 AUTOSTART=$AUTOSTART
 EOF
+
+if [ -n "$TIMEZONE" ]; then
+  echo "==> Zeitzone -> $TIMEZONE (fuer die Screensaver-Uhr)"
+  sudo timedatectl set-timezone "$TIMEZONE" 2>/dev/null \
+    || echo "   WARN: Zeitzone nicht gesetzt (timedatectl fehlt?) — manuell: sudo timedatectl set-timezone $TIMEZONE"
+fi
 
 echo "==> 4/5 Voraussetzungen"
 command -v python3 >/dev/null || echo "   WARN: python3 fehlt  -> sudo apt install -y python3"
