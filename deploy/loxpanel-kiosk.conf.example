@@ -19,3 +19,7 @@ AGENT_PORT=8130
 # AUTOSTART=0 -> Kiosk NICHT automatisch oeffnen; Start/Ansicht kommt aus
 # der Settings-Seite (Displays). Default 1 (startet beim Hochfahren).
 # AUTOSTART=0
+# X = horizontaler Feinversatz der ganzen Visu in px gegen Display-Overscan/
+# Fensterposition (negativ = nach links). Leer/0 = kein Versatz. Nach Aendern:
+# Agent neu laden (Settings -> Displays -> Reload) bzw. neu booten.
+# X=-8

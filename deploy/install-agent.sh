@@ -15,6 +15,7 @@ AGENT_NAME="${AGENT_NAME:-$(hostname)}"  # Anzeigename in /settings
 PANEL="${PANEL:-}"                       # Panel-Profil-ID (leer = Standardansicht)
 AUTOSTART="${AUTOSTART:-1}"              # 1 = Kiosk beim Booten; 0 = nur Agent, Start aus /settings
 TIMEZONE="${TIMEZONE:-Europe/Vienna}"   # Systemzeitzone (Screensaver-Uhr); leer = unveraendert lassen
+NUDGE_X="${NUDGE_X:-}"                   # horiz. Feinversatz der Visu in px (z.B. -8 = 8px nach links); leer = 0
 # ================================================================================
 
 AGENT_DIR="/opt/loxpanel/agent"
@@ -75,6 +76,8 @@ SERVER = _cfg("SERVER", "localhost:8099")
 PORT = int(_cfg("AGENT_PORT", "8130"))
 NAME = _cfg("AGENT_NAME") or socket.gethostname()
 AUTOSTART = _cfg("AUTOSTART", "1").lower() not in ("0", "false", "no", "off")
+# X = horizontaler Feinversatz der ganzen Visu in px (negativ = nach links).
+NUDGE_X = _cfg("X", "").strip()
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -97,7 +100,12 @@ MY_IP = local_ip()
 
 
 def kiosk_url(panel):
-    return "http://%s/" % SERVER + ("?panel=%s" % panel if panel else "")
+    q = []
+    if panel:
+        q.append("panel=%s" % panel)
+    if NUDGE_X:
+        q.append("x=%s" % NUDGE_X)
+    return "http://%s/" % SERVER + ("?" + "&".join(q) if q else "")
 
 
 def stop_kiosk():
@@ -214,6 +222,7 @@ PANEL=$PANEL
 AGENT_NAME=$AGENT_NAME
 AGENT_PORT=8130
 AUTOSTART=$AUTOSTART
+X=$NUDGE_X
 EOF
 
 if [ -n "$TIMEZONE" ]; then
