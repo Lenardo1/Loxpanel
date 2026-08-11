@@ -42,6 +42,7 @@ _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
 HTML = _WEB / "panel.html"
 CONFIG_HTML = _WEB / "config.html"
 SETTINGS_HTML = _WEB / "settings.html"
+INSTALL_SH = Path(__file__).resolve().parent.parent / "deploy" / "install-agent.sh"
 _CFGDIR = Path(__file__).resolve().parent.parent / "config"
 PANELS_FILE = _CFGDIR / "panels.json"
 CFG_FILE = _CFGDIR / "loxpanel.cfg"
@@ -1200,6 +1201,15 @@ async def settings_index(request: web.Request) -> web.Response:
     return web.Response(text=SETTINGS_HTML.read_text(encoding="utf-8"), content_type="text/html")
 
 
+async def install_script(request: web.Request) -> web.Response:
+    """Liefert das Panel-Installer-Skript (fuer 'curl ... | bash' vom Panel aus)."""
+    try:
+        txt = INSTALL_SH.read_text(encoding="utf-8").replace("\r\n", "\n")
+    except OSError:
+        return web.Response(status=404, text="install-agent.sh nicht gefunden")
+    return web.Response(text=txt, content_type="text/plain")
+
+
 async def api_settings(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     cfg = _load_cfg()
@@ -1472,6 +1482,7 @@ def main() -> None:
     a.router.add_get("/", index)
     a.router.add_get("/config", config_index)
     a.router.add_get("/settings", settings_index)
+    a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_post("/api/panels", api_save_panels)
     a.router.add_get("/api/settings", api_settings)
