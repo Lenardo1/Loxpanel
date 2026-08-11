@@ -527,6 +527,15 @@ class App:
             "tiles": prof.get("tiles") or {},
         }
 
+    def panel_dpms(self, pid: str | None):
+        """Display-Abschaltzeit (Sek.) fuer ein Panel aus dem Profil (0=nie,
+        None=nicht gesetzt -> Agent nutzt seinen kiosk.conf-Default). Wird dem
+        Panel-Agenten in der Announce-Antwort mitgegeben (er fuehrt xset aus)."""
+        ui = {**self.theme.get("ui", {}),
+              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+        v = ui.get("dpmsOff")
+        return max(0, min(3600, int(v))) if isinstance(v, (int, float)) else None
+
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
         ar = prof.get("rooms") if prof else None
         if ar is None:
@@ -546,7 +555,7 @@ class App:
             "rooms": [u for u in self.rooms_with if r and u in r],
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
-                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX")},
+                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX", "dpmsOff")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -590,6 +599,8 @@ class App:
                 cui["font"] = str(ui["font"])[:120]
             if isinstance(ui.get("nudgeX"), (int, float)):
                 cui["nudgeX"] = max(-40, min(40, ui["nudgeX"]))  # horiz. Versatz px
+            if isinstance(ui.get("dpmsOff"), (int, float)):
+                cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
             if cui:
                 e["ui"] = cui
             st = p.get("states") or {}
@@ -1436,7 +1447,9 @@ async def api_agent_announce(request: web.Request) -> web.Response:
     app.agents[ip] = {"ip": ip, "name": str(d.get("name") or ip)[:60],
                       "panel": str(d.get("panel") or ""), "port": int(d.get("port") or 8130),
                       "kiosk": bool(d.get("kiosk")), "ts": time.time()}
-    return web.json_response({"ok": True})
+    # Panel-spezifische Geraeteeinstellungen an den Agenten zurueckgeben
+    # (der wendet sie am Geraet an, z.B. Display-Abschaltung per xset).
+    return web.json_response({"ok": True, "dpmsOff": app.panel_dpms(d.get("panel"))})
 
 
 async def api_agents(request: web.Request) -> web.Response:

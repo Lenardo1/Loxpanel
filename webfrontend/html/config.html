@@ -237,6 +237,9 @@ function renderEditor(){
        '<div class="field"><label class="lbl">Horiz. Versatz (px)</label>'+
          '<input type="number" min="-40" max="40" step="2" data-ui="nudgeX" value="'+
          (((p.ui||{}).nudgeX==null)?'':(p.ui||{}).nudgeX)+'" placeholder="0"></div>'+
+       '<div class="field"><label class="lbl">Display aus nach (Sek.)</label>'+
+         '<input type="number" min="0" max="3600" step="30" data-ui="dpmsOff" value="'+
+         (((p.ui||{}).dpmsOff==null)?'':(p.ui||{}).dpmsOff)+'" placeholder="180"></div>'+
      '</div></div>'+
 
    '<div class="actions">'+

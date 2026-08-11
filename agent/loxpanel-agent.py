@@ -99,19 +99,31 @@ def kiosk_url(panel):
     return "http://%s/" % SERVER + ("?" + "&".join(q) if q else "")
 
 
-def setup_dpms(env):
-    """Bildschirm-Power-Management (DPMS) einrichten: nach DPMS_OFF Sekunden
-    Inaktivitaet schaltet X das Display ab (Backlight aus); ein Antippen weckt
-    es automatisch (Input-Event). Der X-eigene Screensaver-Blank wird aus-
-    geschaltet, damit nur die echte Abschaltung greift."""
+_dpms_cur = None
+
+
+def _dpms_default():
+    try:
+        return int(float(DPMS_OFF or "0"))
+    except ValueError:
+        return 0
+
+
+def apply_dpms(secs):
+    """Display-Power-Management setzen: nach `secs` Sekunden Inaktivitaet
+    schaltet X das Display ab (Backlight aus); Antippen weckt es (Input-Event).
+    secs=0 -> nie abschalten. None -> ignorieren (kein Wert vom Server).
+    Wird sowohl beim Kiosk-Start (kiosk.conf-Default) als auch live aus der
+    Announce-Antwort des Servers aufgerufen; redundante Aufrufe werden verworfen."""
+    global _dpms_cur
+    if secs is None or secs == _dpms_cur:
+        return
     xset = shutil.which("xset")
     if not xset:
         print("xset fehlt (Paket x11-xserver-utils) — Display-Abschaltung inaktiv")
         return
-    try:
-        secs = int(float(DPMS_OFF or "0"))
-    except ValueError:
-        secs = 0
+    env = dict(os.environ)
+    env.setdefault("DISPLAY", ":0")
     try:
         subprocess.run([xset, "s", "off"], env=env, check=False)
         if secs > 0:
@@ -121,7 +133,8 @@ def setup_dpms(env):
             print("DPMS: Display aus nach %ss Inaktivitaet" % secs)
         else:
             subprocess.run([xset, "-dpms"], env=env, check=False)
-            print("DPMS: Abschaltung deaktiviert (DPMS_OFF=0)")
+            print("DPMS: Abschaltung deaktiviert (0)")
+        _dpms_cur = secs
     except Exception as e:
         print("DPMS-Setup fehlgeschlagen:", e)
 
@@ -159,7 +172,7 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
-    setup_dpms(env)
+    apply_dpms(_dpms_default())   # kiosk.conf-Default; Server kann es per Announce ueberschreiben
     print("Kiosk gestartet:", kiosk_url(_cur_panel))
     return True
 
@@ -175,7 +188,14 @@ def announce_loop():
             data = json.dumps({"name": NAME, "panel": _cur_panel, "ip": MY_IP,
                                "port": PORT, "kiosk": running()}).encode()
             req = urlreq.Request(url, data=data, headers={"Content-Type": "application/json"})
-            urlreq.urlopen(req, timeout=6).read()
+            resp = urlreq.urlopen(req, timeout=6).read()
+            # Server kann Geraeteeinstellungen zurueckgeben (z.B. Display-Abschaltung)
+            try:
+                r = json.loads(resp or b"{}")
+                if running():
+                    apply_dpms(r.get("dpmsOff"))
+            except Exception:
+                pass
         except Exception:
             pass
         time.sleep(15)
