@@ -58,6 +58,10 @@ NAME = _cfg("AGENT_NAME") or socket.gethostname()
 # AUTOSTART=0 -> Kiosk NICHT beim Start oeffnen, nur auf /start aus der
 # Settings-Seite warten.
 AUTOSTART = _cfg("AUTOSTART", "1").lower() not in ("0", "false", "no", "off")
+# X = horizontaler Feinversatz der ganzen Visu in px (negativ = nach links),
+# gegen Display-Overscan/Fensterposition. Wird als ?x= an die Kiosk-URL gehaengt
+# und ueberlebt Reboots (im Gegensatz zum localStorage im fluechtigen /tmp-Profil).
+NUDGE_X = _cfg("X", "").strip()
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -82,7 +86,12 @@ MY_IP = local_ip()
 
 
 def kiosk_url(panel):
-    return "http://%s/" % SERVER + ("?panel=%s" % panel if panel else "")
+    q = []
+    if panel:
+        q.append("panel=%s" % panel)
+    if NUDGE_X:
+        q.append("x=%s" % NUDGE_X)
+    return "http://%s/" % SERVER + ("?" + "&".join(q) if q else "")
 
 
 def stop_kiosk():
