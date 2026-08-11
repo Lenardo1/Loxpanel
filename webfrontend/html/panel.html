@@ -157,7 +157,15 @@
   .saver .sv-time{font-size:78px;font-weight:300;line-height:1;letter-spacing:1px;
     font-variant-numeric:tabular-nums;color:var(--ink);}
   .saver .sv-date{font-size:20px;color:var(--muted);margin-top:8px;text-transform:capitalize;}
-  .saver .sv-hint{position:absolute;bottom:26px;font-size:13px;color:var(--muted);opacity:.5;}
+  .saver .sv-hint{margin-top:22px;font-size:13px;color:var(--muted);opacity:.5;}
+  /* Anti-Einbrennen: Uhr driftet langsam ueber den Schirm */
+  .saver .sv-wrap{display:flex;flex-direction:column;align-items:center;
+    animation:svdrift 90s linear infinite;}
+  @keyframes svdrift{
+    0%{transform:translate(-30px,-20px);}   25%{transform:translate(30px,-20px);}
+    50%{transform:translate(30px,20px);}     75%{transform:translate(-30px,20px);}
+    100%{transform:translate(-30px,-20px);}
+  }
   .moreb{position:absolute;top:6px;right:8px;z-index:6;width:34px;height:34px;border-radius:50%;
     display:grid;place-items:center;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;
     background:rgba(255,255,255,.06);}
@@ -190,9 +198,11 @@
   <div class="grid" id="grid"></div>
   <div class="tabs" id="tabs"></div>
   <div class="saver hidden" id="saver">
-    <div class="sv-time" id="svTime">--:--</div>
-    <div class="sv-date" id="svDate"></div>
-    <div class="sv-hint">Zum Öffnen tippen</div>
+    <div class="sv-wrap">
+      <div class="sv-time" id="svTime">--:--</div>
+      <div class="sv-date" id="svDate"></div>
+      <div class="sv-hint">Zum Öffnen tippen</div>
+    </div>
   </div>
 </div>
 
