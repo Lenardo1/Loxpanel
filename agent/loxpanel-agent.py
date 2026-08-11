@@ -112,8 +112,9 @@ def start_kiosk(panel=None):
            "--disable-infobars", "--disable-session-crashed-bubble", "--disable-pinch",
            "--overscroll-history-navigation=0", "--check-for-update-interval=31536000",
            "--force-device-scale-factor=1", "--autoplay-policy=no-user-gesture-required",
-           # kein automatisches http->https (unser Server ist http):
-           "--disable-features=HttpsUpgrades,HttpsFirstBalancedMode,HttpsFirstModeV2",
+           # kein http->https-Upgrade (unser Server ist http) + keine Uebersetzen-Leiste:
+           "--disable-features=HttpsUpgrades,HttpsFirstBalancedMode,HttpsFirstModeV2,Translate,TranslateUI",
+           "--no-first-run",
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
