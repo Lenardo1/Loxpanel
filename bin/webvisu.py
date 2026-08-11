@@ -66,6 +66,11 @@ JAL = JalousieAdapter()
 
 SWITCHY = {"Switch", "TimedSwitch"}
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
+# Reine Anzeige-Bausteine: keine Steuer-2.-Ebene -> Antippen zeigt eine
+# grosse 1/1-Wertseite (_view_control -> _big_view).
+STATUS_BIG = {"Meter", "Slider", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
+              "InfoOnlyDigital", "SmokeAlarm", "PresenceDetector", "Alarm",
+              "AcControl", "ClimateControllerUS", "Hourcounter"}
 _COLOR_RE = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|[a-zA-Z]{3,20})$")
 
 
@@ -739,6 +744,9 @@ class App:
             it.setdefault("sublabel", "Zentral")
             it.update(icon="central", on=(n > 0),
                       nav={"view": "group", "kind": "central", "id": uuid})
+        # Status-Bausteine antippbar machen -> grosse Wertseite
+        if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
+            it["nav"] = {"view": "control", "id": uuid}
         return self._apply_tile_style(it, uuid, prof)
 
     def _apply_tile_style(self, it: dict, uuid: str, prof: dict | None) -> dict:
@@ -863,6 +871,18 @@ class App:
                   dict(empty)]
         return {"t": "view", "title": _clean(c.get("name")),
                 "route": {"view": "sources", "id": uuid}, "blocks": blocks}
+
+    def _big_view(self, uuid: str, icon: str, big: str, sub: str = "", tone=None) -> dict:
+        """Grosse 1/1-Wertseite fuer reine Status-Bausteine."""
+        c = self.controls.get(uuid, {})
+        blk = {"k": "big", "text": big}
+        if tone:
+            blk["tone"] = tone
+        blocks = [{"k": "hero", "icon": icon}, blk]
+        if sub:
+            blocks.append({"k": "status", "text": sub})
+        return {"t": "view", "title": _clean(c.get("name")),
+                "route": {"view": "control", "id": uuid}, "blocks": blocks}
 
     def _view_control(self, uuid: str) -> dict:
         v = self._view_control_inner(uuid)
@@ -1035,6 +1055,53 @@ class App:
             if cells:
                 blocks.append({"k": "row", "cells": cells})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+        # --- Status-Bausteine: grosse 1/1-Wertseite ---
+        if t == "Meter":
+            det = c.get("details") or {}
+            a = self._fmt_num(self._state(c, "actual"), det.get("actualFormat", "%.1f"))
+            tot = self._fmt_num(self._state(c, "total"), det.get("totalFormat", "%.1f"))
+            return self._big_view(uuid, "info", a or "–", (tot + " gesamt") if tot else "")
+        if t in ("Slider", "InfoOnlyAnalog"):
+            det = c.get("details") or {}
+            return self._big_view(uuid, "info",
+                                  self._fmt_num(self._state(c, "value"), det.get("format", "%.1f")) or "–")
+        if t in ("TextState", "InfoOnlyText"):
+            return self._big_view(uuid, "info",
+                                  str(self._state(c, "textAndIcon") or self._state(c, "text") or "–"))
+        if t == "InfoOnlyDigital":
+            on = bool(self._state(c, "active"))
+            tx = (c.get("details") or {}).get("text") or {}
+            return self._big_view(uuid, "info",
+                                  (tx.get("on") if on else tx.get("off")) or ("Ein" if on else "Aus"))
+        if t == "SmokeAlarm":
+            ok = (self._state(c, "level") or 0) == 0
+            return self._big_view(uuid, "alarm", "Alles ok" if ok else "Alarm!",
+                                  tone=("good" if ok else "crit"))
+        if t == "PresenceDetector":
+            on = bool(self._state(c, "active"))
+            itxt = self._text(c, "infoText")
+            big = itxt if (itxt and itxt.lower() not in ("on", "off")) else ("Anwesend" if on else "Abwesend")
+            return self._big_view(uuid, "info", big)
+        if t == "Alarm":
+            armed = bool(self._state(c, "armed"))
+            lvl = self._state(c, "level") or 0
+            return self._big_view(uuid, "alarm",
+                                  "Alarm!" if lvl else ("Scharf" if armed else "Unscharf"),
+                                  tone=("crit" if lvl else None))
+        if t == "AcControl":
+            modes = self._json_list_map(c, "operatingModes")
+            ta = self._fmt_num(self._state(c, "temperature"), "%.1f")
+            tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
+            big = (ta + " °C") if ta else ((tt + " °C") if tt else "–")
+            sub = " · ".join(x for x in (modes.get(int(self._state(c, "mode") or 0)),
+                                         ("Soll " + tt + " °C") if (ta and tt) else "") if x)
+            return self._big_view(uuid, "thermo", big, sub)
+        if t == "ClimateControllerUS":
+            return self._big_view(uuid, "thermo", "Klimasteuerung")
+        if t == "Hourcounter":
+            ov = self._state(c, "overdue")
+            return self._big_view(uuid, "info", self._fmt_num(self._state(c, "total"), "%.0f h") or "–",
+                                  "Wartung fällig" if ov else "", tone=("crit" if ov else None))
         return {"t": "view", "title": _clean(c.get("name")), "route": route,
                 "items": [self._control_item(uuid)]}
 
