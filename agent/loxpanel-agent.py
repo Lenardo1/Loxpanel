@@ -62,6 +62,11 @@ AUTOSTART = _cfg("AUTOSTART", "1").lower() not in ("0", "false", "no", "off")
 # gegen Display-Overscan/Fensterposition. Wird als ?x= an die Kiosk-URL gehaengt
 # und ueberlebt Reboots (im Gegensatz zum localStorage im fluechtigen /tmp-Profil).
 NUDGE_X = _cfg("X", "").strip()
+# DPMS_OFF = Sekunden bis das Display komplett abschaltet (Backlight aus), wenn
+# nichts angetippt wird. 0 = nie abschalten. Antippen weckt es sofort wieder.
+# Unsere schlanke .xsession bringt sonst kein Power-Management mit -> Display
+# lief nach dem Autostart-Umbau durch.
+DPMS_OFF = _cfg("DPMS_OFF", "180").strip()
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -92,6 +97,33 @@ def kiosk_url(panel):
     if NUDGE_X:
         q.append("x=%s" % NUDGE_X)
     return "http://%s/" % SERVER + ("?" + "&".join(q) if q else "")
+
+
+def setup_dpms(env):
+    """Bildschirm-Power-Management (DPMS) einrichten: nach DPMS_OFF Sekunden
+    Inaktivitaet schaltet X das Display ab (Backlight aus); ein Antippen weckt
+    es automatisch (Input-Event). Der X-eigene Screensaver-Blank wird aus-
+    geschaltet, damit nur die echte Abschaltung greift."""
+    xset = shutil.which("xset")
+    if not xset:
+        print("xset fehlt (Paket x11-xserver-utils) — Display-Abschaltung inaktiv")
+        return
+    try:
+        secs = int(float(DPMS_OFF or "0"))
+    except ValueError:
+        secs = 0
+    try:
+        subprocess.run([xset, "s", "off"], env=env, check=False)
+        if secs > 0:
+            subprocess.run([xset, "+dpms"], env=env, check=False)
+            # standby/suspend/off-Timer: nur "off" nutzen (echtes Abschalten)
+            subprocess.run([xset, "dpms", "0", "0", str(secs)], env=env, check=False)
+            print("DPMS: Display aus nach %ss Inaktivitaet" % secs)
+        else:
+            subprocess.run([xset, "-dpms"], env=env, check=False)
+            print("DPMS: Abschaltung deaktiviert (DPMS_OFF=0)")
+    except Exception as e:
+        print("DPMS-Setup fehlgeschlagen:", e)
 
 
 def stop_kiosk():
@@ -127,6 +159,7 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
+    setup_dpms(env)
     print("Kiosk gestartet:", kiosk_url(_cur_panel))
     return True
 
