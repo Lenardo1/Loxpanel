@@ -234,6 +234,9 @@ function renderEditor(){
        sizeField('Sub-Größe','subSize',p.ui)+
        '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
          '<input type="text" id="fFont" value="'+esc((p.ui||{}).font||'')+'" placeholder="Inter, Roboto, …"></div>'+
+       '<div class="field"><label class="lbl">Horiz. Versatz (px)</label>'+
+         '<input type="number" min="-40" max="40" step="2" data-ui="nudgeX" value="'+
+         (((p.ui||{}).nudgeX==null)?'':(p.ui||{}).nudgeX)+'" placeholder="0"></div>'+
      '</div></div>'+
 
    '<div class="actions">'+

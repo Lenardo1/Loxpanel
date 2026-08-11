@@ -500,6 +500,14 @@ class App:
              "--sub-size": f"{ui.get('subSize', 15)}px"}
         if ui.get("font"):
             v["--font"] = ui["font"]
+        nudge = ui.get("nudgeX")
+        if nudge not in (None, ""):
+            # Horizontaler Feinversatz der ganzen Visu (px, negativ = nach links)
+            # gegen Display-Overscan. Wird vom Frontend als --nudge-x angewandt.
+            try:
+                v["--nudge-x"] = f"{float(nudge):g}px"
+            except (TypeError, ValueError):
+                pass
         return {k: val for k, val in v.items() if val}
 
     def resolve_profile(self, pid: str | None) -> dict:
@@ -538,7 +546,7 @@ class App:
             "rooms": [u for u in self.rooms_with if r and u in r],
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
-                   if k in ("iconSize", "nameSize", "subSize", "font")},
+                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -580,6 +588,8 @@ class App:
                    if isinstance(ui.get(k), (int, float))}
             if ui.get("font"):
                 cui["font"] = str(ui["font"])[:120]
+            if isinstance(ui.get("nudgeX"), (int, float)):
+                cui["nudgeX"] = max(-40, min(40, ui["nudgeX"]))  # horiz. Versatz px
             if cui:
                 e["ui"] = cui
             st = p.get("states") or {}
