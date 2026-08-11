@@ -9,12 +9,12 @@
 # Der eingebettete Agent ist ein Spiegel von agent/loxpanel-agent.py.
 set -e
 
-# ================= ANPASSEN =================
-SERVER="192.168.1.10:8099"      # IP:Port deines LoxPanel-Servers (Docker-Host/Pi)
-AGENT_NAME="$(hostname)"        # Anzeigename in /settings
-PANEL=""                        # Panel-Profil-ID (leer = Standardansicht)
-AUTOSTART="1"                   # 1 = Kiosk beim Booten oeffnen; 0 = nur Agent, Start aus /settings
-# ===========================================
+# ===== ANPASSEN (oder per Env uebergeben: SERVER=... bash install-agent.sh) =====
+SERVER="${SERVER:-192.168.1.10:8099}"    # IP:Port deines LoxPanel-Servers (Docker-Host/Pi)
+AGENT_NAME="${AGENT_NAME:-$(hostname)}"  # Anzeigename in /settings
+PANEL="${PANEL:-}"                       # Panel-Profil-ID (leer = Standardansicht)
+AUTOSTART="${AUTOSTART:-1}"              # 1 = Kiosk beim Booten; 0 = nur Agent, Start aus /settings
+# ================================================================================
 
 AGENT_DIR="/opt/loxpanel/agent"
 AGENT="$AGENT_DIR/loxpanel-agent.py"
