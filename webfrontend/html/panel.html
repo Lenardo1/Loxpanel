@@ -141,8 +141,11 @@
   .tab svg{width:28px;height:28px;}
   .tab.active{color:var(--accent);}
   .tab:active{transform:scale(.92);}
-  .conn{position:absolute;top:8px;left:8px;width:8px;height:8px;border-radius:50%;background:#c14338;z-index:5;}
+  /* Online-Punkt: nur auf den Haupt-Screens (Tabs), zentriert im 2x2-Raster */
+  .conn{grid-row:1;grid-column:1;place-self:center;z-index:6;pointer-events:none;
+    width:8px;height:8px;border-radius:50%;background:#c14338;display:none;}
   .conn.ok{background:var(--accent);}
+  .conn.vis{display:block;}
   .saver{position:absolute;inset:0;z-index:30;background:var(--bg);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     cursor:pointer;user-select:none;-webkit-user-select:none;}
@@ -285,6 +288,7 @@ function cellHtml(c,i){
 function renderPanel(blocks){
   stopVideo();
   setMore((blocks.find(b=>b.k==='more')||{}).route||null);
+  el('conn').classList.remove('vis');
   el('grid').classList.add('panel');
   el('grid').classList.remove('list');
   const g=el('grid');
@@ -363,6 +367,7 @@ function render(){
   if(!view) return;
   stopVideo();
   setMore(null);
+  el('conn').classList.toggle('vis', !!(view.route && view.route.view==='tab'));
   el('grid').classList.remove('panel');
   el('grid').classList.toggle('list', view.layout==='list');
   const items = view.items || [];
