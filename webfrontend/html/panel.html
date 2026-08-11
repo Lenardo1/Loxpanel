@@ -143,6 +143,14 @@
   .tab:active{transform:scale(.92);}
   .conn{position:absolute;top:8px;left:8px;width:8px;height:8px;border-radius:50%;background:#c14338;z-index:5;}
   .conn.ok{background:var(--accent);}
+  .saver{position:absolute;inset:0;z-index:30;background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;user-select:none;-webkit-user-select:none;}
+  .saver.hidden{display:none;}
+  .saver .sv-time{font-size:78px;font-weight:300;line-height:1;letter-spacing:1px;
+    font-variant-numeric:tabular-nums;color:var(--ink);}
+  .saver .sv-date{font-size:20px;color:var(--muted);margin-top:8px;text-transform:capitalize;}
+  .saver .sv-hint{position:absolute;bottom:26px;font-size:13px;color:var(--muted);opacity:.5;}
   .moreb{position:absolute;top:6px;right:8px;z-index:6;width:34px;height:34px;border-radius:50%;
     display:grid;place-items:center;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;
     background:rgba(255,255,255,.06);}
@@ -174,6 +182,11 @@
   <div class="conn" id="conn"></div>
   <div class="grid" id="grid"></div>
   <div class="tabs" id="tabs"></div>
+  <div class="saver hidden" id="saver">
+    <div class="sv-time" id="svTime">--:--</div>
+    <div class="sv-date" id="svDate"></div>
+    <div class="sv-hint">Zum Öffnen tippen</div>
+  </div>
 </div>
 
 <script>
@@ -440,6 +453,26 @@ function connect(){
     }
   };
 }
+// ---- Screensaver: Uhr als Startseite, Tippen -> Favoriten ----
+const SAVER_IDLE_MS = 60000;   // nach 60 s Inaktivitaet zurueck zur Uhr
+let idleTimer=null;
+function tickClock(){
+  const d=new Date();
+  const t=el('svTime'), dd=el('svDate');
+  if(t) t.textContent=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  if(dd) dd.textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+}
+function saverOn(){ return !el('saver').classList.contains('hidden'); }
+function showSaver(){ tickClock(); el('saver').classList.remove('hidden'); }
+function hideSaver(){ el('saver').classList.add('hidden'); }
+function resetIdle(){ clearTimeout(idleTimer);
+  idleTimer=setTimeout(()=>{ goTab(tabsCfg[0]||'favoriten'); showSaver(); }, SAVER_IDLE_MS); }
+el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); hideSaver(); resetIdle(); });
+['pointerdown','keydown','wheel'].forEach(ev=>document.addEventListener(ev, ()=>{ if(!saverOn()) resetIdle(); }, {passive:true}));
+setInterval(tickClock, 1000);
+showSaver();     // Startseite = Uhr
+resetIdle();
+
 connect();
 </script>
 </body>
