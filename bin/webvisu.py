@@ -210,6 +210,7 @@ class App:
         self._bell_prev: dict[str, object] = {}
         self._pending_ring: str | None = None
         self.agents: dict[str, dict] = {}   # ip -> Panel-Agent (Fernstart)
+        self.bg_tasks: set = set()          # laufende Hintergrund-Tasks (z.B. Favs anfordern)
 
     def _ssl_ctx(self) -> _ssl.SSLContext:
         ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
@@ -342,7 +343,17 @@ class App:
                 if isinstance(x, dict) and x.get("id") is not None}
 
     def _audio_favs(self, c: dict) -> list:
-        """Raum-Favoriten (Radio/Playlist/Spotify) aus dem sourceList-State."""
+        """Raum-Favoriten (Radio/Playlist/Spotify) aus dem sourceList-State.
+
+        Loxone legt das Ergebnis von `roomfav/get` in den sourceList-Textstate.
+        Die Struktur variiert je nach Firmware:
+          {"getroomfavs_result":[{...,"items":[...]}]}  (Gruppe(n) mit items)
+          {"getroomfavs_result":[{...item...}]}          (flache Item-Liste)
+          {"items":[...]}                                 (direktes Listing)
+        Der State ist ausserdem ein transienter Browse-Puffer: er ist nur
+        verlaesslich befuellt, nachdem wir `roomfav/get` angefordert haben
+        (siehe prime_favs). Wir sammeln alle Items mit gueltigem 'slot' ein.
+        """
         raw = self._state(c, "sourceList")
         if not raw:
             return []
@@ -350,16 +361,42 @@ class App:
             data = json.loads(raw)
         except (ValueError, TypeError):
             return []
-        out = []
-        for grp in data.get("getroomfavs_result", []):
-            for it in grp.get("items", []):
-                slot = it.get("slot")
-                if slot is None:
+        buckets = []
+        res = data.get("getroomfavs_result")
+        if isinstance(res, list):
+            for grp in res:
+                if isinstance(grp, dict) and isinstance(grp.get("items"), list):
+                    buckets.append(grp["items"])
+                elif isinstance(grp, dict) and "slot" in grp:
+                    buckets.append([grp])
+        if isinstance(data.get("items"), list):
+            buckets.append(data["items"])
+        out, seen = [], set()
+        for items in buckets:
+            for it in items:
+                if not isinstance(it, dict):
                     continue
+                slot = it.get("slot")
+                if slot is None or slot in seen:
+                    continue
+                seen.add(slot)
                 out.append({"slot": slot, "cover": it.get("coverurl") or "",
                             "type": (it.get("type") or "").lower(),
                             "name": unquote(str(it.get("name") or it.get("title") or f"Favorit {slot}"))})
+        out.sort(key=lambda f: f["slot"])
         return out
+
+    async def prime_favs(self, uuid: str) -> None:
+        """Fordert die Zonen-Favoriten aktiv an (`roomfav/get`), damit der
+        sourceList-State frisch befuellt wird. Das Ergebnis kommt asynchron
+        per WS -> _on_value setzt _dirty -> broadcaster re-rendert die offene
+        Ansicht (Musikauswahl) mit den nun vorhandenen Favoriten."""
+        c = self.controls.get(uuid, {})
+        if c.get("type") != "AudioZone":
+            return
+        ua = c.get("uuidAction")
+        if ua:
+            await self.command(ua, "roomfav/get/0/20")
 
     def _fmt_num(self, value, fmt: str) -> str:
         """Loxone-Formatstring anwenden, Einheiten skalieren (kWh→MWh), Komma-Dezimal."""
@@ -1006,8 +1043,9 @@ class App:
                 {"k": "slider", "icon": "vol", "value": vol, "min": 0, "max": 100,
                  "cmd": {"uuid": ua, "tmpl": "volume/{v}"}},
             ]
-            if self._audio_favs(c):   # Quellen (Radio/Playlist/Spotify) auf Unterseite
-                blocks.append({"k": "more", "route": {"view": "sources", "id": uuid}})
+            # Quellen (Radio/Playlist/Spotify) immer auf Unterseite erreichbar
+            # (Favoriten werden dort per prime_favs frisch angefordert).
+            blocks.append({"k": "more", "route": {"view": "sources", "id": uuid}})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Gate":
             ua = c.get("uuidAction")
@@ -1122,6 +1160,14 @@ class App:
         try:
             if pin is not None:
                 return await self._secured_command(uuid, cmd, pin)
+            # Zonen-Favorit: eine gestoppte/abgeschaltete AudioZone startet auf
+            # `roomfav/play/...` allein NICHT (am Miniserver verifiziert) — erst
+            # ein vorheriges `on` weckt sie zuverlaessig.
+            if cmd.startswith("roomfav/play/"):
+                try:
+                    await self.client.jdev_get(f"sps/io/{uuid}/on")
+                except Exception:
+                    pass
             log.info("cmd %s/%s", uuid, cmd)
             await self.client.jdev_get(f"sps/io/{uuid}/{cmd}")
             return "200"
@@ -1510,8 +1556,16 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
             except ValueError:
                 continue
             if data.get("t") == "nav" and isinstance(data.get("route"), dict):
-                app.conn_route[ws] = data["route"]
-                await ws.send_json(app.render(data["route"], prof))
+                route = data["route"]
+                app.conn_route[ws] = route
+                await ws.send_json(app.render(route, prof))
+                # Beim Oeffnen einer AudioZone / Musikauswahl die Zonen-Favoriten
+                # aktiv anfordern; das frische Ergebnis wird per broadcaster
+                # nachgereicht (roomfav/get befuellt den sourceList-State).
+                if route.get("view") in ("control", "sources") and route.get("id"):
+                    task = asyncio.create_task(app.prime_favs(route["id"]))
+                    app.bg_tasks.add(task)
+                    task.add_done_callback(app.bg_tasks.discard)
             elif data.get("t") == "cmd":
                 pin = data.get("pin")
                 code = await app.command(data.get("uuid"), data.get("cmd"), pin)
