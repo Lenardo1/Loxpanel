@@ -11,7 +11,7 @@
     --good:#52b881; --crit:#e2695f;
     --tile:rgba(255,255,255,.045);
     --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
-    --nudge-x:-4px;   /* Feinversatz der ganzen Visu (negativ = nach links) */
+    --nudge-x:0px;    /* Feinversatz der ganzen Visu; live via ?x=-6 (negativ=links) */
   }
   *{box-sizing:border-box;}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
@@ -448,6 +448,15 @@ g.addEventListener('touchend',e=>{
 
 let booted=false;
 const PANEL_ID = new URLSearchParams(location.search).get('panel') || '';
+// Horizontaler Feinversatz der ganzen Visu — live einstellbar ohne Redeploy:
+//   ?x=-6  -> 6px nach links     ?x=8 -> nach rechts     ?x=0 -> zuruecksetzen
+// Der Wert wird gemerkt (localStorage) und gilt dann auch ohne Parameter weiter.
+(function(){
+  const p=new URLSearchParams(location.search).get('x');
+  if(p!==null) localStorage.setItem('lp_nudge_x', p);
+  const v=localStorage.getItem('lp_nudge_x');
+  if(v!==null && v!=='') document.documentElement.style.setProperty('--nudge-x',(parseFloat(v)||0)+'px');
+})();
 function connect(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
                    +(PANEL_ID?('?panel='+encodeURIComponent(PANEL_ID)):''));
