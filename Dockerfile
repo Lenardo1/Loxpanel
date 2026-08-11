@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY bin/ ./bin/
 COPY webfrontend/ ./webfrontend/
 COPY config/ ./config/
+COPY deploy/ ./deploy/
+COPY agent/ ./agent/
 
 # Laufzeit-Config (loxpanel.cfg, panels.json, theme.json) wird als Volume
 # unter /app/config gemountet; Miniserver-Zugang kann auch per Env kommen.

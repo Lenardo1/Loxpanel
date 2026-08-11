@@ -52,6 +52,8 @@
   .ag .sp{flex:1;min-width:8px;}
   .btn.sm{padding:8px 13px;font-size:13px;}
   .btn.ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
+  .cmdout{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;margin-top:10px;
+    font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--fg);}
 </style>
 </head>
 <body>
@@ -86,6 +88,23 @@
     <p class="note">Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
     <div id="ag_list"><div class="muted">Suche Panels…</div></div>
     <div class="toast" id="ag_toast" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card">
+    <h3>Neues Panel einrichten</h3>
+    <p class="note">Erzeugt den Befehl, der Agent + Config aufs Panel überträgt, den Autostart einrichtet und Chromium still stellt (keine Übersetzen-Leiste / Anmeldung). Einmal im Terminal ausführen — fragt nach dem SSH-/sudo-Passwort des Panels.</p>
+    <div class="row2">
+      <div class="field"><label class="lbl">Panel-IP</label><input type="text" id="np_ip" placeholder="10.0.0.77"></div>
+      <div class="field"><label class="lbl">SSH-Benutzer</label><input type="text" id="np_user" value="linaro"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label class="lbl">Anzeigename</label><input type="text" id="np_name" placeholder="Wohnzimmer"></div>
+      <div class="field"><label class="lbl">Startansicht (Profil)</label><select id="np_panel"></select></div>
+    </div>
+    <div class="field"><label class="lbl">Server-Adresse (dieser Server)</label><input type="text" id="np_server" placeholder="10.0.0.55:8099"></div>
+    <div class="actions"><button class="btn" id="np_gen">Befehl erzeugen</button></div>
+    <pre id="np_out" class="cmdout" style="display:none"></pre>
+    <div class="actions" id="np_copyrow" style="display:none"><button class="btn ghost sm" id="np_copy">In Zwischenablage kopieren</button><span class="toast" id="np_toast"></span></div>
   </div>
 </div>
 <script>
@@ -183,8 +202,27 @@ async function agentCmd(ip,action,panel){
 }
 async function pollAgents(){ try{ const r=await fetch('/api/agents'); const j=await r.json(); renderAgents(j.agents||[]); }catch(e){} }
 
+// ---- Neues Panel: Befehl-Generator ----
+function fillNewPanel(){
+  const srv=$('#np_server'); if(srv && !srv.value) srv.value=location.host;
+  const sel=$('#np_panel'); if(sel) sel.innerHTML='<option value="">(Standard)</option>'+
+    PANEL_IDS.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
+}
+function genPanelCmd(){
+  const ip=$('#np_ip').value.trim(), user=($('#np_user').value.trim()||'linaro');
+  const name=$('#np_name').value.trim(), panel=$('#np_panel').value, server=$('#np_server').value.trim();
+  if(!ip||!server){ flash($('#np_toast'),'Panel-IP und Server-Adresse nötig',false); return; }
+  const cmd="ssh -t "+user+"@"+ip+" \"curl -fsSL http://"+server+"/install-agent.sh -o /tmp/lp-install.sh && "+
+    "SERVER='"+server+"' AGENT_NAME='"+name+"' PANEL='"+panel+"' bash /tmp/lp-install.sh\"";
+  $('#np_out').textContent=cmd; $('#np_out').style.display='block'; $('#np_copyrow').style.display='flex';
+}
+$('#np_gen').onclick=genPanelCmd;
+$('#np_copy').onclick=()=>{ navigator.clipboard.writeText($('#np_out').textContent)
+  .then(()=>flash($('#np_toast'),'✓ kopiert',true))
+  .catch(()=>flash($('#np_toast'),'Kopieren nicht möglich – bitte manuell markieren',false)); };
+
 load().catch(e=>{ $('#conn').innerHTML='Konnte Einstellungen nicht laden: '+esc(e); });
-loadPanelIds().then(()=>{ pollAgents(); setInterval(pollAgents,6000); });
+loadPanelIds().then(()=>{ fillNewPanel(); pollAgents(); setInterval(pollAgents,6000); });
 </script>
 </body>
 </html>
