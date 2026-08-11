@@ -219,38 +219,25 @@ command -v python3 >/dev/null || echo "   WARN: python3 fehlt  -> sudo apt insta
 command -v chromium >/dev/null || command -v chromium-browser >/dev/null \
   || echo "   WARN: chromium fehlt -> sudo apt install -y chromium"
 
-echo "==> 5/5 X-Autostart"
-# Passende Autostart-Datei finden
-TARGET=""
-for cand in "$HOME/.config/openbox/autostart" "$HOME/.xinitrc" "/etc/xdg/openbox/autostart"; do
-  [ -f "$cand" ] && TARGET="$cand" && break
-done
-: "${TARGET:=$HOME/.config/openbox/autostart}"
-mkdir -p "$(dirname "$TARGET")" 2>/dev/null || true
-[ -f "$TARGET" ] || : > "$TARGET"
-
-# schreibbar? sonst via sudo
-w() { if [ -w "$TARGET" ]; then "$@"; else sudo "$@"; fi; }
-
-w cp "$TARGET" "$TARGET.loxpanel.bak" 2>/dev/null || true
-
-# alte Loxone/kerberos-Startzeile(n) auskommentieren
-if grep -qiE 'kerberos|/opt/Loxone' "$TARGET"; then
-  w sed -i -E 's@^([^#].*(kerberos|/opt/Loxone).*)@# LoxPanel-deaktiviert: \1@I' "$TARGET"
-  echo "   alte Loxone-Startzeile auskommentiert (Backup: $TARGET.loxpanel.bak)"
+echo "==> 5/5 Autostart via ~/.xsession"
+# Robust fuer LightDM/GDM (Default-Xsession fuehrt ~/.xsession aus) und startx.
+# Der Kiosk laeuft ohne extra Fenstermanager (wie eine dedizierte Kiosk-Session).
+XS="$HOME/.xsession"
+if [ -f "$XS" ] && ! grep -qF "loxpanel-agent" "$XS"; then
+  cp "$XS" "$XS.loxpanel.bak"
+  echo "   vorhandene ~/.xsession gesichert: $XS.loxpanel.bak"
 fi
-
-# Agent-Startzeile hinzufuegen (idempotent)
-case "$TARGET" in
-  *xinitrc) LINE="exec python3 $AGENT   # LoxPanel-Agent" ;;
-  *)        LINE="python3 $AGENT &      # LoxPanel-Agent" ;;
-esac
-if grep -qF "$AGENT" "$TARGET"; then
-  echo "   Autostart bereits vorhanden ($TARGET)"
-else
-  printf '%s\n' "$LINE" | w tee -a "$TARGET" >/dev/null
-  echo "   Agent-Autostart eingetragen ($TARGET)"
-fi
+cat > "$XS" <<EOF
+#!/bin/sh
+# LoxPanel Panel-Agent -> startet den Chromium-Kiosk und meldet das Panel
+xset s off -dpms 2>/dev/null || true
+exec python3 $AGENT
+EOF
+chmod +x "$XS"
+echo "   $XS angelegt (LightDM fuehrt es nach dem Auto-Login aus)"
+# alte openbox-Zeile aus frueheren Versuchen aufraeumen (schadet sonst nicht)
+OB="$HOME/.config/openbox/autostart"
+[ -f "$OB" ] && sed -i '/loxpanel-agent/d' "$OB" 2>/dev/null || true
 
 echo
 echo "=== Fertig ==="
