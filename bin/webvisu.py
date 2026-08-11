@@ -66,6 +66,12 @@ JAL = JalousieAdapter()
 
 SWITCHY = {"Switch", "TimedSwitch"}
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
+
+
+def _is_tab(t) -> bool:
+    """Gueltiges Tab-Kennzeichen: einer der 4 Standard-Tabs ODER eine einzelne
+    Kategorie als Direkt-Tab (`cat:<uuid>`)."""
+    return t in VALID_TABS or (isinstance(t, str) and t.startswith("cat:") and len(t) > 4)
 # Reine Anzeige-Bausteine: keine Steuer-2.-Ebene -> Antippen zeigt eine
 # grosse 1/1-Wertseite (_view_control -> _big_view).
 STATUS_BIG = {"Meter", "Slider", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
@@ -515,7 +521,7 @@ class App:
         prof = self.panels.get(pid or "") or self.panels.get("default") or {}
         ui = {**self.theme.get("ui", {}), **(prof.get("ui") or {})}
         states = {**self.theme.get("states", {}), **(prof.get("states") or {})}
-        tabs = prof.get("tabs") or ui.get("tabs") or \
+        tabs = [t for t in (prof.get("tabs") or ui.get("tabs") or []) if _is_tab(t)] or \
             ["favoriten", "zentral", "raeume", "kategorien"]
         return {
             "id": pid or "default",
@@ -526,6 +532,17 @@ class App:
             "vars": self._theme_vars(states, ui),
             "tiles": prof.get("tiles") or {},
         }
+
+    def _tab_meta(self, tab_keys) -> dict:
+        """Label + Icon fuer dynamische Tabs (Kategorie-Direkt-Tabs). Die 4
+        Standard-Tabs kennt das Frontend selbst; hier nur die `cat:`-Tabs."""
+        meta = {}
+        for t in tab_keys or []:
+            if isinstance(t, str) and t.startswith("cat:"):
+                cat = self.cats.get(t[4:], {})
+                meta[t] = {"label": _clean(cat.get("name")) or "Kategorie",
+                           "iconUrl": self._icon_url(cat.get("image")) or ""}
+        return meta
 
     def panel_dpms(self, pid: str | None):
         """Display-Abschaltzeit (Sek.) fuer ein Panel aus dem Profil (0=nie,
@@ -548,7 +565,7 @@ class App:
         in Anzeige-Reihenfolge; leere Liste = alle)."""
         r = self._resolve_ids(raw.get("rooms"), self.rooms)
         c = self._resolve_ids(raw.get("cats"), self.cats)
-        tabs = [t for t in (raw.get("tabs") or VALID_TABS) if t in VALID_TABS]
+        tabs = [t for t in (raw.get("tabs") or VALID_TABS) if _is_tab(t)]
         return {
             "title": raw.get("title") or "",
             "tabs": tabs or list(VALID_TABS),
@@ -588,7 +605,7 @@ class App:
             e: dict = {}
             if p.get("title"):
                 e["title"] = str(p["title"])[:40]
-            tabs = [t for t in (p.get("tabs") or []) if t in VALID_TABS]
+            tabs = [t for t in (p.get("tabs") or []) if _is_tab(t)][:4]
             e["tabs"] = tabs or list(VALID_TABS)
             e["rooms"] = [str(x) for x in (p.get("rooms") or []) if isinstance(x, str)]
             e["cats"] = [str(x) for x in (p.get("cats") or []) if isinstance(x, str)]
@@ -850,6 +867,14 @@ class App:
     def _view_tab(self, tab: str, prof: dict | None = None) -> dict:
         ar = prof.get("rooms") if prof else None
         ac = prof.get("cats") if prof else None
+        if isinstance(tab, str) and tab.startswith("cat:"):
+            # Kategorie-Direkt-Tab: dieselben Controls wie im Kategorie-Drilldown
+            cu = tab[4:]
+            items = [self._control_item(u, prof) for u, c in self.controls.items()
+                     if c.get("cat") == cu and self._room_ok(u, prof)]
+            title = _clean(self.cats.get(cu, {}).get("name")) or "Kategorie"
+            return {"t": "view", "title": title, "tab": tab,
+                    "route": {"view": "tab", "tab": tab}, "items": items}
         if tab == "favoriten":
             items = [self._control_item(u, prof) for u, c in self.controls.items()
                      if c.get("isFavorite") and self._room_ok(u, prof)]
@@ -1308,7 +1333,10 @@ async def api_meta(request: web.Request) -> web.Response:
         "tabs": [{"tab": "favoriten", "label": "Favoriten"},
                  {"tab": "zentral", "label": "Zentral"},
                  {"tab": "raeume", "label": "Räume"},
-                 {"tab": "kategorien", "label": "Kategorien"}],
+                 {"tab": "kategorien", "label": "Kategorien"}]
+        + [{"tab": "cat:" + cu, "label": _clean(app.cats[cu].get("name", "")),
+            "iconUrl": app._icon_url(app.cats[cu].get("image")), "cat": True}
+           for cu in app.cats_with],
         "panels": panels,
     })
 
@@ -1568,7 +1596,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
              prof["tabs"], "alle" if prof["rooms"] is None else len(prof["rooms"]),
              "alle" if prof["cats"] is None else len(prof["cats"]))
     await ws.send_json({"t": "theme", "vars": prof["vars"], "tabs": prof["tabs"],
-                        "title": prof["title"]})
+                        "tabMeta": app._tab_meta(prof["tabs"]), "title": prof["title"]})
     await ws.send_json(app.render(app.conn_route[ws], prof))
     try:
         async for msg in ws:
