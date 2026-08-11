@@ -89,6 +89,10 @@
   .status{text-align:center;color:var(--muted);font-size:14px;padding:2px 6px;}
   .pbar{background:var(--tile);border:1px solid var(--line);border-radius:12px;
     padding:15px;text-align:center;font-weight:650;font-size:15px;}
+  .pbig{text-align:center;font-size:54px;font-weight:600;letter-spacing:-.02em;line-height:1.06;
+    padding:8px 8px;word-break:break-word;}
+  .pbig.good{color:var(--good);} .pbig.crit{color:var(--crit);}
+  .grid.panel.bigpage{justify-content:center;gap:14px;}
   .brow{display:flex;gap:10px;}
   .btn{flex:1;background:var(--tile);border:1px solid var(--line);border-radius:12px;
     padding:17px 10px;text-align:center;font-weight:650;font-size:15px;cursor:pointer;
@@ -291,6 +295,7 @@ function renderPanel(blocks){
   el('conn').classList.remove('vis');
   el('grid').classList.add('panel');
   el('grid').classList.remove('list');
+  el('grid').classList.toggle('bigpage', blocks.some(b=>b.k==='big'));
   const g=el('grid');
   let html='';
   for(const b of blocks){
@@ -300,6 +305,7 @@ function renderPanel(blocks){
     else if(b.k==='status') html+='<div class="status">'+esc(b.text||'')+'</div>';
     else if(b.k==='title') html+='<div class="ptitle">'+esc(b.text||'')+'<div class="psub">'+esc(b.sub||'')+'</div></div>';
     else if(b.k==='value') html+='<div class="pbar">'+esc(b.text||'')+'</div>';
+    else if(b.k==='big') html+='<div class="pbig'+(b.tone==='good'?' good':(b.tone==='crit'?' crit':''))+'">'+esc(b.text||'')+'</div>';
     else if(b.k==='slider') html+='<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'" value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
     else if(b.k==='row') html+='<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+'">'+b.cells.map(cellHtml).join('')+'</div>';
     else if(b.k==='head') html+='<div class="phead">'+esc(b.text||'')+'</div>';
@@ -336,6 +342,7 @@ function updatePanel(blocks){
   if(rows.length!==rowBlocks.length){ renderPanel(blocks); return; }
   const s=blocks.find(b=>b.k==='status'); if(s){const e=g.querySelector('.status'); if(e)e.textContent=s.text||'';}
   const v=blocks.find(b=>b.k==='value'); if(v){const e=g.querySelector('.pbar'); if(e)e.textContent=v.text||'';}
+  const bg=blocks.find(b=>b.k==='big'); if(bg){const e=g.querySelector('.pbig'); if(e){e.textContent=bg.text||''; e.className='pbig'+(bg.tone==='good'?' good':(bg.tone==='crit'?' crit':''));}}
   const ti=blocks.find(b=>b.k==='title'); if(ti){const e=g.querySelector('.ptitle'); if(e){ e.childNodes[0].nodeValue=ti.text||''; const su=e.querySelector('.psub'); if(su)su.textContent=ti.sub||''; }}
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img&&img.getAttribute('src')!==cov.src){img.style.opacity='0'; img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
   const sb=blocks.find(b=>b.k==='slider'); if(sb){const sld=g.querySelector('.sld'); if(sld&&!sldDragging){ sld.value=sb.value; const sv=g.querySelector('.sval'); if(sv)sv.textContent=sb.value; }}
@@ -368,7 +375,7 @@ function render(){
   stopVideo();
   setMore(null);
   el('conn').classList.toggle('vis', !!(view.route && view.route.view==='tab'));
-  el('grid').classList.remove('panel');
+  el('grid').classList.remove('panel','bigpage');
   el('grid').classList.toggle('list', view.layout==='list');
   const items = view.items || [];
   const g = el('grid');
