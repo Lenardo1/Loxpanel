@@ -32,6 +32,12 @@
     scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
   .grid::-webkit-scrollbar{width:5px;}
   .grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px;}
+  /* Seiten-Snapping: Kachelraster rastet hart in Vierer-Seiten ein (4 oben/4
+     unten, nie dazwischen), lange Listen rasten nur sanft ein. Snap-Punkte
+     setzt render() per .snap auf jede 4. Kachel. */
+  .grid.snapy{scroll-snap-type:y mandatory;scroll-padding-top:10px;}
+  .grid.list.snapy{scroll-snap-type:y proximity;}
+  .tile.snap{scroll-snap-align:start;}
   .tile{background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
     border:1px solid var(--line);border-radius:16px;padding:16px;
     display:flex;flex-direction:column;justify-content:space-between;
@@ -74,8 +80,9 @@
   .tctrls .tb:active{transform:scale(.92);background:rgba(255,255,255,.18);}
   .tctrls .tb svg{width:17px;height:17px;}
   .empty{grid-column:1/3;text-align:center;color:var(--muted);padding-top:40px;font-size:15px;}
-  /* Listen-Layout (volle Breite, ~96px Zeilen) */
-  .grid.list{grid-template-columns:1fr;grid-auto-rows:96px;}
+  /* Listen-Layout (volle Breite): immer exakt 4 Zeilen sichtbar (fuellt die
+     Grid-Hoehe, egal wie hoch die Tab-Leiste ist -> kein 3,75-Zeilen-Rest). */
+  .grid.list{grid-template-columns:1fr;grid-auto-rows:calc((100% - 3*var(--gap)) / 4);}
   .grid.list .tile{flex-direction:row;align-items:center;gap:14px;padding:0 18px;}
   .grid.list .tile .head{flex:0 0 auto;}
   .grid.list .tile .body{flex:1;min-width:0;}
@@ -143,6 +150,8 @@
   .tabs{display:flex;border-top:1px solid var(--line);background:rgba(0,0,0,.25);}
   .tab{flex:1;display:grid;place-items:center;padding:13px 0;color:var(--muted);cursor:pointer;}
   .tab svg{width:28px;height:28px;}
+  .tab .tico{display:inline-block;width:28px;height:28px;background-color:currentColor;
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .tab.active{color:var(--accent);}
   .tab:active{transform:scale(.92);}
   /* Online-Punkt: nur auf den Haupt-Screens (Tabs), zentriert im 2x2-Raster */
@@ -239,6 +248,7 @@ const TABS = [
 const el = id => document.getElementById(id);
 let ws, stack = [{view:'tab',tab:'favoriten'}], view = null;
 let tabsCfg = ['favoriten','zentral','raeume','kategorien'];
+let tabMeta = {};   // Label/Icon fuer dynamische Tabs (Kategorien), vom Server
 
 function svg(inner){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>';}
 function svgF(inner){return '<svg viewBox="0 0 24 24" fill="currentColor">'+inner+'</svg>';}
@@ -304,7 +314,7 @@ function renderPanel(blocks){
   setMore((blocks.find(b=>b.k==='more')||{}).route||null);
   el('conn').classList.remove('vis');
   el('grid').classList.add('panel');
-  el('grid').classList.remove('list');
+  el('grid').classList.remove('list','snapy');
   el('grid').classList.toggle('bigpage', blocks.some(b=>b.k==='big'));
   const g=el('grid');
   let html='';
@@ -370,8 +380,14 @@ function activeTab(){ const b=stack[0]; return b && b.view==='tab' ? b.tab : nul
 function renderTabs(){
   const at = activeTab();
   const items = tabsCfg.map(tk => {
-    const t = TABS.find(x => x.tab===tk); if(!t) return '';
-    return '<div class="tab'+(t.tab===at?' active':'')+'" data-tab="'+t.tab+'" title="'+esc(t.label)+'">'+svg(t.icon)+'</div>';
+    const cls = 'tab'+(tk===at?' active':'');
+    const t = TABS.find(x => x.tab===tk);
+    if(t) return '<div class="'+cls+'" data-tab="'+esc(tk)+'" title="'+esc(t.label)+'">'+svg(t.icon)+'</div>';
+    const m = tabMeta[tk]; if(!m) return '';   // dynamischer Tab (Kategorie)
+    const ico = m.iconUrl
+      ? '<span class="tico" style="--u:url(\''+esc(m.iconUrl)+'\')"></span>'
+      : svg('<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/>');
+    return '<div class="'+cls+'" data-tab="'+esc(tk)+'" title="'+esc(m.label||'')+'">'+ico+'</div>';
   }).filter(Boolean);
   const mid = Math.floor(items.length/2);
   items.splice(mid, 0, '<div class="tabback'+(stack.length>1?' on':'')+'" id="tabback">‹</div>');
@@ -391,7 +407,9 @@ function render(){
   const g = el('grid');
   if(!items.length){ g.innerHTML='<div class="empty">nichts hier</div>'; renderTabs(); return; }
   let html='';
+  let _i=-1;
   for(const it of items){
+    _i++;
     const icoHtml = it.iconImg
       ? '<span class="ico"><img class="rawico" src="'+esc(it.iconImg)+'" alt=""></span>'
       : it.iconUrl
@@ -414,7 +432,7 @@ function render(){
     if(ts.weight) nsv.push('font-weight:'+ts.weight);
     if(ts.italic) nsv.push('font-style:italic');
     const nst = nsv.length?' style="'+esc(nsv.join(';'))+'"':'';
-    html += '<div class="tile'+tone+'" data-id="'+esc(it.id)+'"'+st+'>'+
+    html += '<div class="tile'+tone+(_i%4===0?' snap':'')+'" data-id="'+esc(it.id)+'"'+st+'>'+
               '<div class="head">'+icoHtml+chev+'</div>'+
               '<div class="body"><div class="name"'+nst+'>'+esc(it.label)+'</div>'+
               (it.sublabel?'<div class="sub">'+esc(it.sublabel)+'</div>':'')+'</div>'+
@@ -422,6 +440,7 @@ function render(){
             '</div>';
   }
   g.innerHTML = html;
+  g.classList.toggle('snapy', items.length>4);   // Snapping erst ab >1 Seite
   g.querySelectorAll('.tile[data-id]').forEach(n=>{
     const it = items.find(x=>String(x.id)===n.dataset.id);
     if(it.controls){
@@ -468,6 +487,7 @@ function connect(){
     const msg=JSON.parse(e.data);
     if(msg.t==='theme'){ const v=msg.vars||{}; for(const k in v){ if(v[k]) document.documentElement.style.setProperty(k,v[k]); }
       if(msg.title) document.title=msg.title;
+      if(msg.tabMeta) tabMeta=msg.tabMeta;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }

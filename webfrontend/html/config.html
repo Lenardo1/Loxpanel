@@ -50,7 +50,12 @@
   .chips{display:flex;gap:8px;flex-wrap:wrap;}
   .chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg);color:var(--muted);cursor:pointer;user-select:none;font-size:14px;}
   .chip.on{background:rgba(224,162,77,.14);border-color:var(--accent);color:var(--fg);}
+  .chip.dis{opacity:.4;cursor:not-allowed;}
+  .chip.cat{border-style:dashed;}
   .chip .star{color:var(--accent);font-size:11px;margin-left:6px;}
+  .chip .chic{width:15px;height:15px;object-fit:contain;vertical-align:-2px;margin-right:6px;}
+  #tabcount{margin-left:6px;color:var(--muted);font-size:12.5px;}
+  #tabcount.full{color:var(--accent);}
   /* checklist */
   .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
   .count{color:var(--muted);font-size:13px;}
@@ -204,7 +209,9 @@ function renderEditor(){
      '<div class="field"><input type="text" id="fTitle" value="'+esc(p.title||'')+'" placeholder="'+esc(cur)+'"></div></div>'+
 
    '<div class="card"><h3>Untere Leiste (Tabs)</h3>'+
-     '<p class="note">Welche Tabs erscheinen — der <b>erste aktive</b> ist die Startseite (★).</p>'+
+     '<p class="note">Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne '+
+       'Kategorien als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★). '+
+       '<span id="tabcount"></span></p>'+
      '<div class="chips" id="chips"></div></div>'+
 
    '<div class="card"><h3>Räume</h3>'+
@@ -268,15 +275,18 @@ function sizeField(label,key,ui){
 
 function renderChips(p){
   const box=$('#chips'); box.innerHTML='';
+  const full = p.tabs.length>=4;
   META.tabs.forEach(t=>{
     const on=p.tabs.includes(t.tab);
     const first = p.tabs.length && p.tabs.indexOf(t.tab)===firstTabIndex(p);
     const c=document.createElement('div');
-    c.className='chip'+(on?' on':'');
-    c.innerHTML=esc(t.label)+(on&&first?'<span class="star">★ Start</span>':'');
+    c.className='chip'+(on?' on':'')+(!on&&full?' dis':'')+(t.cat?' cat':'');
+    c.innerHTML=(t.iconUrl?'<img class="chic" src="'+esc(t.iconUrl)+'">':'')+
+      esc(t.label)+(on&&first?'<span class="star">★ Start</span>':'');
     c.onclick=()=>{ toggleTab(p,t.tab); renderChips(p); markDirty(); };
     box.appendChild(c);
   });
+  const tc=$('#tabcount'); if(tc){ tc.textContent=p.tabs.length+'/4 gewählt'+(full?' (voll)':''); tc.className=full?'full':''; }
   // Größen-Inputs binden
   document.querySelectorAll('input[data-ui]').forEach(inp=>{
     inp.oninput=()=>{ p.ui=p.ui||{}; const k=inp.dataset.ui;
@@ -291,7 +301,9 @@ function firstTabIndex(p){ // kleinster Index in kanonischer Reihenfolge
 function toggleTab(p,tab){
   const i=p.tabs.indexOf(tab);
   if(i>-1){ if(p.tabs.length>1) p.tabs.splice(i,1); }   // mind. 1 Tab behalten
-  else { // in kanonischer Reihenfolge einsortieren
+  else {
+    if(p.tabs.length>=4) return;   // max. 4 Buttons
+    // in kanonischer Reihenfolge einsortieren
     const order=META.tabs.map(t=>t.tab);
     p.tabs.push(tab); p.tabs.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
   }
