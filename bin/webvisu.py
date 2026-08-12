@@ -960,12 +960,18 @@ class App:
                 "route": {"view": "sources", "id": uuid}, "blocks": blocks}
 
     def _big_view(self, uuid: str, icon: str, big: str, sub: str = "", tone=None) -> dict:
-        """Grosse 1/1-Wertseite fuer reine Status-Bausteine."""
+        """Grosse 1/1-Wertseite fuer reine Status-Bausteine. Das Hero-Icon ist
+        dasselbe wie auf der Kachel vorne: Loxone-eigenes Icon, falls vorhanden,
+        sonst das Builtin-Icon (`icon`)."""
         c = self.controls.get(uuid, {})
+        hero = {"k": "hero", "icon": icon}
+        iu = self._control_icon_url(c)
+        if iu:
+            hero["iconUrl"] = iu
         blk = {"k": "big", "text": big}
         if tone:
             blk["tone"] = tone
-        blocks = [{"k": "hero", "icon": icon}, blk]
+        blocks = [hero, blk]
         if sub:
             blocks.append({"k": "status", "text": sub})
         return {"t": "view", "title": _clean(c.get("name")),
