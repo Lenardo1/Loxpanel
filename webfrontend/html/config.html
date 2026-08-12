@@ -247,6 +247,11 @@ function renderEditor(){
        '<div class="field"><label class="lbl">Display aus nach (Sek.)</label>'+
          '<input type="number" min="0" max="3600" step="30" data-ui="dpmsOff" value="'+
          (((p.ui||{}).dpmsOff==null)?'':(p.ui||{}).dpmsOff)+'" placeholder="180"></div>'+
+       '<div class="field"><label class="lbl">Kacheln pro Zeile</label>'+
+         '<select id="fCols">'+
+           '<option value="2"'+(((p.ui||{}).cols==3)?'':' selected')+'>2 × 2 (4″-Panel)</option>'+
+           '<option value="3"'+(((p.ui||{}).cols==3)?' selected':'')+'>3 × 2 (Tablet)</option>'+
+         '</select></div>'+
      '</div></div>'+
 
    '<div class="actions">'+
@@ -257,6 +262,8 @@ function renderEditor(){
   // Titel live
   $('#fTitle').oninput=e=>{ p.title=e.target.value; $('#hTitle').textContent=e.target.value||cur; markDirty(); };
   $('#fFont').oninput=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.font=e.target.value:delete p.ui.font; markDirty(); };
+  { const fc=$('#fCols'); if(fc) fc.onchange=e=>{ p.ui=p.ui||{}; const v=Number(e.target.value);
+      if(v===3) p.ui.cols=3; else delete p.ui.cols; markDirty(); }; }
 
   renderChips(p); renderChecklist(p,'rooms'); renderChecklist(p,'cats');
   renderTileList(); renderTileEditor();

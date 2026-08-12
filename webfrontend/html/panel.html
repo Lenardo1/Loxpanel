@@ -19,14 +19,14 @@
     display:grid;place-items:center;-webkit-font-smoothing:antialiased;}
   .screen{
     position:relative;
-    width:100vw;height:100vh;max-width:480px;max-height:480px;
+    width:100vw;height:100vh;max-width:calc(var(--cols,2) * 240px);max-height:480px;
     border-radius:16px;overflow:hidden;background:var(--screen);
     box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 0 60px rgba(0,0,0,.5);
     transform:translateX(var(--nudge-x,0));
     display:grid;grid-template-rows:1fr auto;}
   /* Scrollbarer Kachelbereich: 2 Spalten, exakt 2 Reihen (=4 Kacheln) sichtbar */
   .grid{--gap:10px;grid-area:1/1;
-    display:grid;grid-template-columns:1fr 1fr;
+    display:grid;grid-template-columns:repeat(var(--cols,2),1fr);
     grid-auto-rows:calc((100% - var(--gap)) / 2);gap:var(--gap);padding:10px;
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
     scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
@@ -79,7 +79,7 @@
     display:grid;place-items:center;color:var(--ink);flex:0 0 auto;}
   .tctrls .tb:active{transform:scale(.92);background:rgba(255,255,255,.18);}
   .tctrls .tb svg{width:17px;height:17px;}
-  .empty{grid-column:1/3;text-align:center;color:var(--muted);padding-top:40px;font-size:15px;}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding-top:40px;font-size:15px;}
   /* Listen-Layout (volle Breite): immer exakt 4 Zeilen sichtbar (fuellt die
      Grid-Hoehe, egal wie hoch die Tab-Leiste ist -> kein 3,75-Zeilen-Rest). */
   .grid.list{grid-template-columns:1fr;grid-auto-rows:calc((100% - 3*var(--gap)) / 4);}
@@ -249,6 +249,7 @@ const el = id => document.getElementById(id);
 let ws, stack = [{view:'tab',tab:'favoriten'}], view = null;
 let tabsCfg = ['favoriten','zentral','raeume','kategorien'];
 let tabMeta = {};   // Label/Icon fuer dynamische Tabs (Kategorien), vom Server
+let gridCols = 2;   // Kacheln pro Zeile (2x2 oder 3x2), vom Panel-Profil
 
 function svg(inner){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>';}
 function svgF(inner){return '<svg viewBox="0 0 24 24" fill="currentColor">'+inner+'</svg>';}
@@ -437,7 +438,8 @@ function render(){
     if(ts.weight) nsv.push('font-weight:'+ts.weight);
     if(ts.italic) nsv.push('font-style:italic');
     const nst = nsv.length?' style="'+esc(nsv.join(';'))+'"':'';
-    html += '<div class="tile'+tone+(_i%4===0?' snap':'')+'" data-id="'+esc(it.id)+'"'+st+'>'+
+    const _pg = (view.layout==='list'?4:gridCols*2);   // Snap-Seite: Liste 4 Zeilen, sonst cols x 2
+    html += '<div class="tile'+tone+(_i%_pg===0?' snap':'')+'" data-id="'+esc(it.id)+'"'+st+'>'+
               '<div class="head">'+icoHtml+chev+'</div>'+
               '<div class="body"><div class="name"'+nst+'>'+esc(it.label)+'</div>'+
               (it.sublabel?'<div class="sub">'+esc(it.sublabel)+'</div>':'')+'</div>'+
@@ -445,7 +447,7 @@ function render(){
             '</div>';
   }
   g.innerHTML = html;
-  g.classList.toggle('snapy', items.length>4);   // Snapping erst ab >1 Seite
+  g.classList.toggle('snapy', items.length > (view.layout==='list'?4:gridCols*2));   // Snapping erst ab >1 Seite
   g.querySelectorAll('.tile[data-id]').forEach(n=>{
     const it = items.find(x=>String(x.id)===n.dataset.id);
     if(it.controls){
@@ -491,6 +493,7 @@ function connect(){
   ws.onmessage=e=>{
     const msg=JSON.parse(e.data);
     if(msg.t==='theme'){ const v=msg.vars||{}; for(const k in v){ if(v[k]) document.documentElement.style.setProperty(k,v[k]); }
+      gridCols = (v['--cols']?(parseInt(v['--cols'])||2):2);
       if(msg.title) document.title=msg.title;
       if(msg.tabMeta) tabMeta=msg.tabMeta;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
