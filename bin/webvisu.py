@@ -447,7 +447,9 @@ class App:
         return None
 
     def _control_icon_url(self, c: dict) -> str | None:
-        """Echtes Loxone-Icon eines Controls: control-eigenes Bild, sonst Kategorie-Icon."""
+        """Echtes Loxone-Icon eines Controls. Reihenfolge wie in der Loxone-App:
+        control-eigenes Bild -> `defaultIcon` (hier legt Loxone das pro Control
+        gewaehlte/GEAENDERTE Icon ab, auch eigene Uploads) -> Kategorie-Icon."""
         di = (c.get("details") or {}).get("image")
         if isinstance(di, str):
             img = di
@@ -456,9 +458,9 @@ class App:
         else:
             img = None
         if not img:
-            img = (self.cats.get(c.get("cat")) or {}).get("image")
+            img = c.get("defaultIcon")      # pro-Control gewaehltes Icon (inkl. Aenderung/Upload)
         if not img:
-            img = c.get("defaultIcon")
+            img = (self.cats.get(c.get("cat")) or {}).get("image")   # Kategorie als Fallback
         return self._icon_url(img)
 
     def _cat_color(self, cat_uuid: str | None) -> str | None:
