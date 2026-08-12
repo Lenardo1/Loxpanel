@@ -360,6 +360,11 @@ function updatePanel(blocks){
   const rowBlocks=blocks.filter(b=>b.k==='row');
   const rows=[...g.querySelectorAll('.brow')];
   if(rows.length!==rowBlocks.length){ renderPanel(blocks); return; }
+  // Favoriten kommen asynchron nach (roomfav/get) -> wenn sich die Anzahl
+  // gegenueber der Anzeige aendert (Platzhalter -> Liste), komplett neu rendern,
+  // sonst blieben sie unsichtbar/nicht klickbar.
+  const fb=blocks.find(b=>b.k==='favs');
+  if((fb?fb.items.length:0)!==g.querySelectorAll('.fav').length){ renderPanel(blocks); return; }
   const s=blocks.find(b=>b.k==='status'); if(s){const e=g.querySelector('.status'); if(e)e.textContent=s.text||'';}
   const v=blocks.find(b=>b.k==='value'); if(v){const e=g.querySelector('.pbar'); if(e)e.textContent=v.text||'';}
   const bg=blocks.find(b=>b.k==='big'); if(bg){const e=g.querySelector('.pbig'); if(e){e.textContent=bg.text||''; e.className='pbig'+(bg.tone==='good'?' good':(bg.tone==='crit'?' crit':''));}}
