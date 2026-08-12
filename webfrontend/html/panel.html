@@ -93,6 +93,9 @@
   .hero .circle{width:84px;height:84px;border-radius:50%;background:var(--tile);
     border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);}
   .hero .circle svg{width:38px;height:38px;}
+  .hero .circle .himg{width:38px;height:38px;background-color:currentColor;
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .hero .circle .rawico{width:38px;height:38px;object-fit:contain;}
   .status{text-align:center;color:var(--muted);font-size:14px;padding:2px 6px;}
   .pbar{background:var(--tile);border:1px solid var(--line);border-radius:12px;
     padding:15px;text-align:center;font-weight:650;font-size:15px;}
@@ -320,7 +323,12 @@ function renderPanel(blocks){
   const g=el('grid');
   let html='';
   for(const b of blocks){
-    if(b.k==='hero') html+='<div class="hero"><div class="circle">'+svg(ICONS[b.icon]||ICONS.info)+'</div></div>';
+    if(b.k==='hero'){ const hic = b.iconImg
+        ? '<img class="rawico" src="'+esc(b.iconImg)+'" alt="">'
+        : b.iconUrl
+        ? '<span class="himg" style="--u:url(\''+esc(b.iconUrl)+'\')"></span>'
+        : svg(ICONS[b.icon]||ICONS.info);
+      html+='<div class="hero"><div class="circle">'+hic+'</div></div>'; }
     else if(b.k==='cover') html+='<div class="cover"><div class="coverph">'+svg(ICONS.music)+'</div><img id="coverimg" alt=""></div>';
     else if(b.k==='video') html+='<div class="video"><img alt=""></div>';
     else if(b.k==='status') html+='<div class="status">'+esc(b.text||'')+'</div>';
