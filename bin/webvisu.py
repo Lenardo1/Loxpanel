@@ -506,6 +506,8 @@ class App:
              "--sub-size": f"{ui.get('subSize', 15)}px"}
         if ui.get("font"):
             v["--font"] = ui["font"]
+        if ui.get("cols") == 3:
+            v["--cols"] = "3"          # 3x2-Kachelraster (Tablet); Default 2x2
         nudge = ui.get("nudgeX")
         if nudge not in (None, ""):
             # Horizontaler Feinversatz der ganzen Visu (px, negativ = nach links)
@@ -572,7 +574,7 @@ class App:
             "rooms": [u for u in self.rooms_with if r and u in r],
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
-                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX", "dpmsOff")},
+                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX", "dpmsOff", "cols")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -618,6 +620,8 @@ class App:
                 cui["nudgeX"] = max(-40, min(40, ui["nudgeX"]))  # horiz. Versatz px
             if isinstance(ui.get("dpmsOff"), (int, float)):
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
+            if ui.get("cols") in (2, 3):
+                cui["cols"] = int(ui["cols"])   # Kacheln pro Zeile (2x2 oder 3x2)
             if cui:
                 e["ui"] = cui
             st = p.get("states") or {}
