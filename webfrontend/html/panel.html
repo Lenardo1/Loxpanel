@@ -44,8 +44,9 @@
     cursor:pointer;user-select:none;overflow:hidden;
     transition:background .16s,border-color .16s,transform .07s;}
   .tile:active{transform:scale(.97);}
-  .tile.on{background:linear-gradient(180deg,rgba(224,162,77,.22),rgba(224,162,77,.05));
-    border-color:rgba(224,162,77,.55);}
+  /* Aktiv-Overlay: Farbe je Zustand (--*-rgb), Aussehen global via --ov-* (pro Kachel ueberschreibbar) */
+  .tile.on{background:rgba(var(--on-rgb,224,162,77),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--on-rgb,224,162,77),var(--ov-bord,.55));}
   .tile .head{display:flex;justify-content:space-between;align-items:flex-start;}
   .tile .ico{color:var(--ico,var(--muted));}
   .tile.on .ico{color:var(--ico-fixed,var(--glow));}
@@ -68,11 +69,11 @@
   .tile .sub{font-size:var(--sub-size,15px);color:var(--muted);font-weight:400;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px;}
   .tile.on .sub{color:var(--glow);}
-  .tile.good{background:linear-gradient(180deg,rgba(82,184,129,.20),rgba(82,184,129,.04));
-    border-color:rgba(82,184,129,.5);}
+  .tile.good{background:rgba(var(--good-rgb,82,184,129),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--good-rgb,82,184,129),var(--ov-bord,.55));}
   .tile.good .ico,.tile.good .sub{color:var(--good);}
-  .tile.crit{background:linear-gradient(180deg,rgba(226,107,95,.22),rgba(226,107,95,.05));
-    border-color:rgba(226,107,95,.55);}
+  .tile.crit{background:rgba(var(--crit-rgb,226,107,95),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--crit-rgb,226,107,95),var(--ov-bord,.55));}
   .tile.crit .ico,.tile.crit .sub{color:var(--crit);}
   .tctrls{display:flex;gap:8px;justify-content:center;margin-top:6px;}
   .tctrls .tb{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.10);
@@ -439,6 +440,10 @@ function render(){
     if(ts.border) sv.push('border-color:'+ts.border);
     if(ts.txt) sv.push('color:'+ts.txt);
     if(ts.font) sv.push('font-family:'+ts.font);
+    // Aktiv-Overlay pro Kachel: nur die --ov-* Variablen setzen (Farbe bleibt zustandsabhaengig)
+    if(ts.ovFill!=null) sv.push('--ov-fill:'+ts.ovFill);
+    if(ts.ovBord!=null) sv.push('--ov-bord:'+ts.ovBord);
+    if(ts.ovBw!=null) sv.push('--ov-bw:'+ts.ovBw+'px');
     const st = sv.length?' style="'+esc(sv.join(';'))+'"':'';
     const nsv=[];
     if(ts.txt) nsv.push('color:'+ts.txt);

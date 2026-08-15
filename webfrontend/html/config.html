@@ -90,6 +90,12 @@
   .trow .tnm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .trow .trm{color:var(--muted);font-size:12px;}
   .trow .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;}
+  .trow .eye{flex:none;width:30px;height:26px;display:grid;place-items:center;border-radius:7px;color:var(--muted);cursor:pointer;}
+  .trow .eye svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+  .trow .eye:hover{background:var(--bg);color:var(--fg);}
+  .trow .eye.off{color:var(--crit);}
+  .trow.hidden .tico{opacity:.4;} .trow.hidden .tnm{opacity:.5;text-decoration:line-through;} .trow.hidden .trm{opacity:.5;}
+  .thidden{color:var(--crit);}
   /* Kachel-Editor */
   .tedit{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap;}
   .tprev{width:150px;height:110px;flex:none;border:1px solid var(--line);border-radius:12px;background:var(--panel2);display:flex;flex-direction:column;justify-content:space-between;padding:12px;overflow:hidden;}
@@ -121,6 +127,18 @@
   select{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:8px 10px;font:inherit;max-width:220px;}
   select:focus{outline:none;border-color:var(--accent);}
   .muted{color:var(--muted);padding:12px;}
+  /* Aktiv-Overlay-Editor */
+  .ovwrap{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
+  .ovctrl{flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px;}
+  .ovctrl .frow{display:flex;align-items:center;gap:10px;}
+  .ovctrl .frow input[type=range]{flex:1;accent-color:var(--accent);}
+  .ovctrl .cval{min-width:44px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;}
+  .ovprev{flex:none;display:grid;place-items:center;}
+  .ovtile{--on-rgb:224,162,77;width:132px;height:88px;border-radius:14px;display:grid;place-items:center;
+    color:var(--fg);font-size:13px;font-weight:500;
+    background:rgba(var(--on-rgb),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--on-rgb),var(--ov-bord,.55));}
+  .ovtile.g{--on-rgb:82,184,129;} .ovtile.c{--on-rgb:226,107,95;}
   @media(max-width:720px){ .wrap{grid-template-columns:1fr;} .side{border-right:none;border-bottom:1px solid var(--line);} .main{max-height:none;} }
 </style>
 </head>
@@ -197,6 +215,42 @@ function renderList(){
 
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
+// ---- Aktiv-Overlay (Rahmen/Füllung/Deckkraft) ----
+const OV_DEF={mode:'both',fill:16,bord:55,bw:1};   // = bisheriges Aussehen
+function ovVal(ov,k){ return (ov&&ov[k]!=null)?ov[k]:OV_DEF[k]; }
+function pruneOverlay(host){ if(host&&host.overlay&&!Object.keys(host.overlay).length) delete host.overlay; }
+function overlayFields(ov,pfx){
+  const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw');
+  const opt=(v,t)=>'<option value="'+v+'"'+(m===v?' selected':'')+'>'+t+'</option>';
+  return '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
+      opt('both','Rahmen + Füllung')+opt('border','Nur Rahmen')+opt('fill','Nur Füllung')+'</select></div>'+
+    '<div class="frow"><label class="lbl">Füllung</label>'+
+      '<input type="range" id="'+pfx+'fill" min="0" max="100" step="5" value="'+fi+'">'+
+      '<span class="cval" id="'+pfx+'fillv">'+fi+' %</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmen</label>'+
+      '<input type="range" id="'+pfx+'bord" min="0" max="100" step="5" value="'+bo+'">'+
+      '<span class="cval" id="'+pfx+'bordv">'+bo+' %</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'bw">'+
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
+}
+function bindOverlay(pfx,getOv,onChange){
+  const m=$('#'+pfx+'mode'),fi=$('#'+pfx+'fill'),bo=$('#'+pfx+'bord'),bw=$('#'+pfx+'bw'),
+        fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv');
+  const set=(k,v)=>{ getOv()[k]=v; onChange(); };
+  if(m) m.onchange=()=>set('mode',m.value);
+  if(fi) fi.oninput=()=>{ fiv.textContent=fi.value+' %'; set('fill',Number(fi.value)); };
+  if(bo) bo.oninput=()=>{ bov.textContent=bo.value+' %'; set('bord',Number(bo.value)); };
+  if(bw) bw.onchange=()=>set('bw',Number(bw.value));
+}
+function ovPreview(elId,ov){
+  const el=$('#'+elId); if(!el) return;
+  const m=ovVal(ov,'mode'); let fill=ovVal(ov,'fill')/100, bord=ovVal(ov,'bord')/100;
+  if(m==='border') fill=0; if(m==='fill') bord=0;
+  el.style.setProperty('--ov-fill',fill);
+  el.style.setProperty('--ov-bord',bord);
+  el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
+}
+
 function renderEditor(){
   const p=PANELS[cur]; if(!p){ $('#main').innerHTML='<div class="empty">Kein Panel gewählt.</div>'; return; }
   const urlTxt = cur==='default' ? '/  (Standard, ohne Parameter)' : '/?panel='+cur;
@@ -228,7 +282,8 @@ function renderEditor(){
      '<div class="grid" id="cats"></div></div>'+
 
    '<div class="card"><h3>Kacheln gestalten</h3>'+
-     '<p class="note">Klicke eine Kachel an und ändere <b>Farben, Schrift und Icon nur für diese Kachel</b> (auf diesem Panel). Farbiger Punkt = schon angepasst.</p>'+
+     '<p class="note">Klicke eine Kachel an und ändere <b>Farben, Schrift und Icon nur für diese Kachel</b> (auf diesem Panel). Farbiger Punkt = schon angepasst. '+
+       'Mit dem <b>Auge</b> rechts blendest du eine Kachel auf diesem Panel ganz aus. <span id="tileHidden" class="thidden"></span></p>'+
      '<input type="text" id="tileSearch" placeholder="Kachel suchen…" style="max-width:280px;margin-bottom:10px">'+
      '<div class="tlist" id="tiles"></div>'+
      '<div id="tileEditor"></div></div>'+
@@ -254,6 +309,17 @@ function renderEditor(){
          '</select></div>'+
      '</div></div>'+
 
+   '<div class="card"><h3>Aktiv-Overlay</h3>'+
+     '<p class="note">Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird '+
+       '(an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. '+
+       'Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. '+
+       'Gilt für dieses Panel — einzelne Kacheln können unten abweichen.</p>'+
+     '<div class="ovwrap">'+
+       '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div></div>'+
+       '<div class="ovctrl">'+overlayFields((p.ui||{}).overlay,'ov_')+
+         '<div class="frow"><button class="minibtn" id="ovReset">Auf Standard zurücksetzen</button></div>'+
+       '</div></div></div>'+
+
    '<div class="actions">'+
      '<button class="btn save" id="saveBtn">Speichern</button>'+
      (cur==='default'?'':'<button class="btn del" id="delBtn">Panel löschen</button>')+
@@ -264,6 +330,11 @@ function renderEditor(){
   $('#fFont').oninput=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.font=e.target.value:delete p.ui.font; markDirty(); };
   { const fc=$('#fCols'); if(fc) fc.onchange=e=>{ p.ui=p.ui||{}; const v=Number(e.target.value);
       if(v===3) p.ui.cols=3; else delete p.ui.cols; markDirty(); }; }
+
+  bindOverlay('ov_', ()=>{ p.ui=p.ui||{}; p.ui.overlay=p.ui.overlay||{}; return p.ui.overlay; },
+              ()=>{ pruneOverlay(p.ui); ovPreview('ovPrev',(p.ui||{}).overlay); markDirty(); });
+  ovPreview('ovPrev',(p.ui||{}).overlay);
+  { const r=$('#ovReset'); if(r) r.onclick=()=>{ if(p.ui) delete p.ui.overlay; renderEditor(); markDirty(); }; }
 
   renderChips(p); renderChecklist(p,'rooms'); renderChecklist(p,'cats');
   renderTileList(); renderTileEditor();
@@ -360,13 +431,25 @@ function renderTileList(){
   if(!list.length){ box.innerHTML='<div class="muted">'+((p.rooms&&p.rooms.length)?'keine Kacheln in den gewählten Räumen':'nichts gefunden')+'</div>'; return; }
   list.slice(0,400).forEach(c=>{
     const has=p.tiles&&p.tiles[c.uuid];
-    const d=document.createElement('div'); d.className='trow'+(c.uuid===tileSel?' active':'');
+    const hidden=p.hide&&p.hide.includes(c.uuid);
+    const d=document.createElement('div'); d.className='trow'+(c.uuid===tileSel?' active':'')+(hidden?' hidden':'');
     const ic=c.iconUrl?'<span class="tico" style="--u:url(\''+esc(c.iconUrl)+'\')"></span>':'<span class="tico gen"></span>';
-    d.innerHTML=ic+'<span class="tnm">'+esc(c.name)+'</span><span class="trm">'+esc(c.roomName||'')+'</span>'+(has?'<span class="dot"></span>':'');
+    d.innerHTML=ic+'<span class="tnm">'+esc(c.name)+'</span><span class="trm">'+esc(c.roomName||'')+'</span>'+
+      (has?'<span class="dot"></span>':'')+
+      '<span class="eye'+(hidden?' off':'')+'" title="'+(hidden?'ausgeblendet – wieder einblenden':'sichtbar – ausblenden')+'">'+
+        svg(hidden?EYE_OFF:EYE_ON)+'</span>';
     d.onclick=()=>{ tileSel=c.uuid; renderTileList(); renderTileEditor(); };
+    d.querySelector('.eye').onclick=(e)=>{ e.stopPropagation(); toggleHide(c.uuid); };
     box.appendChild(d);
   });
+  const hc=$('#tileHidden'), n=(p.hide||[]).length;
+  if(hc) hc.textContent = n ? ('· '+n+' ausgeblendet') : '';
 }
+const EYE_ON='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>';
+const EYE_OFF='<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M6.7 6.7C3.9 8.3 2 11 1 12c1.7 2.6 5.5 7 11 7 1.7 0 3.2-.4 4.6-1"/><path d="M9.9 5.2A10 10 0 0 1 12 5c5.5 0 9.3 4.4 11 7-.6 1-1.7 2.4-3.2 3.6"/>';
+function toggleHide(uuid){ const p=PANELS[cur]; p.hide=p.hide||[];
+  const i=p.hide.indexOf(uuid); if(i>-1) p.hide.splice(i,1); else p.hide.push(uuid);
+  if(!p.hide.length) delete p.hide; markDirty(); renderTileList(); }
 function tileOv(){ const p=PANELS[cur]; p.tiles=p.tiles||{}; p.tiles[tileSel]=p.tiles[tileSel]||{}; return p.tiles[tileSel]; }
 function pruneTile(){ const p=PANELS[cur]; if(p.tiles&&p.tiles[tileSel]&&!Object.keys(p.tiles[tileSel]).length) delete p.tiles[tileSel]; }
 function setTile(k,v){ const ov=tileOv(); if(v==null||v==='') delete ov[k]; else ov[k]=v; pruneTile(); markDirty(); drawPrev(); renderTileList(); }
@@ -394,6 +477,12 @@ function renderTileEditor(){
         '<span class="itab" data-src="loxone">Loxone ('+(((META.icons||{}).loxone)||[]).length+')</span>'+
         '<span class="itab dis" title="folgt in Stufe 2/3">Google · Upload</span></div></div>'+
       '<div class="ipick" id="ipick"></div>'+
+      '<div class="frow" style="margin-top:8px"><label class="lbl">Aktiv-Overlay</label>'+
+        '<span class="tgl'+(ov.overlay?' on':'')+'" id="tOvOn" title="Für diese Kachel abweichend">◐</span>'+
+        '<span style="color:var(--muted);font-size:12.5px">abweichend vom Panel</span></div>'+
+      '<div class="ovwrap" id="tOvBox"'+(ov.overlay?'':' style="display:none"')+'>'+
+        '<div class="ovprev"><div class="ovtile on" id="tovPrev">An</div></div>'+
+        '<div class="ovctrl">'+overlayFields(ov.overlay,'tov_')+'</div></div>'+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
   bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
@@ -405,6 +494,11 @@ function renderTileEditor(){
   $('#tItalic').onclick=()=>{ const ov=tileOv(); if(ov.italic)delete ov.italic; else ov.italic=true; pruneTile(); $('#tItalic').classList.toggle('on'); markDirty(); drawPrev(); renderTileList(); };
   host.querySelectorAll('.itab[data-src]').forEach(t=>t.onclick=()=>{
     host.querySelectorAll('.itab').forEach(x=>x.classList.remove('on')); t.classList.add('on'); renderIconPick(t.dataset.src); });
+  bindOverlay('tov_', ()=>{ const o=tileOv(); o.overlay=o.overlay||{}; return o.overlay; },
+              ()=>{ ovPreview('tovPrev', tileOv().overlay); pruneTile(); markDirty(); renderTileList(); });
+  ovPreview('tovPrev', ov.overlay);
+  { const tg=$('#tOvOn'); if(tg) tg.onclick=()=>{ const o=tileOv();
+      if(o.overlay) delete o.overlay; else o.overlay={}; pruneTile(); renderTileEditor(); renderTileList(); markDirty(); }; }
   $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
   renderIconPick('builtin'); drawPrev();
 }
