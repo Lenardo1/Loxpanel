@@ -107,6 +107,57 @@ def _clean(name: str) -> str:
     return re.sub(r"^[^0-9A-Za-zÄÖÜäöü]+", "", name or "").strip() or (name or "")
 
 
+def _hex_rgb(value) -> str | None:
+    """#RRGGBB / #RGB -> \"r,g,b\" (fuer rgba() mit variabler Deckkraft). None bei ungueltig."""
+    h = str(value or "").lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6:
+        return None
+    try:
+        return f"{int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)}"
+    except ValueError:
+        return None
+
+
+def _overlay_alphas(ov: dict) -> tuple[float, float, int]:
+    """Overlay-Config -> (Fuellung-Alpha, Rahmen-Alpha, Rahmenbreite px).
+
+    Defaults entsprechen dem bisherigen fest verdrahteten Aussehen. `mode`
+    schaltet Fuellung bzw. Rahmen komplett ab (Rahmen/Fuellung/Beides).
+    """
+    ov = ov if isinstance(ov, dict) else {}
+    def _num(key, default):
+        try:
+            return float(ov.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+    fill = max(0.0, min(1.0, _num("fill", 16) / 100.0))
+    bord = max(0.0, min(1.0, _num("bord", 55) / 100.0))
+    bw = max(1, min(4, int(_num("bw", 1))))
+    mode = ov.get("mode")
+    if mode == "border":
+        fill = 0.0
+    elif mode == "fill":
+        bord = 0.0
+    return fill, bord, bw
+
+
+def _sanitize_overlay(ov) -> dict:
+    """Overlay-Config aus der Config-Seite auf erlaubte Werte eindampfen."""
+    if not isinstance(ov, dict):
+        return {}
+    out: dict = {}
+    if ov.get("mode") in ("both", "border", "fill"):
+        out["mode"] = ov["mode"]
+    for k in ("fill", "bord"):
+        if isinstance(ov.get(k), (int, float)):
+            out[k] = max(0, min(100, int(ov[k])))
+    if isinstance(ov.get("bw"), (int, float)):
+        out["bw"] = max(1, min(4, int(ov["bw"])))
+    return out
+
+
 def _config() -> dict:
     # Reihenfolge: geschriebene loxpanel.cfg (Settings-Seite) -> Env (Docker) -> Beispiel.
     base = Path(__file__).resolve().parent.parent / "config"
@@ -348,6 +399,29 @@ class App:
         return {int(x["id"]): x.get("name") for x in (arr or [])
                 if isinstance(x, dict) and x.get("id") is not None}
 
+    def _irc_modes(self, c: dict) -> dict:
+        """IRoomControllerV2: Temperatur-/Timer-Modi aus details.timerModes ->
+        {id: Name} (z. B. 0=Eco, 1=Komfort, 2=Gebaeudeschutz)."""
+        tm = (c.get("details") or {}).get("timerModes") or []
+        return {int(m["id"]): _clean(m.get("name"))
+                for m in tm if isinstance(m, dict) and m.get("id") is not None}
+
+    @staticmethod
+    def _irc_activity(prep, win) -> list:
+        """Aktivitaets-Hinweise fuer die Raumregelung: heizt/kuehlt + Fenster."""
+        bits = []
+        try:
+            p = float(prep)
+        except (TypeError, ValueError):
+            p = 0.0
+        if p > 0:
+            bits.append("heizt")
+        elif p < 0:
+            bits.append("kühlt")
+        if win:
+            bits.append("Fenster")
+        return bits
+
     def _audio_favs(self, c: dict) -> list:
         """Raum-Favoriten (Radio/Playlist/Spotify) aus dem sourceList-State.
 
@@ -506,6 +580,19 @@ class App:
              "--ico-size": f"{ui.get('iconSize', 38)}px",
              "--name-size": f"{ui.get('nameSize', 18)}px",
              "--sub-size": f"{ui.get('subSize', 15)}px"}
+        # Zustands-Farben zusaetzlich als R,G,B-Tripel, damit das Aktiv-Overlay
+        # (Fuellung/Rahmen) die konfigurierte Farbe mit variabler Deckkraft nutzt.
+        for skey, rvar in (("active", "--on-rgb"), ("good", "--good-rgb"),
+                           ("crit", "--crit-rgb"), ("warn", "--warn-rgb")):
+            rgb = _hex_rgb(states.get(skey))
+            if rgb:
+                v[rvar] = rgb
+        # Aussehen des Aktiv-Overlays (global fuers Panel; pro Kachel ueberschreibbar).
+        if isinstance(ui.get("overlay"), dict):
+            fill, bord, bw = _overlay_alphas(ui["overlay"])
+            v["--ov-fill"] = f"{fill:.3g}"
+            v["--ov-bord"] = f"{bord:.3g}"
+            v["--ov-bw"] = f"{bw}px"
         if ui.get("font"):
             v["--font"] = ui["font"]
         if ui.get("cols") == 3:
@@ -535,6 +622,7 @@ class App:
             "cats": self._resolve_ids(prof.get("cats"), self.cats),
             "vars": self._theme_vars(states, ui),
             "tiles": prof.get("tiles") or {},
+            "hide": {u for u in (prof.get("hide") or []) if isinstance(u, str)},
         }
 
     def _tab_meta(self, tab_keys) -> dict:
@@ -563,6 +651,11 @@ class App:
             return True
         return self.controls.get(uuid, {}).get("room") in ar
 
+    def _shown(self, uuid: str, prof: dict | None) -> bool:
+        """False, wenn diese Kachel auf dem Panel einzeln ausgeblendet wurde
+        (zusaetzlich zum Raum-/Kategorie-Filter). Gilt panelweit."""
+        return not (prof and uuid in prof.get("hide", ()))
+
     # ---- Config-Seite (Panel-Editor) ----
     def _panel_export(self, raw: dict) -> dict:
         """Rohes Profil aus der Datei -> UI-Form (rooms/cats als UUID-Listen,
@@ -576,10 +669,13 @@ class App:
             "rooms": [u for u in self.rooms_with if r and u in r],
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
-                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX", "dpmsOff", "cols")},
+                   if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
+                            "dpmsOff", "cols", "overlay")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
+            "hide": [u for u in (raw.get("hide") or [])
+                     if isinstance(u, str) and u in self.controls],
         }
 
     def _loxone_icons(self) -> list:
@@ -613,6 +709,9 @@ class App:
             e["tabs"] = tabs or list(VALID_TABS)
             e["rooms"] = [str(x) for x in (p.get("rooms") or []) if isinstance(x, str)]
             e["cats"] = [str(x) for x in (p.get("cats") or []) if isinstance(x, str)]
+            hide = [str(x) for x in (p.get("hide") or []) if isinstance(x, str)]
+            if hide:
+                e["hide"] = hide           # einzeln ausgeblendete Kacheln (panelweit)
             ui = p.get("ui") or {}
             cui = {k: ui[k] for k in ("iconSize", "nameSize", "subSize")
                    if isinstance(ui.get(k), (int, float))}
@@ -624,6 +723,9 @@ class App:
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
             if ui.get("cols") in (2, 3):
                 cui["cols"] = int(ui["cols"])   # Kacheln pro Zeile (2x2 oder 3x2)
+            ovc = _sanitize_overlay(ui.get("overlay"))
+            if ovc:
+                cui["overlay"] = ovc            # Aussehen des Aktiv-Overlays
             if cui:
                 e["ui"] = cui
             st = p.get("states") or {}
@@ -646,6 +748,9 @@ class App:
                     for bk in ("bold", "italic"):
                         if ov.get(bk) is True:
                             e2[bk] = True
+                    tov = _sanitize_overlay(ov.get("overlay"))
+                    if tov:
+                        e2["overlay"] = tov     # Aktiv-Overlay nur fuer diese Kachel
                     icc = _clean_icon(ov.get("icon"))
                     if icc:
                         e2["icon"] = icc
@@ -725,9 +830,14 @@ class App:
                                 ("Geschlossen" if pct <= 0 else f"{pct}% offen")))
         elif t == "IRoomControllerV2":
             ta = self._state(c, "tempActual"); tt = self._state(c, "tempTarget")
+            prep = self._state(c, "prepareState")
+            bits = self._irc_activity(prep, self._state(c, "openWindow"))
+            sub = (f"{self._fmt_num(ta, '%.1f')}° → {self._fmt_num(tt, '%.1f')}°"
+                   if ta is not None else "Heizung")
+            if bits:
+                sub += " · " + " · ".join(bits)
             it.update(icon="thermo", nav={"view": "control", "id": uuid},
-                      sublabel=(f"{self._fmt_num(ta, '%.1f')}° → {self._fmt_num(tt, '%.1f')}°"
-                                if ta is not None else "Heizung"))
+                      on=bool(prep), sublabel=sub)
         elif t == "Intercom":
             it.update(icon="cam", sublabel="Türsprechanlage",
                       nav={"view": "control", "id": uuid})
@@ -847,6 +957,11 @@ class App:
             style["weight"] = 700
         if ov.get("italic"):
             style["italic"] = True
+        if isinstance(ov.get("overlay"), dict):
+            fill, bord, bw = _overlay_alphas(ov["overlay"])
+            style["ovFill"] = f"{fill:.3g}"     # ueberschreibt --ov-* nur fuer diese Kachel
+            style["ovBord"] = f"{bord:.3g}"
+            style["ovBw"] = bw
         if style:
             it["style"] = style
         ic = ov.get("icon")
@@ -877,17 +992,17 @@ class App:
             # Kategorie-Direkt-Tab: dieselben Controls wie im Kategorie-Drilldown
             cu = tab[4:]
             items = [self._control_item(u, prof) for u, c in self.controls.items()
-                     if c.get("cat") == cu and self._room_ok(u, prof)]
+                     if c.get("cat") == cu and self._room_ok(u, prof) and self._shown(u, prof)]
             title = _clean(self.cats.get(cu, {}).get("name")) or "Kategorie"
             return {"t": "view", "title": title, "tab": tab,
                     "route": {"view": "tab", "tab": tab}, "items": items}
         if tab == "favoriten":
             items = [self._control_item(u, prof) for u, c in self.controls.items()
-                     if c.get("isFavorite") and self._room_ok(u, prof)]
+                     if c.get("isFavorite") and self._room_ok(u, prof) and self._shown(u, prof)]
             title = "Favoriten"
         elif tab == "zentral":
             items = [self._control_item(u, prof) for u, c in self.controls.items()
-                     if (c.get("type") or "").startswith("Central")]
+                     if (c.get("type") or "").startswith("Central") and self._shown(u, prof)]
             title = "Zentral"
         elif tab == "raeume":
             rooms = [ru for ru in self.rooms_with if ar is None or ru in ar]
@@ -918,15 +1033,17 @@ class App:
         layout = None
         if kind == "cat":
             uuids = [u for u, c in self.controls.items()
-                     if c.get("cat") == gid and self._room_ok(u, prof)]
+                     if c.get("cat") == gid and self._room_ok(u, prof) and self._shown(u, prof)]
             title = _clean(self.cats.get(gid, {}).get("name")); tab = "kategorien"
         elif kind == "room":
-            uuids = [u for u, c in self.controls.items() if c.get("room") == gid]
+            uuids = [u for u, c in self.controls.items()
+                     if c.get("room") == gid and self._shown(u, prof)]
             title = _clean(self.rooms.get(gid, {}).get("name")); tab = "raeume"
         elif kind == "central":
             c = self.controls.get(gid, {})
             members = (c.get("details") or {}).get("controls") or []
-            uuids = [m.get("uuid") for m in members if m.get("uuid") in self.controls]
+            uuids = [m.get("uuid") for m in members
+                     if m.get("uuid") in self.controls and self._shown(m.get("uuid"), prof)]
             title = _clean(c.get("name")); tab = "zentral"
             if c.get("type") == "CentralAudioZone":
                 layout = "list"
@@ -1130,15 +1247,37 @@ class App:
                                 or self._state(c, "tempTarget") or 20)
             except (TypeError, ValueError):
                 comfort = 20.0
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
-                {"k": "hero", "icon": "thermo"},
-                {"k": "value", "text": f"{ta} °C"},
-                {"k": "status", "text": f"Soll {tt} °C"},
+            modes = self._irc_modes(c)
+            am = self._state(c, "activeMode")
+            try:
+                am = int(am) if am is not None else None
+            except (TypeError, ValueError):
+                am = None
+            # Status: Soll-Temp + aktiver Modus + heizt/kuehlt/Fenster
+            sbits = []
+            if am is not None and am in modes:
+                sbits.append(modes[am])
+            sbits += self._irc_activity(self._state(c, "prepareState"),
+                                        self._state(c, "openWindow"))
+            status = f"Soll {tt} °C" + (" · " + " · ".join(sbits) if sbits else "")
+            blocks = [
+                {"k": "big", "text": f"{ta} °C"},          # grosse Ist-Temp statt Icon
+                {"k": "status", "text": status},
                 {"k": "row", "cells": [
                     {"label": "−", "cmd": {"uuid": ua, "cmd": f"setComfortTemperature/{comfort - 0.5:.1f}"}},
                     {"label": "+", "cmd": {"uuid": ua, "cmd": f"setComfortTemperature/{comfort + 0.5:.1f}"}},
                 ]},
-            ]}
+            ]
+            # Betriebsmodi als Override-Buttons (Komfort/Eco/Gebaeudeschutz, 1 h),
+            # plus Rueckkehr zur Zeitschaltung. Modus-Ids stammen aus timerModes.
+            if modes:
+                blocks.append({"k": "row", "cells": [
+                    {"label": nm, "on": (mid == am),
+                     "cmd": {"uuid": ua, "cmd": f"override/{mid}"}}
+                    for mid, nm in sorted(modes.items())]})
+                blocks.append({"k": "row", "cells": [
+                    {"label": "Automatik", "cmd": {"uuid": ua, "cmd": "stopOverride"}}]})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Intercom":
             ent = self.intercom_cfg.get(uuid)
             has_url = bool(ent.get("url") if isinstance(ent, dict) else ent)
