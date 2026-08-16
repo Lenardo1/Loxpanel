@@ -610,7 +610,8 @@ class App:
              "--crit": states.get("crit"), "--warn": states.get("warn"),
              "--ico-size": f"{ui.get('iconSize', 38)}px",
              "--name-size": f"{ui.get('nameSize', 18)}px",
-             "--sub-size": f"{ui.get('subSize', 15)}px"}
+             "--sub-size": f"{ui.get('subSize', 15)}px",
+             "--name-weight": "700" if ui.get("bold") else "450"}
         # Zustands-Farben zusaetzlich als R,G,B-Tripel, damit das Aktiv-Overlay
         # (Fuellung/Rahmen) die konfigurierte Farbe mit variabler Deckkraft nutzt.
         for skey, rvar in (("active", "--on-rgb"), ("good", "--good-rgb"),
@@ -626,6 +627,8 @@ class App:
             v["--ov-bw"] = f"{bw}px"
         if ui.get("font"):
             v["--font"] = ui["font"]
+        if ui.get("textColor"):
+            v["--name-color"] = ui["textColor"]
         if ui.get("cols") == 3:
             v["--cols"] = "3"          # 3x2-Kachelraster (Tablet); Default 2x2
         nudge = ui.get("nudgeX")
@@ -701,7 +704,7 @@ class App:
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
                    if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                            "dpmsOff", "cols", "overlay")},
+                            "dpmsOff", "cols", "overlay", "textColor", "bold")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -754,6 +757,10 @@ class App:
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
             if ui.get("cols") in (2, 3):
                 cui["cols"] = int(ui["cols"])   # Kacheln pro Zeile (2x2 oder 3x2)
+            if _color_ok(ui.get("textColor")):
+                cui["textColor"] = ui["textColor"].strip()   # globale Schriftfarbe (Name)
+            if ui.get("bold"):
+                cui["bold"] = True                            # Kachel-Namen fett
             ovc = _sanitize_overlay(ui.get("overlay"))
             if ovc:
                 cui["overlay"] = ovc            # Aussehen des Aktiv-Overlays
@@ -800,6 +807,41 @@ class App:
         PANELS_FILE.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
                                encoding="utf-8")
         self.panels = load_panels()
+
+    @staticmethod
+    def _sanitize_theme_ui(ui: dict) -> dict:
+        """Globale Darstellungs-ui (theme.json) validieren: nur bekannte Keys."""
+        ui = ui or {}
+        out: dict = {}
+        for k in ("iconSize", "nameSize", "subSize"):
+            if isinstance(ui.get(k), (int, float)):
+                out[k] = max(8, min(80, int(ui[k])))
+        if ui.get("font"):
+            out["font"] = str(ui["font"])[:120]
+        if _color_ok(ui.get("textColor")):
+            out["textColor"] = ui["textColor"].strip()
+        if ui.get("bold"):
+            out["bold"] = True
+        return out
+
+    def _write_theme(self, ui: dict) -> None:
+        """Globale Darstellung in theme.json schreiben (Darstellungs-Keys ersetzen,
+        uebrige Theme-Inhalte wie states/categories/tabs bleiben erhalten)."""
+        f = Path(__file__).resolve().parent.parent / "config" / "theme.json"
+        try:
+            doc = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
+        except ValueError:
+            doc = {}
+        cur = doc.get("ui") if isinstance(doc.get("ui"), dict) else {}
+        for k in ("iconSize", "nameSize", "subSize", "font", "textColor", "bold"):
+            if k in ui:
+                cur[k] = ui[k]
+            else:
+                cur.pop(k, None)
+        doc["ui"] = cur
+        f.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        self.theme = load_theme()
+        self._dirty = True   # verbundene Panels neu rendern lassen
 
     async def fetch_icon(self, path: str) -> tuple[bytes, str] | None:
         if path in self.icon_cache:
@@ -1628,6 +1670,9 @@ async def api_meta(request: web.Request) -> web.Response:
             "iconUrl": app._icon_url(app.cats[cu].get("image")), "cat": True}
            for cu in app.cats_with],
         "panels": panels,
+        "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
+                         if k in ("iconSize", "nameSize", "subSize", "font",
+                                  "textColor", "bold")}},
     })
 
 
@@ -1647,6 +1692,25 @@ async def api_save_panels(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": str(err)}, status=500)
     log.info("panels.json gespeichert: %d Profile", len(clean))
     return web.json_response({"ok": True, "count": len(clean)})
+
+
+async def api_save_theme(request: web.Request) -> web.Response:
+    """Globale Darstellung (theme.json ui) speichern — gilt fuer alle Panels."""
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    ui = data.get("ui")
+    if not isinstance(ui, dict):
+        return web.json_response({"ok": False, "error": "Feld 'ui' fehlt"}, status=400)
+    clean = App._sanitize_theme_ui(ui)
+    try:
+        app._write_theme(clean)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
+    log.info("theme.json (globale Darstellung) gespeichert")
+    return web.json_response({"ok": True})
 
 
 async def settings_index(request: web.Request) -> web.Response:
@@ -1947,6 +2011,7 @@ def main() -> None:
     a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_post("/api/panels", api_save_panels)
+    a.router.add_post("/api/theme", api_save_theme)
     a.router.add_get("/api/settings", api_settings)
     a.router.add_post("/api/settings/miniserver", api_settings_ms)
     a.router.add_post("/api/settings/intercom", api_settings_intercom)
