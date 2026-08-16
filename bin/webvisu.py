@@ -36,6 +36,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from loxone_api import LoxoneClient  # noqa: E402
 from loxone_ws import LoxoneWS  # noqa: E402
 from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
+from audioserver import make_backend, AudioBackend  # noqa: E402
 
 log = logging.getLogger("loxpanel.webvisu")
 _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
@@ -181,6 +182,24 @@ def _config() -> dict:
     return json.loads((base / "loxpanel.cfg.example").read_text(encoding="utf-8")).get("miniserver", {})
 
 
+def _audio_config() -> dict:
+    """Audio-Backend-Config (Loxone-Audioserver / MS4H auf Port 7091).
+
+    Aus loxpanel.cfg `audio`-Block: {"host": "10.0.2.2", "port": 7091}.
+    Fehlt `host`, wird er aus einer roomfav-Cover-URL abgeleitet (die zeigen
+    auf den Audioserver, z.B. http://10.0.2.2:7092/...), sobald verfügbar.
+    """
+    base = Path(__file__).resolve().parent.parent / "config"
+    f = base / "loxpanel.cfg"
+    if not f.is_file():
+        f = base / "loxpanel.cfg.example"
+    try:
+        cfg = json.loads(f.read_text(encoding="utf-8")).get("audio", {})
+    except ValueError:
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
 def _intercom_config() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
     f = base / "loxpanel.cfg"
@@ -240,10 +259,15 @@ def load_panels() -> dict:
 
 
 class App:
-    def __init__(self, ms: dict):
+    def __init__(self, ms: dict, audio: dict | None = None):
         self.host, self.port = ms["host"], ms.get("port", 443)
         self.user, self.password = ms["user"], ms["pass"]
         self.verify_tls = ms.get("verify_tls", False)
+
+        self.audio_cfg = audio or {}
+        self.audio: AudioBackend | None = make_backend(self.audio_cfg)
+        # uuidAction -> Loxone-playerid (fuer Audioserver-Kommandos)
+        self.playerid_by_action: dict[str, int] = {}
 
         self.client: LoxoneClient | None = None
         self.ws: LoxoneWS | None = None
@@ -287,13 +311,20 @@ class App:
             {c.get("cat") for c in self.controls.values() if c.get("cat") in self.cats},
             key=lambda c: self.cats[c].get("name", ""))
         self.bell_map = {}
+        self.playerid_by_action = {}
         for _u, _c in self.controls.items():
             if _c.get("type") == "Intercom":
                 _bu = (_c.get("states") or {}).get("bell")
                 if _bu:
                     self.bell_map[_bu] = _u
-        log.info("Struktur: %d Controls, %d Räume, %d Kategorien, %d Intercom-Klingeln",
-                 len(self.controls), len(self.rooms_with), len(self.cats_with), len(self.bell_map))
+            elif _c.get("type") == "AudioZone":
+                _pid = (_c.get("details") or {}).get("playerid")
+                _ua = _c.get("uuidAction")
+                if _ua and _pid is not None:
+                    self.playerid_by_action[_ua] = int(_pid)
+        log.info("Struktur: %d Controls, %d Räume, %d Kategorien, %d Intercom-Klingeln, %d AudioZones",
+                 len(self.controls), len(self.rooms_with), len(self.cats_with),
+                 len(self.bell_map), len(self.playerid_by_action))
 
     async def start(self) -> None:
         try:
@@ -1418,6 +1449,35 @@ class App:
             return self._view_sources(route.get("id"))
         return self._view_tab(route.get("tab", "favoriten"), prof)
 
+    def _detect_audio_host(self) -> str | None:
+        """Audioserver-Host aus einer AudioZone-Cover/sourceList-URL ableiten.
+
+        Loxone-Musik-Cover werden ueber den Audioserver-Proxy ausgeliefert
+        (z.B. http://10.0.2.2:7092/...), die Host-IP ist also dort ablesbar.
+        """
+        for c in self.controls.values():
+            if c.get("type") != "AudioZone":
+                continue
+            s = c.get("states") or {}
+            for key in ("cover", "sourceList"):
+                v = self.states.get(s.get(key))
+                if isinstance(v, str):
+                    m = re.search(r"https?://(\d{1,3}(?:\.\d{1,3}){3}):\d+/", v)
+                    if m:
+                        return m.group(1)
+        return None
+
+    def _audio_backend(self) -> AudioBackend | None:
+        """Liefert das Audio-Backend; erkennt den Host bei Bedarf automatisch."""
+        if self.audio is not None:
+            return self.audio
+        host = self._detect_audio_host()
+        if host:
+            self.audio = make_backend({"host": host, "port": self.audio_cfg.get("port", 7091)})
+            if self.audio:
+                log.info("Audioserver-Host automatisch erkannt: %s", host)
+        return self.audio
+
     async def command(self, uuid: str, cmd: str, pin: str | None = None) -> str | None:
         """Fuehrt einen Befehl aus. Mit pin: gesicherter Befehl (Visu-Passwort)."""
         if not (self.client and uuid and cmd):
@@ -1425,14 +1485,22 @@ class App:
         try:
             if pin is not None:
                 return await self._secured_command(uuid, cmd, pin)
-            # Zonen-Favorit: eine gestoppte/abgeschaltete AudioZone startet auf
-            # `roomfav/play/...` allein NICHT (am Miniserver verifiziert) — erst
-            # ein vorheriges `on` weckt sie zuverlaessig.
-            if cmd.startswith("roomfav/play/"):
-                try:
-                    await self.client.jdev_get(f"sps/io/{uuid}/on")
-                except Exception:
-                    pass
+            # AudioZone-Steuerung laeuft ueber den Audioserver (Loxone-Music-
+            # Server-Protokoll, Port 7091), NICHT ueber den Miniserver: play,
+            # pause, queueplus/-minus, volume/{n}, roomfav/play/{slot} werden zu
+            # audio/{playerid}/{cmd}. uuid = AudioZone-uuidAction -> Loxone-
+            # playerid; der Audioserver mappt sie intern auf den realen Player,
+            # die Anzeige folgt ueber die Loxone-States. Ausnahme roomfav/get:
+            # die Favoriten-Abfrage muss ueber den Miniserver laufen, sie
+            # befuellt den sourceList-State fuer die Anzeige.
+            pid = self.playerid_by_action.get(uuid)
+            if pid is not None and not cmd.startswith("roomfav/get"):
+                backend = self._audio_backend()
+                if backend:
+                    ok = await backend.command(pid, cmd)
+                    return "200" if ok else None
+                log.warning("AudioZone-Befehl ohne Audio-Backend (uuid=%s, cmd=%s)", uuid, cmd)
+                return None
             log.info("cmd %s/%s", uuid, cmd)
             await self.client.jdev_get(f"sps/io/{uuid}/{cmd}")
             return "200"
@@ -1519,6 +1587,8 @@ class App:
             await self.icon_session.close()
         if self.client:
             await self.client.close()
+        if self.audio:
+            await self.audio.close()
 
 
 async def index(request: web.Request) -> web.Response:
@@ -1869,7 +1939,7 @@ def main() -> None:
     args = p.parse_args()
 
     a = web.Application()
-    a["app"] = App(_config())
+    a["app"] = App(_config(), _audio_config())
     a.router.add_get("/", index)
     a.router.add_get("/config", config_index)
     a.router.add_get("/settings", settings_index)
