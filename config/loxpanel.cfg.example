@@ -34,5 +34,12 @@
     "_comment": "Standard-LMS/MS4H fuer Musik, sofern nicht pro Player-Seite ueberschrieben.",
     "host": "192.168.1.50",
     "port": 9000
+  },
+
+  "audio": {
+    "_comment": "Loxone-Audioserver (echt oder MS4H) fuer Favoriten-Wiedergabe via Loxone-Music-Server-Protokoll (Port 7091). host optional: wird sonst automatisch aus den Cover-URLs erkannt. enabled:false schaltet die Direktsteuerung ab.",
+    "host": "",
+    "port": 7091,
+    "enabled": true
   }
 }
