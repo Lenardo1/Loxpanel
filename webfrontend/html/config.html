@@ -197,13 +197,23 @@ async function load(){
   const r = await fetch('/api/meta'); META = await r.json();
   PANELS = JSON.parse(JSON.stringify(META.panels||{}));
   if(!PANELS.default) PANELS.default = {title:'LoxPanel', tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
+  // Virtuelles Global-Profil: bearbeitet theme.json (gilt fuer alle Panels)
+  PANELS.__global__ = {title:'Global (alle Panels)', ui: JSON.parse(JSON.stringify((META.theme||{}).ui||{})), __global:true};
   cur = PANELS.default ? 'default' : Object.keys(PANELS)[0];
   renderList(); renderEditor();
 }
 
 function renderList(){
   const box=$('#plist'); box.innerHTML='';
+  if(PANELS.__global__){
+    const g=document.createElement('div');
+    g.className='pitem'+('__global__'===cur?' active':'');
+    g.innerHTML='<span class="pn">🌐 Global</span><span class="pid">alle Panels</span>';
+    g.onclick=()=>{ cur='__global__'; tileSel=null; renderList(); renderEditor(); };
+    box.appendChild(g);
+  }
   for(const id of Object.keys(PANELS)){
+    if(id==='__global__') continue;
     const p=PANELS[id];
     const d=document.createElement('div');
     d.className='pitem'+(id===cur?' active':'');
@@ -251,8 +261,51 @@ function ovPreview(elId,ov){
   el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
 }
 
+function bindAppearance(p){
+  // Handler fuer die gemeinsamen Darstellungs-Felder (Panel- + Global-Editor)
+  document.querySelectorAll('input[data-ui]').forEach(inp=>{
+    inp.oninput=()=>{ p.ui=p.ui||{}; const k=inp.dataset.ui;
+      if(inp.value==='') delete p.ui[k]; else p.ui[k]=Number(inp.value); markDirty(); }; });
+  { const fs=$('#fFontSel'), fc=$('#fFontCustom');
+    if(fs) fs.onchange=()=>{ p.ui=p.ui||{};
+      if(fs.value==='__custom'){ fc.style.display=''; const v=fc.value.trim(); v?p.ui.font=v:delete p.ui.font; }
+      else { fc.style.display='none'; fs.value?p.ui.font=fs.value:delete p.ui.font; } markDirty(); };
+    if(fc) fc.oninput=()=>{ p.ui=p.ui||{}; const v=fc.value.trim(); v?p.ui.font=v:delete p.ui.font; markDirty(); }; }
+  { const ci=$('#fTextColor'), cc=$('#fTextColorClr'), cv=$('#fTextColorVal');
+    if(ci) ci.oninput=()=>{ p.ui=p.ui||{}; p.ui.textColor=ci.value; if(cv)cv.textContent=ci.value; markDirty(); };
+    if(cc) cc.onclick=()=>{ if(p.ui) delete p.ui.textColor; if(cv)cv.textContent='Standard'; markDirty(); }; }
+  { const b=$('#fBold'); if(b) b.onchange=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.bold=true:delete p.ui.bold; markDirty(); }; }
+}
+function appearanceFields(ui){
+  ui=ui||{};
+  return sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
+    '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
+      '<select id="fFontSel">'+FONTS.map(f=>'<option value="'+esc(f.v)+'"'+(sameFont(ui.font,f.v)?' selected':'')+'>'+esc(f.label)+'</option>').join('')+
+        '<option value="__custom"'+(customFont(ui.font)?' selected':'')+'>Eigene…</option></select>'+
+      '<input type="text" id="fFontCustom" value="'+esc(customFont(ui.font)?ui.font:'')+'" placeholder="z. B. Pacifico, cursive"'+(customFont(ui.font)?'':' style="display:none"')+'></div>'+
+    '<div class="field" style="max-width:230px"><label class="lbl">Schriftfarbe (Name)</label>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<input type="color" id="fTextColor" value="'+esc(ui.textColor&&String(ui.textColor)[0]==="#"?ui.textColor:"#e8eaed")+'" style="width:40px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--bg);cursor:pointer">'+
+        '<span class="cval" id="fTextColorVal" style="flex:1">'+esc(ui.textColor||"Standard")+'</span>'+
+        '<button class="minibtn" id="fTextColorClr">Standard</button></div></div>'+
+    '<div class="field" style="max-width:150px"><label class="lbl">Schriftstärke</label>'+
+      '<select id="fBold"><option value="">Normal</option><option value="1"'+(ui.bold?' selected':'')+'>Fett</option></select></div>';
+}
+function renderGlobalEditor(p){
+  $('#main').innerHTML =
+    '<div class="ehead"><h2>🌐 Globale Darstellung</h2><span class="badge">alle Panels</span></div>'+
+    '<div class="url">Standard-Aussehen für <b>alle</b> Panels. Einzelne Panels können es unter „Darstellung" überschreiben (leer = erbt global).</div>'+
+    '<div class="card"><h3>Darstellung</h3>'+
+      '<p class="note">Schrift, Größe, Farbe und Stärke der Kachel-Beschriftung — gilt global für alle Panels.</p>'+
+      '<div class="sizes">'+appearanceFields(p.ui)+'</div></div>'+
+    '<div class="actions"><button class="btn save" id="saveBtn">Speichern</button>'+
+      '<span class="toast" id="toast"></span></div>';
+  bindAppearance(p);
+  $('#saveBtn').onclick=save;
+}
 function renderEditor(){
   const p=PANELS[cur]; if(!p){ $('#main').innerHTML='<div class="empty">Kein Panel gewählt.</div>'; return; }
+  if(p.__global){ renderGlobalEditor(p); return; }
   const urlTxt = cur==='default' ? '/  (Standard, ohne Parameter)' : '/?panel='+cur;
   const m=$('#main');
   m.innerHTML =
@@ -290,19 +343,14 @@ function renderEditor(){
 
    '<div class="card"><h3>Darstellung (optional)</h3>'+
      '<p class="note">Überschreibt das globale Theme nur für dieses Panel. Leer = global.</p>'+
-     '<div class="sizes">'+
-       sizeField('Icon-Größe','iconSize',p.ui)+
-       sizeField('Name-Größe','nameSize',p.ui)+
-       sizeField('Sub-Größe','subSize',p.ui)+
-       '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
-         '<input type="text" id="fFont" value="'+esc((p.ui||{}).font||'')+'" placeholder="Inter, Roboto, …"></div>'+
-       '<div class="field"><label class="lbl">Horiz. Versatz (px)</label>'+
+     '<div class="sizes">'+appearanceFields(p.ui)+
+       '<div class="field" style="max-width:180px"><label class="lbl">Horiz. Versatz (px)</label>'+
          '<input type="number" min="-40" max="40" step="2" data-ui="nudgeX" value="'+
          (((p.ui||{}).nudgeX==null)?'':(p.ui||{}).nudgeX)+'" placeholder="0"></div>'+
-       '<div class="field"><label class="lbl">Display aus nach (Sek.)</label>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Display aus nach (Sek.)</label>'+
          '<input type="number" min="0" max="3600" step="30" data-ui="dpmsOff" value="'+
          (((p.ui||{}).dpmsOff==null)?'':(p.ui||{}).dpmsOff)+'" placeholder="180"></div>'+
-       '<div class="field"><label class="lbl">Kacheln pro Zeile</label>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Kacheln pro Zeile</label>'+
          '<select id="fCols">'+
            '<option value="2"'+(((p.ui||{}).cols==3)?'':' selected')+'>2 × 2 (4″-Panel)</option>'+
            '<option value="3"'+(((p.ui||{}).cols==3)?' selected':'')+'>3 × 2 (Tablet)</option>'+
@@ -327,7 +375,7 @@ function renderEditor(){
 
   // Titel live
   $('#fTitle').oninput=e=>{ p.title=e.target.value; $('#hTitle').textContent=e.target.value||cur; markDirty(); };
-  $('#fFont').oninput=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.font=e.target.value:delete p.ui.font; markDirty(); };
+  bindAppearance(p);
   { const fc=$('#fCols'); if(fc) fc.onchange=e=>{ p.ui=p.ui||{}; const v=Number(e.target.value);
       if(v===3) p.ui.cols=3; else delete p.ui.cols; markDirty(); }; }
 
