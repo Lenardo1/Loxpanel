@@ -109,15 +109,18 @@ def _dpms_default():
         return 0
 
 
-def apply_dpms(secs):
+def apply_dpms(secs, force=False):
     """Display-Power-Management setzen: nach `secs` Sekunden Inaktivitaet
     schaltet X das Display ab (Backlight aus); Antippen weckt es (Input-Event).
     secs=0 -> nie abschalten. None -> ignorieren (kein Wert vom Server).
     Wird sowohl beim Kiosk-Start (kiosk.conf-Default) als auch live aus der
     Announce-Antwort des Servers aufgerufen; redundante Aufrufe werden verworfen."""
     global _dpms_cur
-    if secs is None or secs == _dpms_cur:
+    if secs is None:
         return
+    if secs == _dpms_cur and not force:
+        return
+    changed = secs != _dpms_cur   # nur bei echter Aenderung loggen (force laeuft alle 15s)
     xset = shutil.which("xset")
     if not xset:
         print("xset fehlt (Paket x11-xserver-utils) — Display-Abschaltung inaktiv")
@@ -130,10 +133,12 @@ def apply_dpms(secs):
             subprocess.run([xset, "+dpms"], env=env, check=False)
             # standby/suspend/off-Timer: nur "off" nutzen (echtes Abschalten)
             subprocess.run([xset, "dpms", "0", "0", str(secs)], env=env, check=False)
-            print("DPMS: Display aus nach %ss Inaktivitaet" % secs)
+            if changed:
+                print("DPMS: Display aus nach %ss Inaktivitaet" % secs)
         else:
             subprocess.run([xset, "-dpms"], env=env, check=False)
-            print("DPMS: Abschaltung deaktiviert (0)")
+            if changed:
+                print("DPMS: Abschaltung deaktiviert (0)")
         _dpms_cur = secs
     except Exception as e:
         print("DPMS-Setup fehlgeschlagen:", e)
@@ -172,7 +177,9 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
-    apply_dpms(_dpms_default())   # kiosk.conf-Default; Server kann es per Announce ueberschreiben
+    # force: Chromium-(Neu)Start setzt DPMS auf den X-Default (600) zurueck —
+    # deshalb hier immer neu erzwingen (kiosk.conf-Default; Server ueberschreibt).
+    apply_dpms(_dpms_default(), force=True)
     print("Kiosk gestartet:", kiosk_url(_cur_panel))
     return True
 
@@ -193,7 +200,11 @@ def announce_loop():
             try:
                 r = json.loads(resp or b"{}")
                 if running():
-                    apply_dpms(r.get("dpmsOff"))
+                    # regelmaessig durchsetzen (force), damit ein zwischenzeitlich
+                    # zurueckgesetzter DPMS-Timer wieder korrigiert wird. Kein
+                    # Server-Wert -> kiosk.conf-Default. xset weckt das Display nicht.
+                    target = r.get("dpmsOff")
+                    apply_dpms(_dpms_default() if target is None else target, force=True)
             except Exception:
                 pass
         except Exception:

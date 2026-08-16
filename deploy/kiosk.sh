@@ -19,10 +19,20 @@ URL="http://${SERVER}/"
 
 export DISPLAY="${DISPLAY:-:0}"
 
-# Bildschirmschoner / Energiesparen aus
-xset s off 2>/dev/null; xset -dpms 2>/dev/null; xset s noblank 2>/dev/null
-# Mauszeiger verstecken (falls unclutter installiert)
-command -v unclutter >/dev/null && unclutter -idle 0.5 -root &
+# X-eigenen Blank-Screensaver aus (Browser-Screensaver uebernimmt). Die
+# Display-Abschaltung (Backlight) NICHT hart deaktivieren, sondern per DPMS_OFF
+# (Sekunden) steuern — sonst laeuft nur der Web-Screensaver und das Panel wird
+# heiss. DPMS_OFF leer/0 = nie abschalten.
+xset s off 2>/dev/null; xset s noblank 2>/dev/null
+if [ "${DPMS_OFF:-0}" -gt 0 ] 2>/dev/null; then
+  xset +dpms 2>/dev/null; xset dpms 0 0 "${DPMS_OFF}" 2>/dev/null
+else
+  xset -dpms 2>/dev/null
+fi
+# Mauszeiger verstecken (falls unclutter installiert). Die Visu blendet den
+# Cursor selbst per CSS aus (Touch); unclutter ist nur Zusatz fuer X11. Kein
+# -root (bricht bei unclutter-xfixes); Fehler unterdruecken.
+command -v unclutter >/dev/null && unclutter -idle 0.5 >/dev/null 2>&1 &
 
 # Chromium-Binary finden (heisst je nach Distro chromium oder chromium-browser)
 CHROME="$(command -v chromium || command -v chromium-browser)"
