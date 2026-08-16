@@ -909,7 +909,11 @@ class App:
                       sublabel=(" · ".join(x for x in (modes.get(int(self._state(c, "mode") or 0)),
                                                        (tt + " °C" if tt else "")) if x) or "Klima"))
         elif t == "ClimateControllerUS":
-            it.update(icon="thermo", sublabel="Klimasteuerung")
+            dh = self._state(c, "demandHeat") or 0
+            dc = self._state(c, "demandCool") or 0
+            it.update(icon="thermo", on=bool(dh or dc),
+                      nav={"view": "control", "id": uuid},
+                      sublabel=("Heizt" if dh else ("Kühlt" if dc else "Bereit")))
         elif t == "SystemScheme":
             it.update(icon="info", sublabel="Anlagenschema")
         elif t == "Hourcounter":
@@ -1324,15 +1328,79 @@ class App:
                                   "Alarm!" if lvl else ("Scharf" if armed else "Unscharf"),
                                   tone=("crit" if lvl else None))
         if t == "AcControl":
-            modes = self._json_list_map(c, "operatingModes")
-            ta = self._fmt_num(self._state(c, "temperature"), "%.1f")
-            tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
-            big = (ta + " °C") if ta else ((tt + " °C") if tt else "–")
-            sub = " · ".join(x for x in (modes.get(int(self._state(c, "mode") or 0)),
-                                         ("Soll " + tt + " °C") if (ta and tt) else "") if x)
-            return self._big_view(uuid, "thermo", big, sub)
+            ua = c.get("uuidAction")
+            modes = self._json_list_map(c, "operatingModes")   # {1:Auto,2:Heizen,...}
+            on = (self._state(c, "status") or 0) != 0
+            cur_mode = int(self._state(c, "mode") or 0)
+            tgt = self._state(c, "targetTemperature")
+            ist = self._fmt_num(self._state(c, "temperature"), "%.1f")  # oft 0 -> nicht anzeigen
+            try:
+                cur_t = float(tgt)
+            except (TypeError, ValueError):
+                cur_t = 22.0
+            try:
+                lo = float(self._state(c, "minTemp"))
+            except (TypeError, ValueError):
+                lo = 5.0
+            try:
+                hi = float(self._state(c, "maxTemp"))
+            except (TypeError, ValueError):
+                hi = 40.0
+            dn = max(lo, cur_t - 0.5); up = min(hi, cur_t + 0.5)
+            big = (self._fmt_num(tgt, "%.1f") + " °C") if tgt is not None else "–"  # Soll = Stellwert
+            sbits = [modes.get(cur_mode, "")]
+            if ist and float(self._state(c, "temperature") or 0) > 0:
+                sbits.append(f"Ist {ist} °C")
+            sbits.append("Ein" if on else "Aus")
+            status = " · ".join(x for x in sbits if x)
+            blocks = [
+                {"k": "big", "text": big},
+                {"k": "status", "text": status},
+                {"k": "row", "cells": [
+                    {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
+                    {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
+                ]},
+                {"k": "row", "cells": [
+                    {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
+                    {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
+                ]},
+            ]
+            # Betriebsmodi (Auto/Heizen/Kuehlen/Trocknen/Ventilator) in Reihen zu max. 3
+            mode_cells = [{"label": nm, "on": (mid == cur_mode),
+                           "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
+                          for mid, nm in sorted(modes.items())]
+            for i in range(0, len(mode_cells), 3):
+                blocks.append({"k": "row", "cells": mode_cells[i:i + 3]})
+            # Luefterstufe als Slider (0=Aus .. 7=Sehr Hoch)
+            fans = self._json_list_map(c, "fanspeeds")
+            if fans:
+                fmax = max(fans)
+                blocks.append({"k": "slider", "icon": "fan", "min": min(fans), "max": fmax,
+                               "value": int(self._state(c, "fan") or 0),
+                               "cmd": {"uuid": ua, "tmpl": "setFan/{v}"}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "ClimateControllerUS":
-            return self._big_view(uuid, "thermo", "Klimasteuerung")
+            dh = self._state(c, "demandHeat") or 0
+            dc = self._state(c, "demandCool") or 0
+            big = "Heizt" if dh else ("Kühlt" if dc else "Bereit")
+            # verwaltete AC-Einheiten + wie viele gerade Bedarf anmelden
+            try:
+                units = json.loads(self._state(c, "controls") or "[]")
+            except (ValueError, TypeError):
+                units = []
+            active = sum(1 for u in units if isinstance(u, dict) and u.get("demand"))
+            sbits = [f"{active}/{len(units)} Anlagen aktiv"] if units else []
+            hum = self._state(c, "humidity") or 0
+            if hum:
+                sbits.append(f"Feuchte {self._fmt_num(hum, '%.0f')} %")
+            out = self._state(c, "actualOutdoorTemp")
+            try:
+                if out is not None and float(out) > -100:
+                    sbits.append(f"Außen {self._fmt_num(out, '%.1f')} °C")
+            except (TypeError, ValueError):
+                pass
+            return self._big_view(uuid, "thermo", big, " · ".join(sbits),
+                                  tone=("crit" if dc else None))
         if t == "Hourcounter":
             ov = self._state(c, "overdue")
             return self._big_view(uuid, "info", self._fmt_num(self._state(c, "total"), "%.0f h") or "–",
