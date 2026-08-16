@@ -14,6 +14,11 @@
     --nudge-x:0px;    /* Feinversatz der ganzen Visu; live via ?x=-6 (negativ=links) */
   }
   *{box-sizing:border-box;}
+  /* Touch-Panel (Wandpanel/Tablet): keinen Mauszeiger anzeigen — auch nicht die
+     pointer-Hand ueber Kacheln. Am Desktop (echte Maus) bleibt der Cursor.
+     Zwei Trigger: Media-Query (Touch-Geraet) + .touch-Klasse (erste Beruehrung). */
+  @media (hover:none),(pointer:coarse){ *{cursor:none !important;} }
+  body.touch *{cursor:none !important;}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
     font-family:var(--font,"Inter","Roboto","Segoe UI Variable Text",-apple-system,"Segoe UI",system-ui,sans-serif);
     display:grid;place-items:center;-webkit-font-smoothing:antialiased;}
@@ -252,6 +257,8 @@ const TABS = [
 
 const el = id => document.getElementById(id);
 let ws, stack = [{view:'tab',tab:'favoriten'}], view = null;
+// Touch-Panel: nach der ersten Beruehrung den Mauszeiger ausblenden (Desktop-Maus bleibt)
+addEventListener('touchstart', ()=>document.body.classList.add('touch'), {once:true, passive:true});
 let tabsCfg = ['favoriten','zentral','raeume','kategorien'];
 let tabMeta = {};   // Label/Icon fuer dynamische Tabs (Kategorien), vom Server
 let gridCols = 2;   // Kacheln pro Zeile (2x2 oder 3x2), vom Panel-Profil
