@@ -1303,15 +1303,17 @@ class App:
                     {"label": "+", "cmd": {"uuid": ua, "cmd": f"setComfortTemperature/{comfort + 0.5:.1f}"}},
                 ]},
             ]
-            # Betriebsmodi als Override-Buttons (Komfort/Eco/Gebaeudeschutz, 1 h),
-            # plus Rueckkehr zur Zeitschaltung. Modus-Ids stammen aus timerModes.
+            # Betriebsmodi in EINER Zeile: Temperatur-Modi (Eco/Komfort) als
+            # 1-h-Override + Automatik (zurueck zur Zeitschaltung). Namen aus MS
+            # (details.timerModes). Gebaeudeschutz wird ausgelassen (aufgeraeumt).
             if modes:
-                blocks.append({"k": "row", "cells": [
-                    {"label": nm, "on": (mid == am),
-                     "cmd": {"uuid": ua, "cmd": f"override/{mid}"}}
-                    for mid, nm in sorted(modes.items())]})
-                blocks.append({"k": "row", "cells": [
-                    {"label": "Automatik", "cmd": {"uuid": ua, "cmd": "stopOverride"}}]})
+                cells = [{"label": nm, "on": (mid == am),
+                          "cmd": {"uuid": ua, "cmd": f"override/{mid}"}}
+                         for mid, nm in sorted(modes.items())
+                         if "schutz" not in (nm or "").lower()]
+                cells.append({"label": "Automatik",
+                              "cmd": {"uuid": ua, "cmd": "stopOverride"}})
+                blocks.append({"k": "row", "cells": cells})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Intercom":
             ent = self.intercom_cfg.get(uuid)
@@ -1387,12 +1389,11 @@ class App:
             blocks = [
                 {"k": "big", "text": big},
                 {"k": "status", "text": status},
-                {"k": "row", "cells": [
-                    {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
-                    {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
-                ]},
+                # Temperatur (−/+) und Ein/Aus kompakt in EINER Zeile
                 {"k": "row", "cells": [
                     {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
+                    {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
+                    {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
                     {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
                 ]},
             ]
