@@ -75,10 +75,13 @@ def _is_tab(t) -> bool:
     return t in VALID_TABS or (isinstance(t, str) and t.startswith("cat:") and len(t) > 4)
 # Reine Anzeige-Bausteine: keine Steuer-2.-Ebene -> Antippen zeigt eine
 # grosse 1/1-Wertseite (_view_control -> _big_view).
-STATUS_BIG = {"Meter", "Slider", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
-              "InfoOnlyDigital", "SmokeAlarm", "PresenceDetector", "Alarm",
-              "AcControl", "ClimateControllerUS", "Hourcounter"}
+STATUS_BIG = {"Meter", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
+              "InfoOnlyDigital", "SmokeAlarm", "PresenceDetector",
+              "ClimateControllerUS", "Hourcounter"}
 _COLOR_RE = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|[a-zA-Z]{3,20})$")
+# Tracker-Zeile: fuehrender Zeitstempel (TT.MM.JJ[JJ] HH:MM[:SS]) wird vom Text
+# getrennt, damit er als Untertitel erscheint. Matcht sonst nichts -> ganze Zeile.
+_TS_RE = re.compile(r"^\s*(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}[ ,]+\d{1,2}:\d{2}(?::\d{2})?)\s+(.+)$")
 
 
 def _color_ok(v) -> bool:
@@ -409,6 +412,21 @@ class App:
         """Text-State, URL-dekodiert (Loxone liefert songName/artist prozentkodiert)."""
         v = self._state(control, name)
         return unquote(str(v)) if v not in (None, "") else ""
+
+    def _tracker_lines(self, control: dict) -> list[str]:
+        """Ereignis-Zeilen eines Tracker-Bausteins (State 'entries'). Loxone
+        liefert einen mehrzeiligen, ggf. prozentkodierten Text; neueste zuerst."""
+        raw = self._state(control, "entries")
+        if raw in (None, ""):
+            return []
+        txt = unquote(str(raw)).replace("\r", "")
+        return [ln.strip() for ln in txt.split("\n") if ln.strip()]
+
+    @staticmethod
+    def _split_ts(line: str) -> tuple[str | None, str]:
+        """Fuehrenden Zeitstempel abtrennen -> (zeitstempel|None, text)."""
+        m = _TS_RE.match(line or "")
+        return (m.group(1), m.group(2)) if m else (None, line or "")
 
     def _song(self, control: dict) -> str:
         """songName, aber rohe Stream-URLs (Radio) ausblenden."""
@@ -941,7 +959,11 @@ class App:
             a = self._fmt_num(self._state(c, "actual"), det.get("actualFormat", "%.1f"))
             tot = self._fmt_num(self._state(c, "total"), det.get("totalFormat", "%.1f"))
             it["sublabel"] = " • ".join(x for x in (a, tot) if x)
-        elif t in ("Slider", "InfoOnlyAnalog"):
+        elif t == "Slider":
+            det = c.get("details") or {}
+            it.update(sublabel=self._fmt_num(self._state(c, "value"), det.get("format", "%.1f")),
+                      nav={"view": "control", "id": uuid})
+        elif t == "InfoOnlyAnalog":
             det = c.get("details") or {}
             it["sublabel"] = self._fmt_num(self._state(c, "value"), det.get("format", "%.1f"))
         elif t in ("TextState", "InfoOnlyText"):
@@ -974,11 +996,13 @@ class App:
             armed = bool(self._state(c, "armed"))
             lvl = self._state(c, "level") or 0
             it.update(icon="alarm", on=armed, tone=("crit" if lvl else None),
+                      nav={"view": "control", "id": uuid},
                       sublabel=("Alarm!" if lvl else ("Scharf" if armed else "Unscharf")))
         elif t == "AcControl":
             modes = self._json_list_map(c, "operatingModes")
             tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
             it.update(icon="thermo", on=(self._state(c, "status") or 0) != 0,
+                      nav={"view": "control", "id": uuid},
                       sublabel=(" · ".join(x for x in (modes.get(int(self._state(c, "mode") or 0)),
                                                        (tt + " °C" if tt else "")) if x) or "Klima"))
         elif t == "ClimateControllerUS":
@@ -992,6 +1016,11 @@ class App:
         elif t == "Hourcounter":
             it["sublabel"] = ("Wartung fällig" if self._state(c, "overdue")
                               else self._fmt_num(self._state(c, "total"), "%.0f h"))
+        elif t == "Tracker":
+            lines = self._tracker_lines(c)
+            _, last = self._split_ts(lines[0]) if lines else (None, "")
+            it.update(icon="list", nav={"view": "control", "id": uuid},
+                      sublabel=(last or "Keine Einträge"))
         elif (t or "").startswith("Central"):
             muuids = [m.get("uuid") for m in ((c.get("details") or {}).get("controls") or [])
                       if m.get("uuid") in self.controls]
@@ -1369,13 +1398,52 @@ class App:
             if cells:
                 blocks.append({"k": "row", "cells": cells})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+        if t == "Tracker":
+            lines = self._tracker_lines(c)
+            if not lines:
+                return self._big_view(uuid, "list", "Keine Einträge")
+            items = []
+            for i, ln in enumerate(lines):
+                ts, txt = self._split_ts(ln)
+                entry = {"id": f"{uuid}:{i}", "icon": "list", "label": txt}
+                if ts:
+                    entry["sublabel"] = ts
+                items.append(entry)
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "layout": "list", "items": items}
         # --- Status-Bausteine: grosse 1/1-Wertseite ---
         if t == "Meter":
             det = c.get("details") or {}
             a = self._fmt_num(self._state(c, "actual"), det.get("actualFormat", "%.1f"))
             tot = self._fmt_num(self._state(c, "total"), det.get("totalFormat", "%.1f"))
             return self._big_view(uuid, "info", a or "–", (tot + " gesamt") if tot else "")
-        if t in ("Slider", "InfoOnlyAnalog"):
+        if t == "Slider":
+            ua = c.get("uuidAction")
+            det = c.get("details") or {}
+            fmt = det.get("format", "%.1f")
+
+            def _f(key, dflt):
+                try:
+                    return float(det.get(key, dflt))
+                except (TypeError, ValueError):
+                    return float(dflt)
+
+            def _n(x):   # ganzzahlig darstellen, wenn ohne Nachkommastelle
+                return int(x) if float(x).is_integer() else x
+            mn, mx = _f("min", 0), _f("max", 100)
+            stp = _f("step", 1) or 1
+            val = self._state(c, "value")
+            try:
+                cur = float(val)
+            except (TypeError, ValueError):
+                cur = mn
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
+                {"k": "hero", "icon": "info"},
+                {"k": "big", "text": self._fmt_num(val, fmt) or "–"},
+                {"k": "slider", "icon": "vol", "value": _n(cur), "min": _n(mn),
+                 "max": _n(mx), "step": _n(stp), "cmd": {"uuid": ua, "tmpl": "{v}"}},
+            ]}
+        if t == "InfoOnlyAnalog":
             det = c.get("details") or {}
             return self._big_view(uuid, "info",
                                   self._fmt_num(self._state(c, "value"), det.get("format", "%.1f")) or "–")
@@ -1397,18 +1465,43 @@ class App:
             big = itxt if (itxt and itxt.lower() not in ("on", "off")) else ("Anwesend" if on else "Abwesend")
             return self._big_view(uuid, "info", big)
         if t == "Alarm":
+            ua = c.get("uuidAction")
             armed = bool(self._state(c, "armed"))
             lvl = self._state(c, "level") or 0
-            return self._big_view(uuid, "alarm",
-                                  "Alarm!" if lvl else ("Scharf" if armed else "Unscharf"),
-                                  tone=("crit" if lvl else None))
+            big = {"k": "big", "text": ("Alarm!" if lvl else ("Scharf" if armed else "Unscharf"))}
+            if lvl:
+                big["tone"] = "crit"
+            elif not armed:
+                big["tone"] = "good"
+            if lvl:                                   # Alarm ausgeloest
+                sub = "Alarm ausgelöst"
+                cells = [{"label": "Quittieren", "cmd": {"uuid": ua, "cmd": "quit"}},
+                         {"label": "Unscharf", "cmd": {"uuid": ua, "cmd": "off"}}]
+            elif armed:                               # scharf -> nur entschaerfen
+                sub = "Anlage ist scharf"
+                cells = [{"label": "Unscharf", "cmd": {"uuid": ua, "cmd": "off"}}]
+            else:                                     # unscharf -> scharfschalten
+                sub = "Bereit zum Scharfschalten"
+                cells = [{"label": "Scharf", "cmd": {"uuid": ua, "cmd": "on"}},
+                         {"label": "Verzögert", "cmd": {"uuid": ua, "cmd": "delayedon"}}]
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
+                {"k": "hero", "icon": "alarm"},
+                big,
+                {"k": "status", "text": sub},
+                {"k": "row", "cells": cells},
+            ]}
         if t == "AcControl":
             ua = c.get("uuidAction")
-            modes = self._json_list_map(c, "operatingModes")   # {1:Auto,2:Heizen,...}
+            # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-
+            # zeile, dann 2 Bedienzeilen. Modus/Fan klappen ihre Auswahl inline
+            # auf (viele Optionen passen nicht in eine feste Zeile).
+            modes = self._json_list_map(c, "operatingModes")   # {id: name}
+            fans = self._json_list_map(c, "fanspeeds")          # {id: name}
             on = (self._state(c, "status") or 0) != 0
             cur_mode = int(self._state(c, "mode") or 0)
+            cur_fan = int(self._state(c, "fan") or 0)
             tgt = self._state(c, "targetTemperature")
-            ist = self._fmt_num(self._state(c, "temperature"), "%.1f")  # oft 0 -> nicht anzeigen
+            ist = self._state(c, "temperature")
             try:
                 cur_t = float(tgt)
             except (TypeError, ValueError):
@@ -1422,36 +1515,50 @@ class App:
             except (TypeError, ValueError):
                 hi = 40.0
             dn = max(lo, cur_t - 0.5); up = min(hi, cur_t + 0.5)
-            big = (self._fmt_num(tgt, "%.1f") + " °C") if tgt is not None else "–"  # Soll = Stellwert
-            sbits = [modes.get(cur_mode, "")]
-            if ist and float(self._state(c, "temperature") or 0) > 0:
-                sbits.append(f"Ist {ist} °C")
+            # grosse Anzeige = Ist-Temp (wie IRR); Fallback Soll, wenn kein Ist
+            try:
+                ist_ok = ist is not None and float(ist) > -50
+            except (TypeError, ValueError):
+                ist_ok = False
+            big = (self._fmt_num(ist, "%.1f") + " °C") if ist_ok else \
+                  ((self._fmt_num(tgt, "%.1f") + " °C") if tgt is not None else "–")
+            sbits = []
+            if tgt is not None:
+                sbits.append(f"Soll {self._fmt_num(tgt, '%.1f')} °C")
+            if cur_mode in modes:
+                sbits.append(modes[cur_mode])
             sbits.append("Ein" if on else "Aus")
             status = " · ".join(x for x in sbits if x)
+            # Zeile 2: Auto (Schnellzugriff Auto-Modus) + Modus/Fan-Aufklapper
+            auto_id = next((mid for mid, nm in modes.items()
+                            if (nm or "").strip().lower() == "auto"), None)
+            row2 = []
+            if auto_id is not None:
+                row2.append({"label": modes[auto_id], "on": cur_mode == auto_id,
+                             "cmd": {"uuid": ua, "cmd": f"setMode/{auto_id}"}})
+            row2.append({"label": "Modus", "toggle": "acmode"})
+            row2.append({"label": "Fan", "toggle": "acfan"})
             blocks = [
                 {"k": "big", "text": big},
                 {"k": "status", "text": status},
-                # Temperatur (−/+) und Ein/Aus kompakt in EINER Zeile
                 {"k": "row", "cells": [
                     {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
                     {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
                     {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
                     {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
                 ]},
+                {"k": "row", "cells": row2},
             ]
-            # Betriebsmodi (Auto/Heizen/Kuehlen/Trocknen/Ventilator) in Reihen zu max. 3
-            mode_cells = [{"label": nm, "on": (mid == cur_mode),
-                           "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
-                          for mid, nm in sorted(modes.items())]
-            for i in range(0, len(mode_cells), 3):
-                blocks.append({"k": "row", "cells": mode_cells[i:i + 3]})
-            # Luefterstufe als Slider (0=Aus .. 7=Sehr Hoch)
-            fans = self._json_list_map(c, "fanspeeds")
-            if fans:
-                fmax = max(fans)
-                blocks.append({"k": "slider", "icon": "fan", "min": min(fans), "max": fmax,
-                               "value": int(self._state(c, "fan") or 0),
-                               "cmd": {"uuid": ua, "tmpl": "setFan/{v}"}})
+            if modes:   # aufklappende Auswahl: ALLE Betriebsmodi
+                blocks.append({"k": "row", "id": "acmode", "hidden": True, "wrap": True,
+                               "cells": [{"label": nm, "on": mid == cur_mode,
+                                          "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
+                                         for mid, nm in sorted(modes.items())]})
+            if fans:    # aufklappende Auswahl: alle Luefterstufen (Auto..Sehr hoch)
+                blocks.append({"k": "row", "id": "acfan", "hidden": True, "wrap": True,
+                               "cells": [{"label": nm, "on": fid == cur_fan,
+                                          "cmd": {"uuid": ua, "cmd": f"setFan/{fid}"}}
+                                         for fid, nm in sorted(fans.items())]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "ClimateControllerUS":
             dh = self._state(c, "demandHeat") or 0
