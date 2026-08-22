@@ -67,6 +67,18 @@ NUDGE_X = _cfg("X", "").strip()
 # Unsere schlanke .xsession bringt sonst kein Power-Management mit -> Display
 # lief nach dem Autostart-Umbau durch.
 DPMS_OFF = _cfg("DPMS_OFF", "180").strip()
+# Chromium-Profilverzeichnis. Gedacht als fluechtig, ueberlebt aber Reboots,
+# wenn /tmp kein tmpfs ist -> vor jedem Start von Crash-/Lock-Resten befreien,
+# damit nach hartem Stromausfall kein "Wiederherstellen?"-Dialog den Kiosk
+# blockiert, bis jemand aufs Panel tippt.
+PROFILE_DIR = _cfg("PROFILE_DIR", "/tmp/kiosk_profile")
+# Backlight-Device fuer die ECHTE Display-Abschaltung. Auf ARM-Panels (PX30)
+# schaltet X-DPMS nur das Bildsignal ab, nicht die Hintergrundbeleuchtung ->
+# das Panel bleibt hell und wird heiss. Wir ziehen das Backlight per sysfs am
+# DPMS-Status nach. BL_DEVICE = Name unter /sys/class/backlight (leer =
+# automatisch). Braucht Schreibrechte auf .../brightness (udev-Regel + Gruppe
+# video), sonst bleibt nur das reine X-DPMS aktiv.
+BL_DEVICE = _cfg("BL_DEVICE", "").strip()
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -144,6 +156,152 @@ def apply_dpms(secs, force=False):
         print("DPMS-Setup fehlgeschlagen:", e)
 
 
+def _read_dpms_off():
+    """Aktuellen DPMS-'Off'-Timeout (Sekunden) aus `xset q` lesen; 0 wenn DPMS
+    deaktiviert; None bei Fehler. Nur Query -> setzt den X-Inaktivitaets-Zaehler
+    NICHT zurueck (im Gegensatz zu 'xset dpms ...' / 'xset s off'), darf also
+    beliebig oft im announce_loop aufgerufen werden."""
+    xset = shutil.which("xset")
+    if not xset:
+        return None
+    env = dict(os.environ)
+    env.setdefault("DISPLAY", ":0")
+    try:
+        out = subprocess.run([xset, "q"], env=env, capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return None
+    off = None
+    for line in out.splitlines():
+        s = line.strip()
+        if s.startswith("Standby:") and "Off:" in s:  # "Standby: 0  Suspend: 0  Off: 60"
+            try:
+                off = int(s.split("Off:")[1].split()[0])
+            except (ValueError, IndexError):
+                off = None
+    if off is None:
+        return None
+    return off if "DPMS is Enabled" in out else 0
+
+
+def _find_backlight():
+    """Pfad zur brightness-Datei des Panel-Backlights (oder None). Bevorzugt das
+    Device namens 'backlight', sonst das erste unter /sys/class/backlight."""
+    base = "/sys/class/backlight"
+    if BL_DEVICE:
+        cand = [BL_DEVICE]
+    else:
+        try:
+            names = sorted(os.listdir(base))
+        except OSError:
+            return None
+        cand = (["backlight"] if "backlight" in names else []) + \
+               [n for n in names if n != "backlight"]
+    for name in cand:
+        p = os.path.join(base, name, "brightness")
+        if os.path.exists(p):
+            return p
+    return None
+
+
+_BL_PATH = _find_backlight()
+_bl_on_value = None     # zuletzt bekannte "helle" Helligkeit
+_bl_off = False         # True = wir haben das Backlight abgeschaltet
+
+
+def _bl_read():
+    try:
+        with open(_BL_PATH, encoding="ascii") as fh:
+            return int(fh.read().strip())
+    except Exception:
+        return None
+
+
+def _bl_write(val):
+    try:
+        with open(_BL_PATH, "w", encoding="ascii") as fh:
+            fh.write(str(int(val)))
+        return True
+    except Exception as e:
+        print("Backlight schreiben fehlgeschlagen:", e)
+        return False
+
+
+def _monitor_on():
+    """DPMS-Monitorstatus aus `xset q`: True=an, False=aus/standby/suspend,
+    None=unbekannt (xset fehlt oder Fehler)."""
+    xset = shutil.which("xset")
+    if not xset:
+        return None
+    env = dict(os.environ)
+    env.setdefault("DISPLAY", ":0")
+    try:
+        out = subprocess.run([xset, "q"], env=env, capture_output=True,
+                             text=True, timeout=5).stdout
+    except Exception:
+        return None
+    for line in out.splitlines():
+        if "Monitor is" in line:
+            return "On" in line
+    return None
+
+
+def backlight_loop():
+    """Koppelt die Hintergrundbeleuchtung an den X-DPMS-Status: schaltet X das
+    Bild nach Inaktivitaet ab (Monitor Off), ziehen wir das Backlight per sysfs
+    auf 0 nach (Panel wirklich aus, kein Aufheizen); beim Aufwachen zurueck auf
+    den letzten hellen Wert. Eine externe Helligkeitsaenderung (waehrend Monitor
+    On) wird als neuer Normalwert uebernommen."""
+    global _bl_on_value, _bl_off
+    _bl_on_value = _bl_read() or 255
+    while True:
+        try:
+            on = _monitor_on()
+            if on is True:
+                if _bl_off:
+                    _bl_write(_bl_on_value)
+                    _bl_off = False
+                else:
+                    cur = _bl_read()
+                    if cur and cur > 0:
+                        _bl_on_value = cur
+            elif on is False:
+                if not _bl_off:
+                    cur = _bl_read()
+                    if cur and cur > 0:
+                        _bl_on_value = cur
+                    _bl_write(0)
+                    _bl_off = True
+        except Exception:
+            pass
+        time.sleep(1)
+
+
+def _clear_chrome_crash_state():
+    """Nach hartem Stromausfall bleibt im Profil `exited_cleanly:false` bzw. ein
+    verwaistes Singleton-Lock zurueck -> Chromium zeigt beim Start einen
+    "Wiederherstellen?"-/"Profil in Benutzung"-Dialog, der den Kiosk blockiert,
+    bis jemand tippt. Vor jedem Start bereinigen (wie zuvor kiosk.sh per sed)."""
+    prefs = os.path.join(PROFILE_DIR, "Default", "Preferences")
+    try:
+        with open(prefs, encoding="utf-8") as fh:
+            data = fh.read()
+        fixed = (data.replace('"exited_cleanly":false', '"exited_cleanly":true')
+                     .replace('"exit_type":"Crashed"', '"exit_type":"Normal"'))
+        if fixed != data:
+            with open(prefs, "w", encoding="utf-8") as fh:
+                fh.write(fixed)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Crash-Flags bereinigen fehlgeschlagen:", e)
+    for n in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        try:
+            os.unlink(os.path.join(PROFILE_DIR, n))
+        except OSError:
+            pass
+
+
 def stop_kiosk():
     global _proc
     with _lock:
@@ -167,7 +325,9 @@ def start_kiosk(panel=None):
         return False
     env = dict(os.environ)
     env.setdefault("DISPLAY", ":0")
-    cmd = [chrome, "--kiosk", "--user-data-dir=/tmp/kiosk_profile", "--noerrdialogs",
+    os.makedirs(os.path.join(PROFILE_DIR, "Default"), exist_ok=True)
+    _clear_chrome_crash_state()
+    cmd = [chrome, "--kiosk", "--user-data-dir=" + PROFILE_DIR, "--noerrdialogs",
            "--disable-infobars", "--disable-session-crashed-bubble", "--disable-pinch",
            "--overscroll-history-navigation=0", "--check-for-update-interval=31536000",
            "--force-device-scale-factor=1", "--autoplay-policy=no-user-gesture-required",
@@ -200,11 +360,19 @@ def announce_loop():
             try:
                 r = json.loads(resp or b"{}")
                 if running():
-                    # regelmaessig durchsetzen (force), damit ein zwischenzeitlich
-                    # zurueckgesetzter DPMS-Timer wieder korrigiert wird. Kein
-                    # Server-Wert -> kiosk.conf-Default. xset weckt das Display nicht.
+                    # DPMS nur korrigieren, wenn der aktuelle X-Wert abweicht
+                    # (z.B. weil Chromium den Timer beim Start auf den X-Default
+                    # zurueckgesetzt hat). NICHT bei jedem Tick neu setzen: jeder
+                    # 'xset dpms'-Aufruf setzt den Inaktivitaets-Zaehler zurueck,
+                    # dann erreicht er nie den Off-Wert und das Display bleibt an.
+                    # Kein Server-Wert -> kiosk.conf-Default.
                     target = r.get("dpmsOff")
-                    apply_dpms(_dpms_default() if target is None else target, force=True)
+                    try:
+                        want = _dpms_default() if target is None else int(float(target))
+                    except (TypeError, ValueError):
+                        want = _dpms_default()
+                    if _read_dpms_off() != want:
+                        apply_dpms(want, force=True)
             except Exception:
                 pass
         except Exception:
@@ -252,6 +420,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    if _BL_PATH:
+        threading.Thread(target=backlight_loop, daemon=True).start()
+        print("Backlight-Steuerung aktiv:", _BL_PATH)
+    else:
+        print("Kein Backlight-Device gefunden — nur X-DPMS (Bildsignal) aktiv")
     if AUTOSTART and (os.environ.get("DISPLAY") or os.path.exists("/tmp/.X11-unix/X0")):
         start_kiosk(_cur_panel)
     threading.Thread(target=announce_loop, daemon=True).start()
