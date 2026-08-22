@@ -1385,7 +1385,8 @@ class App:
                 cells.append({"label": "Automatik",
                               "cmd": {"uuid": ua, "cmd": "stopOverride"}})
                 blocks.append({"k": "row", "cells": cells})
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
         if t == "Intercom":
             ent = self.intercom_cfg.get(uuid)
             has_url = bool(ent.get("url") if isinstance(ent, dict) else ent)
@@ -1541,25 +1542,29 @@ class App:
             blocks = [
                 {"k": "big", "text": big},
                 {"k": "status", "text": status},
-                {"k": "row", "cells": [
-                    {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
-                    {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
-                    {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
-                    {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
-                ]},
-                {"k": "row", "cells": row2},
             ]
-            if modes:   # aufklappende Auswahl: ALLE Betriebsmodi
+            # Aufklappende Auswahl VOR den festen Zeilen im DOM -> sie waechst nach
+            # OBEN ueber die festen Zeilen (die unten verankert bleiben).
+            if modes:   # ALLE Betriebsmodi
                 blocks.append({"k": "row", "id": "acmode", "hidden": True, "wrap": True,
                                "cells": [{"label": nm, "on": mid == cur_mode,
                                           "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
                                          for mid, nm in sorted(modes.items())]})
-            if fans:    # aufklappende Auswahl: alle Luefterstufen (Auto..Sehr hoch)
+            if fans:    # alle Luefterstufen (Auto..Sehr hoch)
                 blocks.append({"k": "row", "id": "acfan", "hidden": True, "wrap": True,
                                "cells": [{"label": nm, "on": fid == cur_fan,
                                           "cmd": {"uuid": ua, "cmd": f"setFan/{fid}"}}
                                          for fid, nm in sorted(fans.items())]})
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+            # Feste Bedienzeilen (bleiben unten): Temp/Ein-Aus, dann Auto/Modus/Fan
+            blocks.append({"k": "row", "cells": [
+                {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
+                {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
+                {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
+                {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
+            ]})
+            blocks.append({"k": "row", "cells": row2})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
         if t == "ClimateControllerUS":
             dh = self._state(c, "demandHeat") or 0
             dc = self._state(c, "demandCool") or 0

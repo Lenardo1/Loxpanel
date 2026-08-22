@@ -109,6 +109,12 @@
     padding:8px 8px;word-break:break-word;}
   .pbig.good{color:var(--good);} .pbig.crit{color:var(--crit);}
   .grid.panel.bigpage{justify-content:center;gap:14px;}
+  /* anchor:bottom (IRR/Klima): Anzeige oben zentriert, Bedienung unten fixiert.
+     Aufklappende Auswahl steht im .panbot VOR den festen Zeilen -> waechst nach oben. */
+  .grid.panel.anchorbot{justify-content:flex-start;gap:0;}
+  .grid.panel.anchorbot .pantop{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:center;align-items:stretch;gap:10px;}
+  .grid.panel.anchorbot .panbot{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding-top:8px;}
   .brow{display:flex;gap:10px;}
   .btn{flex:1;background:var(--tile);border:1px solid var(--line);border-radius:12px;
     padding:17px 10px;text-align:center;font-weight:650;font-size:15px;cursor:pointer;
@@ -336,26 +342,39 @@ function renderPanel(blocks){
   el('grid').classList.remove('list','snapy');
   el('grid').classList.toggle('bigpage', blocks.some(b=>b.k==='big'));
   const g=el('grid');
-  let html='';
-  for(const b of blocks){
+  // anchor:bottom -> Anzeige (big/status) oben zentriert, Bedienung unten
+  // verankert; aufklappende Auswahl waechst dann nach oben ueber die festen Zeilen.
+  const anchorBot = !!(view && view.anchor==='bottom');
+  g.classList.toggle('anchorbot', anchorBot);
+  const TOPK = {hero:1,cover:1,video:1,status:1,title:1,value:1,big:1};
+  const bh = b => {
     if(b.k==='hero'){ const hic = b.iconImg
         ? '<img class="rawico" src="'+esc(b.iconImg)+'" alt="">'
         : b.iconUrl
         ? '<span class="himg" style="--u:url(\''+esc(b.iconUrl)+'\')"></span>'
         : svg(ICONS[b.icon]||ICONS.info);
-      html+='<div class="hero"><div class="circle">'+hic+'</div></div>'; }
-    else if(b.k==='cover') html+='<div class="cover"><div class="coverph">'+svg(ICONS.music)+'</div><img id="coverimg" alt=""></div>';
-    else if(b.k==='video') html+='<div class="video"><img alt=""></div>';
-    else if(b.k==='status') html+='<div class="status">'+esc(b.text||'')+'</div>';
-    else if(b.k==='title') html+='<div class="ptitle">'+esc(b.text||'')+'<div class="psub">'+esc(b.sub||'')+'</div></div>';
-    else if(b.k==='value') html+='<div class="pbar">'+esc(b.text||'')+'</div>';
-    else if(b.k==='big') html+='<div class="pbig'+(b.tone==='good'?' good':(b.tone==='crit'?' crit':''))+'">'+esc(b.text||'')+'</div>';
-    else if(b.k==='slider') html+='<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'"'+(b.step?' step="'+b.step+'"':'')+' value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
-    else if(b.k==='row') html+='<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+(b.wrap?' wraprow':'')+(b.hidden?' collapsed':'')+'"'+(b.id?' data-rowid="'+esc(b.id)+'"':'')+'>'+b.cells.map(cellHtml).join('')+'</div>';
-    else if(b.k==='head') html+='<div class="phead">'+esc(b.text||'')+'</div>';
-    else if(b.k==='favs') html+='<div class="favs'+(b.wrap?' wrap':'')+'">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
+      return '<div class="hero"><div class="circle">'+hic+'</div></div>'; }
+    if(b.k==='cover') return '<div class="cover"><div class="coverph">'+svg(ICONS.music)+'</div><img id="coverimg" alt=""></div>';
+    if(b.k==='video') return '<div class="video"><img alt=""></div>';
+    if(b.k==='status') return '<div class="status">'+esc(b.text||'')+'</div>';
+    if(b.k==='title') return '<div class="ptitle">'+esc(b.text||'')+'<div class="psub">'+esc(b.sub||'')+'</div></div>';
+    if(b.k==='value') return '<div class="pbar">'+esc(b.text||'')+'</div>';
+    if(b.k==='big') return '<div class="pbig'+(b.tone==='good'?' good':(b.tone==='crit'?' crit':''))+'">'+esc(b.text||'')+'</div>';
+    if(b.k==='slider') return '<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'"'+(b.step?' step="'+b.step+'"':'')+' value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
+    if(b.k==='row') return '<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+(b.wrap?' wraprow':'')+(b.hidden?' collapsed':'')+'"'+(b.id?' data-rowid="'+esc(b.id)+'"':'')+'>'+b.cells.map(cellHtml).join('')+'</div>';
+    if(b.k==='head') return '<div class="phead">'+esc(b.text||'')+'</div>';
+    if(b.k==='favs') return '<div class="favs'+(b.wrap?' wrap':'')+'">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
+    return '';
+  };
+  if(anchorBot){
+    let top='',bot='';
+    for(const b of blocks){ if(b.k==='more')continue; if(TOPK[b.k]) top+=bh(b); else bot+=bh(b); }
+    g.innerHTML='<div class="pantop">'+top+'</div><div class="panbot">'+bot+'</div>';
+  } else {
+    let html='';
+    for(const b of blocks){ if(b.k!=='more') html+=bh(b); }
+    g.innerHTML=html;
   }
-  g.innerHTML=html;
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img){img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
   const vid=blocks.find(b=>b.k==='video'); const vimg=g.querySelector('.video img');
   if(vid&&vimg){ vimg.src=vid.src; }   // MJPEG-Stream: einmal laden, läuft live
@@ -431,7 +450,7 @@ function render(){
   stopVideo();
   setMore(null);
   el('conn').classList.toggle('vis', !!(view.route && view.route.view==='tab'));
-  el('grid').classList.remove('panel','bigpage');
+  el('grid').classList.remove('panel','bigpage','anchorbot');
   el('grid').classList.toggle('list', view.layout==='list');
   const items = view.items || [];
   const g = el('grid');
