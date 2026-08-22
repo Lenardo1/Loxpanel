@@ -1741,12 +1741,21 @@ class App:
             await self.audio.close()
 
 
+# Panel-/Config-/Settings-HTML immer frisch ausliefern: der Kiosk-Chromium
+# cachte die Seite sonst heuristisch und zeigte nach einem Update die alte
+# Version (aufklappende Auswahl etc. griff nicht) bis der Profil-Cache geleert
+# wurde. no-cache erzwingt Revalidierung -> Updates greifen sofort.
+_NOCACHE = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
+
 async def index(request: web.Request) -> web.Response:
-    return web.Response(text=HTML.read_text(encoding="utf-8"), content_type="text/html")
+    return web.Response(text=HTML.read_text(encoding="utf-8"),
+                        content_type="text/html", headers=_NOCACHE)
 
 
 async def config_index(request: web.Request) -> web.Response:
-    return web.Response(text=CONFIG_HTML.read_text(encoding="utf-8"), content_type="text/html")
+    return web.Response(text=CONFIG_HTML.read_text(encoding="utf-8"),
+                        content_type="text/html", headers=_NOCACHE)
 
 
 async def api_meta(request: web.Request) -> web.Response:
@@ -1821,7 +1830,8 @@ async def api_save_theme(request: web.Request) -> web.Response:
 
 
 async def settings_index(request: web.Request) -> web.Response:
-    return web.Response(text=SETTINGS_HTML.read_text(encoding="utf-8"), content_type="text/html")
+    return web.Response(text=SETTINGS_HTML.read_text(encoding="utf-8"),
+                        content_type="text/html", headers=_NOCACHE)
 
 
 async def install_script(request: web.Request) -> web.Response:
