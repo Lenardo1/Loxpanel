@@ -1537,32 +1537,26 @@ class App:
             if auto_id is not None:
                 row2.append({"label": modes[auto_id], "on": cur_mode == auto_id,
                              "cmd": {"uuid": ua, "cmd": f"setMode/{auto_id}"}})
-            row2.append({"label": "Modus", "toggle": "acmode"})
-            row2.append({"label": "Fan", "toggle": "acfan"})
+            # Modus/Fan oeffnen ein Popup mit der Auswahl (statt Inline-Zeilen)
+            if modes:
+                row2.append({"label": "Modus", "menu": [
+                    {"label": nm, "on": mid == cur_mode, "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
+                    for mid, nm in sorted(modes.items())]})
+            if fans:
+                row2.append({"label": "Fan", "menu": [
+                    {"label": nm, "on": fid == cur_fan, "cmd": {"uuid": ua, "cmd": f"setFan/{fid}"}}
+                    for fid, nm in sorted(fans.items())]})
             blocks = [
                 {"k": "big", "text": big},
                 {"k": "status", "text": status},
+                {"k": "row", "cells": [
+                    {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
+                    {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
+                    {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
+                    {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
+                ]},
+                {"k": "row", "cells": row2},
             ]
-            # Aufklappende Auswahl VOR den festen Zeilen im DOM -> sie waechst nach
-            # OBEN ueber die festen Zeilen (die unten verankert bleiben).
-            if modes:   # ALLE Betriebsmodi
-                blocks.append({"k": "row", "id": "acmode", "hidden": True, "wrap": True,
-                               "cells": [{"label": nm, "on": mid == cur_mode,
-                                          "cmd": {"uuid": ua, "cmd": f"setMode/{mid}"}}
-                                         for mid, nm in sorted(modes.items())]})
-            if fans:    # alle Luefterstufen (Auto..Sehr hoch)
-                blocks.append({"k": "row", "id": "acfan", "hidden": True, "wrap": True,
-                               "cells": [{"label": nm, "on": fid == cur_fan,
-                                          "cmd": {"uuid": ua, "cmd": f"setFan/{fid}"}}
-                                         for fid, nm in sorted(fans.items())]})
-            # Feste Bedienzeilen (bleiben unten): Temp/Ein-Aus, dann Auto/Modus/Fan
-            blocks.append({"k": "row", "cells": [
-                {"label": "−", "cmd": {"uuid": ua, "cmd": f"setTarget/{dn:.1f}"}},
-                {"label": "Aus", "on": not on, "cmd": {"uuid": ua, "cmd": "off"}},
-                {"label": "Ein", "on": on, "cmd": {"uuid": ua, "cmd": "on"}},
-                {"label": "+", "cmd": {"uuid": ua, "cmd": f"setTarget/{up:.1f}"}},
-            ]})
-            blocks.append({"k": "row", "cells": row2})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "anchor": "bottom", "blocks": blocks}
         if t == "ClimateControllerUS":
