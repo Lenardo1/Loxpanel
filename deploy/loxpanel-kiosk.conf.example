@@ -27,3 +27,7 @@ AGENT_PORT=8130
 # nichts angetippt wird. 0 = nie. Antippen weckt es sofort. Default 180 (3 min).
 # Der Web-Screensaver (Uhr) erscheint schon nach 60 s; danach schaltet DPMS ab.
 # DPMS_OFF=180
+# RELOAD_HOURS = Stunden bis zum automatischen Kiosk-Neustart (gegen Einfrieren
+# des Panels). 0 = aus (Default). Besser ueber die Settings-Seite pro Panel
+# setzen (ueberschreibt diesen Wert). Beispiel: alle 12 Stunden neu starten.
+# RELOAD_HOURS=12

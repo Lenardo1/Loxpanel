@@ -697,6 +697,15 @@ class App:
         v = ui.get("dpmsOff")
         return max(0, min(3600, int(v))) if isinstance(v, (int, float)) else None
 
+    def panel_reload(self, pid: str | None):
+        """Auto-Neustart-Intervall (Stunden) fuer ein Panel aus dem Profil
+        (0/None = aus). Gegen Einfrieren; der Agent startet Chromium periodisch
+        neu. Wird in der Announce-Antwort mitgegeben."""
+        ui = {**self.theme.get("ui", {}),
+              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+        v = ui.get("reloadHours")
+        return max(0, min(168, float(v))) if isinstance(v, (int, float)) else None
+
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
         ar = prof.get("rooms") if prof else None
         if ar is None:
@@ -773,6 +782,8 @@ class App:
                 cui["nudgeX"] = max(-40, min(40, ui["nudgeX"]))  # horiz. Versatz px
             if isinstance(ui.get("dpmsOff"), (int, float)):
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
+            if isinstance(ui.get("reloadHours"), (int, float)):
+                cui["reloadHours"] = max(0, min(168, float(ui["reloadHours"])))  # Auto-Neustart Std.
             if ui.get("cols") in (2, 3):
                 cui["cols"] = int(ui["cols"])   # Kacheln pro Zeile (2x2 oder 3x2)
             if _color_ok(ui.get("textColor")):
@@ -1947,7 +1958,8 @@ async def api_agent_announce(request: web.Request) -> web.Response:
                       "kiosk": bool(d.get("kiosk")), "ts": time.time()}
     # Panel-spezifische Geraeteeinstellungen an den Agenten zurueckgeben
     # (der wendet sie am Geraet an, z.B. Display-Abschaltung per xset).
-    return web.json_response({"ok": True, "dpmsOff": app.panel_dpms(d.get("panel"))})
+    return web.json_response({"ok": True, "dpmsOff": app.panel_dpms(d.get("panel")),
+                              "reloadHours": app.panel_reload(d.get("panel"))})
 
 
 async def api_agents(request: web.Request) -> web.Response:

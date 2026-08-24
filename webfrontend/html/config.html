@@ -352,6 +352,9 @@ function renderEditor(){
        '<div class="field" style="max-width:180px"><label class="lbl">Display aus nach (Sek.)</label>'+
          '<input type="number" min="0" max="3600" step="30" data-ui="dpmsOff" value="'+
          (((p.ui||{}).dpmsOff==null)?'':(p.ui||{}).dpmsOff)+'" placeholder="180"></div>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Auto-Neustart alle (Std.)</label>'+
+         '<input type="number" min="0" max="168" step="1" data-ui="reloadHours" value="'+
+         (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="0 = aus"></div>'+
        '<div class="field" style="max-width:180px"><label class="lbl">Kacheln pro Zeile</label>'+
          '<select id="fCols">'+
            '<option value="2"'+(((p.ui||{}).cols==3)?'':' selected')+'>2 × 2 (4″-Panel)</option>'+

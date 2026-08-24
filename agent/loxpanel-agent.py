@@ -79,6 +79,11 @@ PROFILE_DIR = _cfg("PROFILE_DIR", "/tmp/kiosk_profile")
 # automatisch). Braucht Schreibrechte auf .../brightness (udev-Regel + Gruppe
 # video), sonst bleibt nur das reine X-DPMS aktiv.
 BL_DEVICE = _cfg("BL_DEVICE", "").strip()
+# RELOAD_HOURS = Stunden bis zum automatischen Kiosk-Neustart (gegen Einfrieren
+# des Panels/Chromium). 0 = aus. Der Server kann den Wert pro Panel per
+# Announce-Antwort (reloadHours) ueberschreiben (Settings-Seite). Nur waehrend
+# der Kiosk laeuft; ein bewusst gestoppter Kiosk wird NICHT neu gestartet.
+RELOAD_HOURS = _cfg("RELOAD_HOURS", "0").strip()
 
 _proc = None
 _cur_panel = _cfg("PANEL", "")
@@ -112,6 +117,14 @@ def kiosk_url(panel):
 
 
 _dpms_cur = None
+_last_reload = time.time()   # Zeitpunkt des letzten (Auto-)Kiosk-Starts
+
+
+def _reload_default() -> float:
+    try:
+        return float(RELOAD_HOURS or "0")
+    except ValueError:
+        return 0.0
 
 
 def _dpms_default():
@@ -315,7 +328,7 @@ def stop_kiosk():
 
 
 def start_kiosk(panel=None):
-    global _proc, _cur_panel
+    global _proc, _cur_panel, _last_reload
     if panel is not None:
         _cur_panel = panel
     stop_kiosk()
@@ -337,6 +350,7 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
+    _last_reload = time.time()   # Auto-Reload-Timer bei jedem Start zuruecksetzen
     # force: Chromium-(Neu)Start setzt DPMS auf den X-Default (600) zurueck —
     # deshalb hier immer neu erzwingen (kiosk.conf-Default; Server ueberschreibt).
     apply_dpms(_dpms_default(), force=True)
@@ -373,6 +387,17 @@ def announce_loop():
                         want = _dpms_default()
                     if _read_dpms_off() != want:
                         apply_dpms(want, force=True)
+                # Periodischer Kiosk-Neustart gegen Einfrieren. reloadHours vom
+                # Server (Settings) oder kiosk.conf-Default. 0 = aus. Nur wenn der
+                # Kiosk laeuft (bewusst gestoppten NICHT wieder starten).
+                rh = r.get("reloadHours")
+                try:
+                    hours = _reload_default() if rh is None else float(rh)
+                except (TypeError, ValueError):
+                    hours = _reload_default()
+                if hours > 0 and running() and (time.time() - _last_reload) >= hours * 3600:
+                    print("Auto-Reload nach %gh (gegen Einfrieren)" % hours)
+                    start_kiosk()
             except Exception:
                 pass
         except Exception:
