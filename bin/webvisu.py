@@ -731,7 +731,7 @@ class App:
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
                    if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                            "dpmsOff", "cols", "overlay", "textColor", "bold")},
+                            "dpmsOff", "reloadHours", "cols", "overlay", "textColor", "bold")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
