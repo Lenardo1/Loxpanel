@@ -496,13 +496,15 @@ function renderTileList(){
     box.appendChild(d);
   });
   const hc=$('#tileHidden'), n=(p.hide||[]).length;
-  if(hc) hc.textContent = n ? ('· '+n+' ausgeblendet') : '';
+  if(hc){ hc.innerHTML = n ? ('· '+n+' ausgeblendet <button class="minibtn" id="clrHide">Alle einblenden</button>') : '';
+    const ch=$('#clrHide'); if(ch) ch.onclick=clearHide; }
 }
 const EYE_ON='<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/>';
 const EYE_OFF='<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M6.7 6.7C3.9 8.3 2 11 1 12c1.7 2.6 5.5 7 11 7 1.7 0 3.2-.4 4.6-1"/><path d="M9.9 5.2A10 10 0 0 1 12 5c5.5 0 9.3 4.4 11 7-.6 1-1.7 2.4-3.2 3.6"/>';
 function toggleHide(uuid){ const p=PANELS[cur]; p.hide=p.hide||[];
   const i=p.hide.indexOf(uuid); if(i>-1) p.hide.splice(i,1); else p.hide.push(uuid);
   if(!p.hide.length) delete p.hide; markDirty(); renderTileList(); }
+function clearHide(){ const p=PANELS[cur]; if(p.hide){ delete p.hide; markDirty(); renderTileList(); } }
 function tileOv(){ const p=PANELS[cur]; p.tiles=p.tiles||{}; p.tiles[tileSel]=p.tiles[tileSel]||{}; return p.tiles[tileSel]; }
 function pruneTile(){ const p=PANELS[cur]; if(p.tiles&&p.tiles[tileSel]&&!Object.keys(p.tiles[tileSel]).length) delete p.tiles[tileSel]; }
 function setTile(k,v){ const ov=tileOv(); if(v==null||v==='') delete ov[k]; else ov[k]=v; pruneTile(); markDirty(); drawPrev(); renderTileList(); }
