@@ -78,6 +78,8 @@ def _is_tab(t) -> bool:
 STATUS_BIG = {"Meter", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
               "InfoOnlyDigital", "SmokeAlarm", "PresenceDetector",
               "ClimateControllerUS", "Hourcounter"}
+# Reine Wert-/Analog-Anzeigen (kein an/aus) -> keine Kategorie-Ampel, neutral.
+_ANALOG = {"InfoOnlyAnalog", "Slider", "Meter", "TextState", "InfoOnlyText", "Hourcounter"}
 _COLOR_RE = re.compile(r"^(#[0-9a-fA-F]{3,8}|rgba?\([0-9.,%\s]+\)|[a-zA-Z]{3,20})$")
 # Tracker-Zeile: fuehrender Zeitstempel (TT.MM.JJ[JJ] HH:MM[:SS]) wird vom Text
 # getrennt, damit er als Untertitel erscheint. Matcht sonst nichts -> ganze Zeile.
@@ -591,14 +593,28 @@ class App:
             img = (self.cats.get(c.get("cat")) or {}).get("image")   # Kategorie als Fallback
         return self._icon_url(img)
 
-    def _cat_color(self, cat_uuid: str | None) -> str | None:
+    def _cat_entry(self, cat_uuid: str | None):
+        """Passender categories-Eintrag (Match: Schluessel als Teilstring des
+        Kategorienamens). Rueckgabe: str (nur Icon-Farbe) | dict {on,off}
+        (Zustandsfarben) | None."""
         name = _clean((self.cats.get(cat_uuid) or {}).get("name") or "").lower()
         if not name:
             return None
-        for key, color in self.theme.get("categories", {}).items():
-            if key.lower() in name:
-                return color
+        for key, val in self.theme.get("categories", {}).items():
+            if not key.startswith("_") and key.lower() in name:
+                return val
         return None
+
+    def _cat_color(self, cat_uuid: str | None) -> str | None:
+        val = self._cat_entry(cat_uuid)
+        if isinstance(val, dict):
+            return val.get("on") or val.get("off")   # Icon-Farbe = Aktiv-Farbe
+        return val if isinstance(val, str) else None
+
+    def _cat_states(self, cat_uuid: str | None):
+        """Zustandsfarben {on, off} einer Kategorie (Ampel) oder None."""
+        val = self._cat_entry(cat_uuid)
+        return val if isinstance(val, dict) else None
 
     # ---- Panel-Profile ----
     def _resolve_ids(self, entries, table: dict):
@@ -1066,6 +1082,17 @@ class App:
         # Status-Bausteine antippbar machen -> grosse Wertseite
         if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
             it["nav"] = {"view": "control", "id": uuid}
+        # Kategorie-Ampel: Bausteine mit an/aus-Zustand einer Kategorie mit
+        # Zustandsfarben leuchten aktiv (on-Farbe) bzw. ok (off-Farbe). Analoge
+        # Anzeigen, Zentralbausteine und Bausteine mit eigenem tone (Rauch/…)
+        # bleiben unberuehrt.
+        cs = self._cat_states(c.get("cat"))
+        if cs and t not in _ANALOG and not (t or "").startswith("Central") and not it.get("tone"):
+            rgb = _hex_rgb(cs.get("on") if it.get("on") else cs.get("off"))
+            if rgb:
+                st = it.setdefault("style", {})
+                st.setdefault("bg", "rgba(%s,.16)" % rgb)
+                st.setdefault("border", "rgba(%s,.55)" % rgb)
         return self._apply_tile_style(it, uuid, prof)
 
     def _apply_tile_style(self, it: dict, uuid: str, prof: dict | None) -> dict:
@@ -1076,7 +1103,7 @@ class App:
         if ov.get("iconColor"):
             it["color"] = ov["iconColor"]           # Icon-Farbe (--ico)
             it["colorFixed"] = ov["iconColor"]      # gewinnt auch im Aktiv-Zustand
-        style = {}
+        style = dict(it.get("style") or {})         # Kategorie-Ampel als Basis, manuell ueberschreibt
         for src, dst in (("bg", "bg"), ("border", "border"),
                          ("textColor", "txt"), ("font", "font")):
             if ov.get(src):

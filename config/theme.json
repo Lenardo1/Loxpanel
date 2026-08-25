@@ -10,14 +10,15 @@
   },
 
   "categories": {
-    "_comment": "Farbe je Kategorie (Match: Schlüssel als Teilstring des Kategorienamens, z.B. 'Beleuchtung' passt auf '1.2 Beleuchtung').",
+    "_comment": "Farbe je Kategorie (Match: Schlüssel als Teilstring des Kategorienamens, z.B. 'Beleuchtung' passt auf '1.2 Beleuchtung'). Wert = Farbe (nur Icon) ODER {on,off} = Zustands-Ampel (Kachel-Hintergrund/Rahmen: on wenn aktiv, off wenn ok). Analoge Wert-Anzeigen bleiben neutral.",
     "Beleuchtung":  "#e0a24d",
     "Heizung":      "#e2695f",
-    "Alarm":        "#e2695f",
+    "Alarm":        { "on": "#e2695f", "off": "#52b881" },
+    "Online":       { "on": "#e8883a", "off": "#52b881" },
+    "Tor":          { "on": "#e0c84a", "off": "#52b881" },
     "Zutritt":      "#52b881",
     "Überwachung":  "#5aa9e6",
     "Audio":        "#a986e0",
-    "Tor":          "#5aa9e6",
     "Beschattung":  "#5aa9e6",
     "Rollläden":    "#5aa9e6",
     "Verbraucher":  "#e0a24d",
