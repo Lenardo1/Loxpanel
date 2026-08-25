@@ -415,11 +415,16 @@ class App:
 
     def _tracker_lines(self, control: dict) -> list[str]:
         """Ereignis-Zeilen eines Tracker-Bausteins (State 'entries'). Loxone
-        liefert einen mehrzeiligen, ggf. prozentkodierten Text; neueste zuerst."""
+        liefert einen mehrzeiligen, ggf. prozentkodierten Text; neueste zuerst.
+        Der Zeilentrenner variiert je nach Firmware: echtes Newline, Literal
+        "\\n"/"\\r" (Backslash+Buchstabe) oder CR -> alle normalisieren, sonst
+        landet der ganze Verlauf in EINER Zeile."""
         raw = self._state(control, "entries")
         if raw in (None, ""):
             return []
-        txt = unquote(str(raw)).replace("\r", "")
+        txt = unquote(str(raw))
+        for sep in ("\r\n", "\\r\\n", "\\n", "\\r", "\r"):
+            txt = txt.replace(sep, "\n")
         return [ln.strip() for ln in txt.split("\n") if ln.strip()]
 
     @staticmethod
