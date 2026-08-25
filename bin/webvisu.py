@@ -1351,7 +1351,8 @@ class App:
                 ]},
                 {"k": "row", "cells": [{"label": "Beschatten", "cmd": {"uuid": ua, "cmd": "shade"}}]},
             ]
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
         if t == "AudioZone":
             ua = c.get("uuidAction")
             playing = self._state(c, "playState") == 2
@@ -1383,7 +1384,8 @@ class App:
             active = self._state(c, "active") or 0
             postext = "Offen" if pct >= 100 else ("Geschlossen" if pct <= 0 else f"{pct}% offen")
             status = "öffnet …" if active > 0 else ("schließt …" if active < 0 else postext)
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
                 {"k": "hero", "icon": "gate"},
                 {"k": "status", "text": status},
                 {"k": "value", "text": postext},
@@ -1534,7 +1536,8 @@ class App:
                 sub = "Bereit zum Scharfschalten"
                 cells = [{"label": "Scharf", "cmd": {"uuid": ua, "cmd": "on"}},
                          {"label": "Verzögert", "cmd": {"uuid": ua, "cmd": "delayedon"}}]
-            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
                 {"k": "hero", "icon": "alarm"},
                 big,
                 {"k": "status", "text": sub},
