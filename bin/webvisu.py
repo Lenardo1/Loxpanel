@@ -230,7 +230,10 @@ def load_theme() -> dict:
     theme = {"states": dict(DEFAULT_THEME["states"]), "categories": {},
              "ui": {"tabs": ["favoriten", "zentral", "raeume", "kategorien"],
                     "iconSize": 38, "nameSize": 18, "subSize": 15, "font": ""}}
-    f = Path(__file__).resolve().parent.parent / "config" / "theme.json"
+    base = Path(__file__).resolve().parent.parent / "config"
+    f = base / "theme.json"
+    if not f.is_file():
+        f = base / "theme.example.json"   # Vorlage fuer frische Installationen
     if f.is_file():
         try:
             user = json.loads(f.read_text(encoding="utf-8"))
@@ -880,12 +883,38 @@ class App:
             out["bold"] = True
         return out
 
-    def _write_theme(self, ui: dict) -> None:
+    @staticmethod
+    def _sanitize_categories(cats) -> dict:
+        """categories aus dem Config-Editor validieren. Wert = Farbe (nur Icon)
+        oder {on,off} (Zustands-Ampel). Ungueltiges/leeres wird verworfen."""
+        out: dict = {}
+        if not isinstance(cats, dict):
+            return out
+        for k, v in cats.items():
+            k = str(k).strip()
+            if not k or k.startswith("_"):
+                continue
+            if isinstance(v, dict):
+                e = {}
+                if _color_ok(v.get("on")):
+                    e["on"] = str(v["on"]).strip()
+                if _color_ok(v.get("off")):
+                    e["off"] = str(v["off"]).strip()
+                if e:
+                    out[k[:40]] = e
+            elif _color_ok(v):
+                out[k[:40]] = str(v).strip()
+        return out
+
+    def _write_theme(self, ui: dict, categories=None) -> None:
         """Globale Darstellung in theme.json schreiben (Darstellungs-Keys ersetzen,
-        uebrige Theme-Inhalte wie states/categories/tabs bleiben erhalten)."""
-        f = Path(__file__).resolve().parent.parent / "config" / "theme.json"
+        uebrige Theme-Inhalte wie states/tabs bleiben erhalten). categories wird,
+        wenn uebergeben, komplett ersetzt (der _comment-Schluessel bleibt)."""
+        base = Path(__file__).resolve().parent.parent / "config"
+        f = base / "theme.json"
+        src = f if f.is_file() else (base / "theme.example.json")   # Vorlage als Basis
         try:
-            doc = json.loads(f.read_text(encoding="utf-8")) if f.is_file() else {}
+            doc = json.loads(src.read_text(encoding="utf-8")) if src.is_file() else {}
         except ValueError:
             doc = {}
         cur = doc.get("ui") if isinstance(doc.get("ui"), dict) else {}
@@ -895,6 +924,10 @@ class App:
             else:
                 cur.pop(k, None)
         doc["ui"] = cur
+        if categories is not None:
+            keep = {k: v for k, v in (doc.get("categories") or {}).items()
+                    if str(k).startswith("_")}   # _comment behalten
+            doc["categories"] = {**keep, **categories}
         f.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         self.theme = load_theme()
         self._dirty = True   # verbundene Panels neu rendern lassen
@@ -1839,7 +1872,9 @@ async def api_meta(request: web.Request) -> web.Response:
         "panels": panels,
         "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
                          if k in ("iconSize", "nameSize", "subSize", "font",
-                                  "textColor", "bold")}},
+                                  "textColor", "bold")},
+                  "categories": {k: v for k, v in (app.theme.get("categories") or {}).items()
+                                 if not str(k).startswith("_")}},
     })
 
 
@@ -1872,11 +1907,14 @@ async def api_save_theme(request: web.Request) -> web.Response:
     if not isinstance(ui, dict):
         return web.json_response({"ok": False, "error": "Feld 'ui' fehlt"}, status=400)
     clean = App._sanitize_theme_ui(ui)
+    cats = data.get("categories")
+    clean_cats = App._sanitize_categories(cats) if isinstance(cats, dict) else None
     try:
-        app._write_theme(clean)
+        app._write_theme(clean, clean_cats)
     except OSError as err:
         return web.json_response({"ok": False, "error": str(err)}, status=500)
-    log.info("theme.json (globale Darstellung) gespeichert")
+    log.info("theme.json (globale Darstellung%s) gespeichert",
+             " + Kategorie-Farben" if clean_cats is not None else "")
     return web.json_response({"ok": True})
 
 

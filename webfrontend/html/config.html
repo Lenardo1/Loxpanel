@@ -61,6 +61,12 @@
   .count{color:var(--muted);font-size:13px;}
   .count b{color:var(--fg);}
   .minibtn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:8px;padding:6px 12px;cursor:pointer;font:inherit;font-size:13px;}
+  .cclist{display:flex;flex-direction:column;gap:7px;}
+  .ccrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .ccnm{flex:1;min-width:120px;font-size:14px;}
+  .cclbl{font-size:12px;color:var(--muted);}
+  .ccmut{font-size:12.5px;color:var(--muted);}
+  .ccrow input[type=color]{width:40px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--bg);cursor:pointer;}
   .minibtn:hover{border-color:var(--accent);}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;}
   .opt{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;user-select:none;}
@@ -198,7 +204,8 @@ async function load(){
   PANELS = JSON.parse(JSON.stringify(META.panels||{}));
   if(!PANELS.default) PANELS.default = {title:'LoxPanel', tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
   // Virtuelles Global-Profil: bearbeitet theme.json (gilt fuer alle Panels)
-  PANELS.__global__ = {title:'Global (alle Panels)', ui: JSON.parse(JSON.stringify((META.theme||{}).ui||{})), __global:true};
+  PANELS.__global__ = {title:'Global (alle Panels)', ui: JSON.parse(JSON.stringify((META.theme||{}).ui||{})),
+                       catColors: JSON.parse(JSON.stringify((META.theme||{}).categories||{})), __global:true};
   cur = PANELS.default ? 'default' : Object.keys(PANELS)[0];
   renderList(); renderEditor();
 }
@@ -298,10 +305,43 @@ function renderGlobalEditor(p){
     '<div class="card"><h3>Darstellung</h3>'+
       '<p class="note">Schrift, Größe, Farbe und Stärke der Kachel-Beschriftung — gilt global für alle Panels.</p>'+
       '<div class="sizes">'+appearanceFields(p.ui)+'</div></div>'+
+    '<div class="card"><h3>Kategorie-Farben (Ampel)</h3>'+
+      '<p class="note">Pro Kategorie eine <b>Aktiv-</b> und <b>OK-Farbe</b> für Kachel-Hintergrund und Rahmen — gilt systemweit auf allen Panels (Wiedererkennung). '+
+        '◐ einschalten = Zustands-Ampel (z. B. Alarm rot/grün, Tor gelb/grün). Aus = neutral. Analoge Messwerte bleiben immer neutral.</p>'+
+      '<div class="cclist" id="catcolors"></div></div>'+
     '<div class="actions"><button class="btn save" id="saveBtn">Speichern</button>'+
       '<span class="toast" id="toast"></span></div>';
   bindAppearance(p);
+  renderCatColors(p);
   $('#saveBtn').onclick=save;
+}
+function renderCatColors(p){
+  const box=$('#catcolors'); if(!box) return;
+  const cc=p.catColors||(p.catColors={});
+  const names=[...new Set((META.cats||[]).map(c=>c.name).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'de'));
+  box.innerHTML = names.map(nm=>{
+    const v=cc[nm], amp=(v&&typeof v==='object');
+    const on=amp?(v.on||'#e2695f'):'#e2695f', off=amp?(v.off||'#52b881'):'#52b881';
+    return '<div class="ccrow">'+
+      '<span class="tgl'+(amp?' on':'')+'" data-catt="'+esc(nm)+'" title="Zustands-Ampel an/aus">◐</span>'+
+      '<span class="ccnm">'+esc(nm)+'</span>'+
+      (amp
+        ? '<label class="cclbl">Aktiv</label><input type="color" data-catc="'+esc(nm)+'" data-slot="on" value="'+esc(on)+'">'+
+          '<label class="cclbl">OK</label><input type="color" data-catc="'+esc(nm)+'" data-slot="off" value="'+esc(off)+'">'
+        : '<span class="ccmut">neutral</span>')+
+    '</div>';
+  }).join('');
+  box.querySelectorAll('[data-catt]').forEach(t=>t.onclick=()=>{
+    const nm=t.dataset.catt;
+    if(cc[nm]&&typeof cc[nm]==='object') delete cc[nm];
+    else cc[nm]={on:'#e2695f',off:'#52b881'};
+    markDirty(); renderCatColors(p);
+  });
+  box.querySelectorAll('input[data-catc]').forEach(inp=>inp.oninput=()=>{
+    const nm=inp.dataset.catc;
+    if(!cc[nm]||typeof cc[nm]!=='object') cc[nm]={on:'#e2695f',off:'#52b881'};
+    cc[nm][inp.dataset.slot]=inp.value; markDirty();
+  });
 }
 function renderEditor(){
   const p=PANELS[cur]; if(!p){ $('#main').innerHTML='<div class="empty">Kein Panel gewählt.</div>'; return; }
@@ -462,11 +502,21 @@ function markDirty(){ dirty=true; const t=$('#toast'); if(t){ t.className='toast
 async function save(){
   const t=$('#toast');
   try{
+    // Panels (ohne das virtuelle Global-Profil) speichern
+    const panels={}; for(const k in PANELS){ if(k!=='__global__') panels[k]=PANELS[k]; }
     const r=await fetch('/api/panels',{method:'POST',headers:{'Content-Type':'application/json'},
-                          body:JSON.stringify({panels:PANELS})});
+                          body:JSON.stringify({panels})});
     const j=await r.json();
-    if(j.ok){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels neu laden zum Übernehmen'; }
-    else { t.className='toast show err'; t.textContent='Fehler: '+(j.error||'?'); }
+    // Globale Darstellung + Kategorie-Farben (theme.json) speichern
+    let okT=true, errT='';
+    if(PANELS.__global__){
+      const g=PANELS.__global__;
+      const r2=await fetch('/api/theme',{method:'POST',headers:{'Content-Type':'application/json'},
+                            body:JSON.stringify({ui:g.ui||{}, categories:g.catColors||{}})});
+      const j2=await r2.json(); okT=j2.ok; errT=j2.error||'';
+    }
+    if(j.ok&&okT){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels neu laden zum Übernehmen'; }
+    else { t.className='toast show err'; t.textContent='Fehler: '+(j.error||errT||'?'); }
   }catch(e){ t.className='toast show err'; t.textContent='Fehler: '+e; }
   setTimeout(()=>{ if(t) t.classList.remove('show'); }, 4000);
 }

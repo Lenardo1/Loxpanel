@@ -17,3 +17,6 @@ deploy/loxpanel-kiosk.conf
 # Python
 *.pyc
 __pycache__/
+
+# Globale Theme-/Kategorie-Farben (zur Laufzeit ueber die Config-UI geschrieben)
+config/theme.json
