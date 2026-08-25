@@ -717,6 +717,12 @@ class App:
             return True
         return self.controls.get(uuid, {}).get("room") in ar
 
+    def _cat_ok(self, uuid: str, prof: dict | None) -> bool:
+        ac = prof.get("cats") if prof else None
+        if ac is None:
+            return True
+        return self.controls.get(uuid, {}).get("cat") in ac
+
     def _shown(self, uuid: str, prof: dict | None) -> bool:
         """False, wenn diese Kachel auf dem Panel einzeln ausgeblendet wurde
         (zusaetzlich zum Raum-/Kategorie-Filter). Gilt panelweit."""
@@ -1159,7 +1165,7 @@ class App:
             title = _clean(self.cats.get(gid, {}).get("name")); tab = "kategorien"
         elif kind == "room":
             uuids = [u for u, c in self.controls.items()
-                     if c.get("room") == gid and self._shown(u, prof)]
+                     if c.get("room") == gid and self._cat_ok(u, prof) and self._shown(u, prof)]
             title = _clean(self.rooms.get(gid, {}).get("name")); tab = "raeume"
         elif kind == "central":
             c = self.controls.get(gid, {})
