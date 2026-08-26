@@ -962,13 +962,28 @@ class App:
             return None
 
     # ---- Kachel fuer ein Control ----
-    def _control_item(self, uuid: str, prof: dict | None = None) -> dict:
+    def _spans_rooms(self, uuids) -> bool:
+        """True, wenn die Bausteine ueber mehr als einen bekannten Raum verteilt
+        sind. Dann lohnt es sich, den Raum je Kachel zu zeigen (Kategorie Licht
+        ueber mehrere Raeume). Bausteine ohne Raum (z.B. Zentral) zaehlen nicht."""
+        rooms = {self.controls[u].get("room") for u in uuids
+                 if u in self.controls and self.controls[u].get("room") in self.rooms}
+        return len(rooms) > 1
+
+    def _control_item(self, uuid: str, prof: dict | None = None,
+                      show_room: bool = False) -> dict:
         c = self.controls.get(uuid)
         if not c:
             return {"id": uuid, "label": "?", "icon": "info", "on": False}
         t = c.get("type")
         name = _clean(c.get("name"))
         it: dict = {"id": uuid, "label": name, "on": False, "icon": "info"}
+        # Raum-Kennzeichnung: nur wenn die Ansicht mehrere Raeume umfasst (z.B.
+        # Kategorie Licht ueber alle Raeume). Zentralbausteine haben keinen Raum.
+        if show_room:
+            rn = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
+            if rn:
+                it["room"] = rn
         if c.get("isSecured"):
             it["secured"] = True
         iu = self._control_icon_url(c)
@@ -1179,14 +1194,18 @@ class App:
         if isinstance(tab, str) and tab.startswith("cat:"):
             # Kategorie-Direkt-Tab: dieselben Controls wie im Kategorie-Drilldown
             cu = tab[4:]
-            items = [self._control_item(u, prof) for u, c in self.controls.items()
+            uuids = [u for u, c in self.controls.items()
                      if c.get("cat") == cu and self._room_ok(u, prof) and self._shown(u, prof)]
+            sr = self._spans_rooms(uuids)
+            items = [self._control_item(u, prof, show_room=sr) for u in uuids]
             title = _clean(self.cats.get(cu, {}).get("name")) or "Kategorie"
             return {"t": "view", "title": title, "tab": tab,
                     "route": {"view": "tab", "tab": tab}, "items": items}
         if tab == "favoriten":
-            items = [self._control_item(u, prof) for u, c in self.controls.items()
+            uuids = [u for u, c in self.controls.items()
                      if c.get("isFavorite") and self._room_ok(u, prof) and self._shown(u, prof)]
+            sr = self._spans_rooms(uuids)
+            items = [self._control_item(u, prof, show_room=sr) for u in uuids]
             title = "Favoriten"
         elif tab == "zentral":
             items = [self._control_item(u, prof) for u, c in self.controls.items()
@@ -1223,6 +1242,10 @@ class App:
             uuids = [u for u, c in self.controls.items()
                      if c.get("cat") == gid and self._room_ok(u, prof) and self._shown(u, prof)]
             title = _clean(self.cats.get(gid, {}).get("name")); tab = "kategorien"
+            sr = self._spans_rooms(uuids)
+            return {"t": "view", "title": title, "tab": tab, "route": route,
+                    "layout": layout,
+                    "items": [self._control_item(u, prof, show_room=sr) for u in uuids]}
         elif kind == "room":
             uuids = [u for u, c in self.controls.items()
                      if c.get("room") == gid and self._cat_ok(u, prof) and self._shown(u, prof)]

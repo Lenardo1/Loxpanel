@@ -69,6 +69,8 @@
     -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .tile .chev{color:var(--muted);opacity:.55;}
   .tile .chev svg{width:20px;height:20px;}
+  .tile .room{font-size:var(--room-size,12px);color:var(--muted);font-weight:500;letter-spacing:.02em;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;opacity:.85;}
   .tile .name{font-size:var(--name-size,18px);font-weight:var(--name-weight,450);color:var(--name-color,inherit);line-height:1.15;letter-spacing:-.01em;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .tile .sub{font-size:var(--sub-size,15px);color:var(--muted);font-weight:400;
@@ -521,7 +523,9 @@ function render(){
     const _pg = (view.layout==='list'?4:gridCols*2);   // Snap-Seite: Liste 4 Zeilen, sonst cols x 2
     html += '<div class="tile'+tone+(_i%_pg===0?' snap':'')+'" data-id="'+esc(it.id)+'"'+st+'>'+
               '<div class="head">'+icoHtml+chev+'</div>'+
-              '<div class="body"><div class="name"'+nst+'>'+esc(it.label)+'</div>'+
+              '<div class="body">'+
+              (it.room?'<div class="room">'+esc(it.room)+'</div>':'')+
+              '<div class="name"'+nst+'>'+esc(it.label)+'</div>'+
               (it.sublabel?'<div class="sub">'+esc(it.sublabel)+'</div>':'')+'</div>'+
               ctrls+
             '</div>';
