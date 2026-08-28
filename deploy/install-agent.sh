@@ -590,6 +590,15 @@ cat > "$XS" <<EOF
 # Screensaver-Blank aus; DPMS (Display-Abschaltung) richtet der Agent selbst
 # gemaess DPMS_OFF ein — daher hier NICHT mehr -dpms setzen.
 xset s off 2>/dev/null || true
+# Audio: In der schlanken Kiosk-Session laeuft sonst kein Soundserver, dann
+# bekommt Chromium keinen Ausgang (Weckton/Test-Ton bleiben stumm). PulseAudio
+# bzw. PipeWire starten und den Ausgang entstummen/aufdrehen — alles best effort.
+pulseaudio --start 2>/dev/null || true
+command -v wireplumber >/dev/null 2>&1 && (pipewire & wireplumber &) 2>/dev/null || true
+amixer -q sset Master unmute 2>/dev/null || true
+amixer -q sset Master 90% 2>/dev/null || true
+amixer -q sset Speaker unmute 2>/dev/null || true
+amixer -q sset PCM unmute 2>/dev/null || true
 exec python3 $AGENT
 EOF
 chmod +x "$XS"

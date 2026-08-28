@@ -324,26 +324,50 @@ function stopAlarmTone(){
   if(_alarmTimer){ clearInterval(_alarmTimer); _alarmTimer=null; }
   clearTimeout(_alarmFailsafe); _alarmFailsafe=null;
 }
-// Kurzer Test-Ton (3 Pieptoene) von der Einstellungen-Seite ausgeloest — prueft
-// die Audio-Ausgabe am Panel. Eigener AudioContext, damit ein evtl. gerade
-// laufender echter Weckton unberuehrt bleibt.
+// Sichtbarer Hinweis oben am Panel — bestaetigt, dass ein Test-Ton-Event
+// tatsaechlich ankam, und meldet den AudioContext-Status. So laesst sich
+// "Push kommt nicht an" von "Audio-Ausgabe stumm" trennen.
+function flashAudioBadge(txt, ok){
+  let b=document.getElementById('audiobadge');
+  if(!b){
+    b=document.createElement('div'); b.id='audiobadge';
+    b.style.cssText='position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;'+
+      'padding:13px 20px;border-radius:12px;font:600 15px system-ui,sans-serif;color:#fff;'+
+      'box-shadow:0 8px 28px rgba(0,0,0,.45);pointer-events:none;opacity:0;transition:opacity .3s;max-width:90vw;text-align:center;';
+    document.body.appendChild(b);
+  }
+  b.textContent=txt;
+  b.style.background = ok ? 'rgba(82,184,129,.96)' : 'rgba(226,107,95,.96)';
+  b.style.opacity='1';
+  clearTimeout(b._t); b._t=setTimeout(()=>{ b.style.opacity='0'; }, 3500);
+}
+// Kurzer Test-Ton (3 Pieptoene) von der Einstellungen-Seite ausgeloest. Eigener
+// AudioContext (stoert einen evtl. laufenden echten Weckton nicht). resume()
+// wird abgewartet, damit der Ton auch bei anfangs suspendiertem Context spielt;
+// der Badge meldet, ob der Context wirklich laeuft.
 function playTestTone(){
-  try{
-    const actx=new (window.AudioContext||window.webkitAudioContext)();
-    if(actx.state==='suspended') actx.resume();
-    let t=actx.currentTime;
-    for(let i=0;i<3;i++){
-      const o=actx.createOscillator(), g=actx.createGain();
-      o.type='square'; o.frequency.value=880;
-      g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(0.35,t+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
-      o.connect(g); g.connect(actx.destination);
-      o.start(t); o.stop(t+0.4);
-      t+=0.5;
-    }
+  let actx;
+  try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }
+  catch(e){ flashAudioBadge('🔊 Test-Ton empfangen — Web Audio nicht verfügbar', false); return; }
+  const boom=()=>{
+    try{
+      let t=actx.currentTime;
+      for(let i=0;i<3;i++){
+        const o=actx.createOscillator(), g=actx.createGain();
+        o.type='square'; o.frequency.value=880;
+        g.gain.setValueAtTime(0.0001,t);
+        g.gain.exponentialRampToValueAtTime(0.4,t+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+        o.connect(g); g.connect(actx.destination);
+        o.start(t); o.stop(t+0.4); t+=0.5;
+      }
+    }catch(e){}
+    const running = actx.state==='running';
+    flashAudioBadge(running ? '🔊 Test-Ton — Audio läuft' : '🔊 empfangen, Audio blockiert ('+actx.state+')', running);
     setTimeout(()=>{ try{ actx.close(); }catch(e){} }, 2200);
-  }catch(e){}
+  };
+  if(actx.state==='suspended'){ actx.resume().then(boom, boom); }
+  else boom();
 }
 
 function send(o){ ws && ws.readyState===1 && ws.send(JSON.stringify(o)); }

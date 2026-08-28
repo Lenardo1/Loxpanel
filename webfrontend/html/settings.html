@@ -27,10 +27,31 @@
   .nitem .nico{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
     background:rgba(224,162,77,.14);color:var(--accent);font-size:15px;}
   .nitem .ntx{font-weight:550;}
-  .foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px;}
   .conn{font-size:13px;color:var(--muted);}
   .conn b.ok{color:var(--good);} .conn b.bad{color:var(--crit);}
-  .backlink{font-size:13px;}
+  /* prominenter Zurueck-Button (wie in /config) */
+  .navbtn{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:11px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer;
+    text-decoration:none;transition:border-color .15s,background .15s,transform .05s;}
+  .navbtn:hover{border-color:var(--accent);background:#252a33;}
+  .navbtn:active{transform:translateY(1px);}
+  .navbtn .nbico{flex:none;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;
+    background:rgba(224,162,77,.14);color:var(--accent);font-size:16px;}
+  .navbtn .nbtx{display:flex;flex-direction:column;gap:1px;min-width:0;}
+  .navbtn .nbt{font-weight:600;font-size:14px;}
+  .navbtn .nbs{font-size:12px;color:var(--muted);}
+  /* "Coming soon"-Platzhalter */
+  .soon{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;
+    padding:44px 20px;color:var(--muted);}
+  .soon .ssico{font-size:40px;opacity:.8;}
+  .soon .sstag{display:inline-block;margin-top:4px;padding:5px 13px;border-radius:999px;
+    background:rgba(224,162,77,.14);border:1px solid var(--accent);color:var(--accent);
+    font-size:12.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+  .nitem.soon-item{opacity:.7;}
+  .nitem .badge{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.3px;
+    color:var(--accent);background:rgba(224,162,77,.14);border:1px solid var(--accent);
+    border-radius:999px;padding:2px 7px;text-transform:uppercase;}
   /* Main */
   .main{padding:26px 30px;overflow-y:auto;max-height:100vh;}
   .pane{display:none;}
@@ -82,13 +103,16 @@
     <nav class="nlist" id="nlist">
       <div class="nitem" data-pane="miniserver"><span class="nico">🔌</span><span class="ntx">Miniserver</span></div>
       <div class="nitem" data-pane="intercom"><span class="nico">📷</span><span class="ntx">Kamera / Türstation</span></div>
+      <div class="nitem soon-item" data-pane="sip"><span class="nico">☎</span><span class="ntx">SIP</span><span class="badge">bald</span></div>
       <div class="nitem" data-pane="panels"><span class="nico">🖥</span><span class="ntx">Panels</span></div>
       <div class="nitem" data-pane="audio"><span class="nico">🔊</span><span class="ntx">Audio</span></div>
       <div class="nitem" data-pane="newpanel"><span class="nico">＋</span><span class="ntx">Neues Panel</span></div>
     </nav>
     <div class="foot">
+      <a class="navbtn" href="/config">
+        <span class="nbico">‹</span>
+        <span class="nbtx"><span class="nbt">Panels &amp; Kacheln</span><span class="nbs">Ansichten gestalten</span></span></a>
       <div class="conn" id="conn">…</div>
-      <a class="backlink" href="/config">‹ Panels &amp; Kacheln</a>
     </div>
   </aside>
 
@@ -118,6 +142,19 @@
       <div class="card">
         <div id="ic_list"><div class="muted">…</div></div>
         <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save">Speichern</button><span class="toast" id="ic_toast"></span></div>
+      </div>
+    </section>
+
+    <!-- SIP (coming soon) -->
+    <section class="pane" data-pane="sip">
+      <h2>SIP</h2>
+      <p class="lead">Gegensprechen über die Türstation direkt am Panel (SIP-Audio/-Video statt nur Kamerabild).</p>
+      <div class="card">
+        <div class="soon">
+          <div class="ssico">☎</div>
+          <div>SIP-Anbindung ist in Arbeit.</div>
+          <div class="sstag">Coming soon</div>
+        </div>
       </div>
     </section>
 
