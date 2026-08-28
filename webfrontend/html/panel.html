@@ -116,6 +116,10 @@
     -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .hero .circle .rawico{width:38px;height:38px;object-fit:contain;}
   .status{text-align:center;color:var(--muted);font-size:14px;padding:2px 6px;}
+  /* Wecker-Status: moderat gross (nicht so riesig wie .pbig), Raum als Unterzeile */
+  .astat{text-align:center;font-size:30px;font-weight:600;line-height:1.18;letter-spacing:-.01em;padding:0 16px;}
+  .astat.crit{color:var(--crit);}
+  .astat .astatsub{font-size:15px;font-weight:400;color:var(--muted);margin-top:8px;letter-spacing:0;}
   .pbar{background:var(--tile);border:1px solid var(--line);border-radius:12px;
     padding:15px;text-align:center;font-weight:650;font-size:15px;}
   .pbig{text-align:center;font-size:clamp(56px,15vw,84px);font-weight:600;letter-spacing:-.02em;line-height:1.06;
@@ -469,7 +473,7 @@ function renderPanel(blocks){
   // verankert; aufklappende Auswahl waechst dann nach oben ueber die festen Zeilen.
   const anchorBot = !!(view && view.anchor==='bottom');
   g.classList.toggle('anchorbot', anchorBot);
-  const TOPK = {hero:1,cover:1,video:1,status:1,title:1,value:1,big:1};
+  const TOPK = {hero:1,cover:1,video:1,status:1,title:1,value:1,big:1,astat:1};
   const bh = b => {
     if(b.k==='hero'){ const hic = b.iconImg
         ? '<img class="rawico" src="'+esc(b.iconImg)+'" alt="">'
@@ -483,6 +487,7 @@ function renderPanel(blocks){
     if(b.k==='title') return '<div class="ptitle">'+esc(b.text||'')+'<div class="psub">'+esc(b.sub||'')+'</div></div>';
     if(b.k==='value') return '<div class="pbar">'+esc(b.text||'')+'</div>';
     if(b.k==='big') return '<div class="pbig'+(b.tone==='good'?' good':(b.tone==='crit'?' crit':''))+'">'+esc(b.text||'')+'</div>';
+    if(b.k==='astat') return '<div class="astat'+(b.tone==='crit'?' crit':'')+'">'+esc(b.text||'')+(b.sub?'<div class="astatsub">'+esc(b.sub)+'</div>':'')+'</div>';
     if(b.k==='slider') return '<div class="srow"><span class="sico">'+svg(ICONS[b.icon]||ICONS.vol)+'</span><input type="range" class="sld" min="'+b.min+'" max="'+b.max+'"'+(b.step?' step="'+b.step+'"':'')+' value="'+b.value+'"><span class="sval">'+b.value+'</span></div>';
     if(b.k==='row') return '<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+(b.wrap?' wraprow':'')+(b.hidden?' collapsed':'')+'"'+(b.id?' data-rowid="'+esc(b.id)+'"':'')+'>'+b.cells.map(cellHtml).join('')+'</div>';
     if(b.k==='head') return '<div class="phead">'+esc(b.text||'')+'</div>';
@@ -546,6 +551,7 @@ function updatePanel(blocks){
   const v=blocks.find(b=>b.k==='value'); if(v){const e=g.querySelector('.pbar'); if(e)e.textContent=v.text||'';}
   const bg=blocks.find(b=>b.k==='big'); if(bg){const e=g.querySelector('.pbig'); if(e){e.textContent=bg.text||''; e.className='pbig'+(bg.tone==='good'?' good':(bg.tone==='crit'?' crit':''));}}
   const ti=blocks.find(b=>b.k==='title'); if(ti){const e=g.querySelector('.ptitle'); if(e){ e.childNodes[0].nodeValue=ti.text||''; const su=e.querySelector('.psub'); if(su)su.textContent=ti.sub||''; }}
+  const ast=blocks.find(b=>b.k==='astat'); if(ast){const e=g.querySelector('.astat'); if(e){ e.childNodes[0].nodeValue=ast.text||''; e.className='astat'+(ast.tone==='crit'?' crit':''); const su=e.querySelector('.astatsub'); if(su)su.textContent=ast.sub||''; }}
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img&&img.getAttribute('src')!==cov.src){img.style.opacity='0'; img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
   const sb=blocks.find(b=>b.k==='slider'); if(sb){const sld=g.querySelector('.sld'); if(sld&&!sldDragging){ sld.value=sb.value; const sv=g.querySelector('.sval'); if(sv)sv.textContent=sb.value; }}
   rowBlocks.forEach((b,ri)=>{ const rowEl=rows[ri]; if(!rowEl)return;

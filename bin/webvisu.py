@@ -1717,16 +1717,16 @@ class App:
             nxt = self._alarm_next_text(c)
             entries = self._alarm_entries(c)
             room = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
-            # Layout wie IRR/Klima (anchor:bottom): grosse Statuszeile mittig oben,
-            # Raum darunter, die Weckzeit-Eintraege unten angedockt. Read-only —
+            # Layout wie IRR/Klima (anchor:bottom): Statuszeile mittig oben (Raum
+            # als Unterzeile), die Weckzeit-Eintraege unten angedockt. Read-only —
             # keine Eintrags-Bearbeitung; klingelt der Wecker, gibt es genau EINEN
             # Button (Loxone 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
-            big = ({"k": "big", "text": "Weckt jetzt", "tone": "crit"} if ringing
-                   else {"k": "big", "text": (nxt or "Keine Weckzeit aktiv")})
-            blocks = [{"k": "hero", "icon": "alarm"}, big]
+            stat = {"k": "astat", "text": ("Weckt jetzt" if ringing else (nxt or "Keine Weckzeit aktiv"))}
+            if ringing:
+                stat["tone"] = "crit"
             if room:
-                blocks.append({"k": "status", "text": room})
-            blocks.append({"k": "alarmlist", "entries": entries})
+                stat["sub"] = room
+            blocks = [{"k": "hero", "icon": "alarm"}, stat, {"k": "alarmlist", "entries": entries}]
             if ringing:
                 blocks.append({"k": "row", "cells": [
                     {"label": "Wecker aus", "cmd": {"uuid": ua, "cmd": "dismiss"}}]})
