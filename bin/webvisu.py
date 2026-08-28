@@ -2183,6 +2183,30 @@ async def api_agent_command(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": str(err)})
 
 
+async def api_testtone(request: web.Request) -> web.Response:
+    """Schickt einen kurzen Test-Weckton an die Panel-Browser (zum Pruefen der
+    Audio-Ausgabe am Geraet, z.B. YC-41PM). Mit `panel` auf ein Profil begrenzt,
+    sonst an alle offenen Visu-Verbindungen. Der Ton wird im Browser per Web
+    Audio erzeugt (derselbe Weg wie der echte Weckton)."""
+    app: App = request.app["app"]
+    try:
+        d = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        d = {}
+    target = str(d.get("panel") or "").strip()
+    n = 0
+    for ws, prof in list(app.conn_prof.items()):
+        if target and (prof or {}).get("id") != target:
+            continue
+        try:
+            await ws.send_json({"t": "testtone"})
+            n += 1
+        except ConnectionError:
+            app.conn_route.pop(ws, None)
+            app.conn_prof.pop(ws, None)
+    return web.json_response({"ok": True, "sent": n})
+
+
 async def icon_handler(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     p = request.query.get("p", "")
@@ -2331,6 +2355,7 @@ def main() -> None:
     a.router.add_post("/api/agent/announce", api_agent_announce)
     a.router.add_get("/api/agents", api_agents)
     a.router.add_post("/api/agent/command", api_agent_command)
+    a.router.add_post("/api/testtone", api_testtone)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
     a.router.add_get("/mjpeg", mjpeg_handler)

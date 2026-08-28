@@ -8,19 +8,36 @@
   :root{
     --bg:#16181c; --panel:#1c1f24; --panel2:#212530; --line:#2a2e35;
     --fg:#e7e9ec; --muted:#9aa0a8; --accent:#e0a24d; --good:#52b881; --crit:#e2695f;
+    --radius:12px;
     --font:"Inter","Roboto","Segoe UI Variable Text",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;min-height:100%;}
+  html,body{margin:0;height:100%;}
   body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:15px;line-height:1.45;}
   a{color:var(--accent);text-decoration:none;}
-  .wrap{max-width:640px;margin:0 auto;padding:26px 22px 60px;}
-  .top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px;}
-  h1{font-size:22px;font-weight:600;margin:0;}
-  h1 small{display:block;color:var(--muted);font-size:12px;font-weight:400;letter-spacing:.4px;text-transform:uppercase;margin-top:2px;}
-  .conn{font-size:13px;color:var(--muted);margin-bottom:20px;}
+  .wrap{display:grid;grid-template-columns:250px 1fr;min-height:100vh;}
+  /* Sidebar mit Reitern */
+  .side{background:var(--panel);border-right:1px solid var(--line);padding:18px 16px;display:flex;flex-direction:column;gap:14px;}
+  .brand{font-size:20px;font-weight:600;letter-spacing:.2px;}
+  .brand small{display:block;color:var(--muted);font-size:12px;font-weight:400;letter-spacing:.4px;text-transform:uppercase;margin-top:2px;}
+  .nlist{display:flex;flex-direction:column;gap:4px;}
+  .nitem{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer;user-select:none;}
+  .nitem:hover{background:var(--panel2);}
+  .nitem.active{background:var(--panel2);border-color:var(--accent);}
+  .nitem .nico{flex:none;width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+    background:rgba(224,162,77,.14);color:var(--accent);font-size:15px;}
+  .nitem .ntx{font-weight:550;}
+  .foot{margin-top:auto;border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .conn{font-size:13px;color:var(--muted);}
   .conn b.ok{color:var(--good);} .conn b.bad{color:var(--crit);}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:18px;}
+  .backlink{font-size:13px;}
+  /* Main */
+  .main{padding:26px 30px;overflow-y:auto;max-height:100vh;}
+  .pane{display:none;}
+  .pane.active{display:block;}
+  .pane h2{margin:0 0 4px;font-size:22px;font-weight:600;}
+  .pane .lead{color:var(--muted);font-size:13.5px;margin:0 0 20px;max-width:640px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;max-width:660px;}
   .card h3{margin:0 0 4px;font-size:15px;font-weight:600;}
   .card .note{color:var(--muted);font-size:13px;margin:0 0 14px;}
   .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;}
@@ -32,16 +49,17 @@
   .row2 .field{flex:1;min-width:140px;}
   .chk{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;margin-bottom:6px;}
   .chk input{width:18px;height:18px;accent-color:var(--accent);}
-  .actions{display:flex;align-items:center;gap:14px;margin-top:6px;}
+  .actions{display:flex;align-items:center;gap:14px;margin-top:6px;flex-wrap:wrap;}
   .btn{border:none;border-radius:10px;padding:11px 20px;font:inherit;font-weight:600;cursor:pointer;background:var(--accent);color:#1a1205;}
   .btn:hover{filter:brightness(1.06);}
+  .btn:disabled{opacity:.5;cursor:default;filter:none;}
   .toast{font-size:14px;opacity:0;transition:opacity .25s;}
   .toast.show{opacity:1;} .toast.ok{color:var(--good);} .toast.err{color:var(--crit);}
   .ic{border-top:1px solid var(--line);padding-top:14px;margin-top:6px;}
   .ic:first-child{border-top:none;padding-top:0;margin-top:0;}
   .ic .icname{font-weight:600;margin-bottom:10px;}
   .muted{color:var(--muted);}
-  select{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:8px 10px;font:inherit;}
+  select{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:9px;padding:9px 11px;font:inherit;}
   select:focus{outline:none;border-color:var(--accent);}
   .ag{display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line);padding:12px 0;}
   .ag:first-child{border-top:none;}
@@ -54,63 +72,116 @@
   .btn.ghost{background:var(--panel2);color:var(--fg);border:1px solid var(--line);}
   .cmdout{background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:12px;margin-top:10px;
     font-family:ui-monospace,monospace;font-size:12.5px;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--fg);}
+  @media(max-width:720px){ .wrap{grid-template-columns:1fr;} .side{border-right:none;border-bottom:1px solid var(--line);} .main{max-height:none;} }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><h1>LoxPanel<small>Einstellungen</small></h1><a href="/config">‹ Panels &amp; Kacheln</a></div>
-  <div class="conn" id="conn">…</div>
-
-  <div class="card">
-    <h3>Miniserver</h3>
-    <p class="note">Zugang zum Loxone Miniserver. Nach dem Speichern verbindet der Server sofort neu.</p>
-    <div class="field"><label class="lbl">Host / IP</label><input type="text" id="ms_host" placeholder="192.168.1.50"></div>
-    <div class="row2">
-      <div class="field"><label class="lbl">Benutzer</label><input type="text" id="ms_user" autocomplete="off"></div>
-      <div class="field"><label class="lbl">Passwort</label><input type="password" id="ms_pass" autocomplete="new-password" placeholder="unverändert lassen"></div>
+  <aside class="side">
+    <div class="brand">LoxPanel<small>Einstellungen</small></div>
+    <nav class="nlist" id="nlist">
+      <div class="nitem" data-pane="miniserver"><span class="nico">🔌</span><span class="ntx">Miniserver</span></div>
+      <div class="nitem" data-pane="intercom"><span class="nico">📷</span><span class="ntx">Kamera / Türstation</span></div>
+      <div class="nitem" data-pane="panels"><span class="nico">🖥</span><span class="ntx">Panels</span></div>
+      <div class="nitem" data-pane="audio"><span class="nico">🔊</span><span class="ntx">Audio</span></div>
+      <div class="nitem" data-pane="newpanel"><span class="nico">＋</span><span class="ntx">Neues Panel</span></div>
+    </nav>
+    <div class="foot">
+      <div class="conn" id="conn">…</div>
+      <a class="backlink" href="/config">‹ Panels &amp; Kacheln</a>
     </div>
-    <div class="row2">
-      <div class="field" style="max-width:120px"><label class="lbl">Port</label><input type="number" id="ms_port" value="443"></div>
-    </div>
-    <label class="chk"><input type="checkbox" id="ms_tls"><span>Zertifikat prüfen (Gen2 mit selbstsigniertem Zertifikat: <b>aus</b>)</span></label>
-    <div class="actions"><button class="btn" id="ms_save">Verbinden &amp; Speichern</button><span class="toast" id="ms_toast"></span></div>
-  </div>
+  </aside>
 
-  <div class="card">
-    <h3>Intercom / Türstation</h3>
-    <p class="note">Video-URL (MJPEG) und Login der Türstation(en). Wird für das Kamerabild im Intercom-Popup gebraucht. Liste kommt aus dem Miniserver.</p>
-    <div id="ic_list"><div class="muted">…</div></div>
-    <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save">Speichern</button><span class="toast" id="ic_toast"></span></div>
-  </div>
+  <main class="main">
+    <!-- Miniserver -->
+    <section class="pane" data-pane="miniserver">
+      <h2>Miniserver</h2>
+      <p class="lead">Zugang zum Loxone Miniserver. Nach dem Speichern verbindet der Server sofort neu.</p>
+      <div class="card">
+        <div class="field"><label class="lbl">Host / IP</label><input type="text" id="ms_host" placeholder="192.168.1.50"></div>
+        <div class="row2">
+          <div class="field"><label class="lbl">Benutzer</label><input type="text" id="ms_user" autocomplete="off"></div>
+          <div class="field"><label class="lbl">Passwort</label><input type="password" id="ms_pass" autocomplete="new-password" placeholder="unverändert lassen"></div>
+        </div>
+        <div class="row2">
+          <div class="field" style="max-width:120px"><label class="lbl">Port</label><input type="number" id="ms_port" value="443"></div>
+        </div>
+        <label class="chk"><input type="checkbox" id="ms_tls"><span>Zertifikat prüfen (Gen2 mit selbstsigniertem Zertifikat: <b>aus</b>)</span></label>
+        <div class="actions"><button class="btn" id="ms_save">Verbinden &amp; Speichern</button><span class="toast" id="ms_toast"></span></div>
+      </div>
+    </section>
 
-  <div class="card">
-    <h3>Displays (Panels)</h3>
-    <p class="note">Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
-    <div id="ag_list"><div class="muted">Suche Panels…</div></div>
-    <div class="toast" id="ag_toast" style="margin-top:8px"></div>
-  </div>
+    <!-- Kamera / Türstation -->
+    <section class="pane" data-pane="intercom">
+      <h2>Kamera / Türstation</h2>
+      <p class="lead">Video-URL (MJPEG) und Login der Türstation(en). Wird für das Kamerabild im Intercom-Popup gebraucht. Die Liste kommt aus dem Miniserver.</p>
+      <div class="card">
+        <div id="ic_list"><div class="muted">…</div></div>
+        <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save">Speichern</button><span class="toast" id="ic_toast"></span></div>
+      </div>
+    </section>
 
-  <div class="card">
-    <h3>Neues Panel einrichten</h3>
-    <p class="note">Erzeugt den Befehl, der Agent + Config aufs Panel überträgt, den Autostart einrichtet und Chromium still stellt (keine Übersetzen-Leiste / Anmeldung). Einmal im Terminal ausführen — fragt nach dem SSH-/sudo-Passwort des Panels.</p>
-    <div class="row2">
-      <div class="field"><label class="lbl">Panel-IP</label><input type="text" id="np_ip" placeholder="10.0.0.77"></div>
-      <div class="field"><label class="lbl">SSH-Benutzer</label><input type="text" id="np_user" value="linaro"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label class="lbl">Anzeigename</label><input type="text" id="np_name" placeholder="Wohnzimmer"></div>
-      <div class="field"><label class="lbl">Startansicht (Profil)</label><select id="np_panel"></select></div>
-    </div>
-    <div class="field"><label class="lbl">Server-Adresse (dieser Server)</label><input type="text" id="np_server" placeholder="10.0.0.55:8099"></div>
-    <div class="actions"><button class="btn" id="np_gen">Befehl erzeugen</button></div>
-    <pre id="np_out" class="cmdout" style="display:none"></pre>
-    <div class="actions" id="np_copyrow" style="display:none"><button class="btn ghost sm" id="np_copy">In Zwischenablage kopieren</button><span class="toast" id="np_toast"></span></div>
-  </div>
+    <!-- Panels (Displays / Agenten) -->
+    <section class="pane" data-pane="panels">
+      <h2>Panels</h2>
+      <p class="lead">Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
+      <div class="card">
+        <div id="ag_list"><div class="muted">Suche Panels…</div></div>
+        <div class="toast" id="ag_toast" style="margin-top:8px"></div>
+      </div>
+    </section>
+
+    <!-- Audio -->
+    <section class="pane" data-pane="audio">
+      <h2>Audio</h2>
+      <p class="lead">Der Weckton (Loxone-Wecker) wird direkt im Kiosk-Browser des Panels erzeugt. Mit dem Test-Ton prüfst du, ob am Panel wirklich etwas zu hören ist — falls nicht, liegt es meist an der Lautstärke/Ausgabe am Gerät (ALSA/PulseAudio), nicht am Browser.</p>
+      <div class="card">
+        <h3>Test-Ton</h3>
+        <p class="note">Sendet 3 kurze Pieptöne an das/die gewählte(n) Panel(s). Es müssen dafür geöffnet sein (Kiosk läuft und zeigt die Visu).</p>
+        <div class="row2">
+          <div class="field" style="max-width:280px"><label class="lbl">Ziel-Panel</label><select id="at_panel"></select></div>
+        </div>
+        <div class="actions"><button class="btn" id="at_send">🔊 Test-Ton senden</button><span class="toast" id="at_toast"></span></div>
+      </div>
+    </section>
+
+    <!-- Neues Panel -->
+    <section class="pane" data-pane="newpanel">
+      <h2>Neues Panel einrichten</h2>
+      <p class="lead">Erzeugt den Befehl, der Agent + Config aufs Panel überträgt, den Autostart einrichtet und Chromium still stellt (keine Übersetzen-Leiste / Anmeldung). Einmal im Terminal ausführen — fragt nach dem SSH-/sudo-Passwort des Panels.</p>
+      <div class="card">
+        <div class="row2">
+          <div class="field"><label class="lbl">Panel-IP</label><input type="text" id="np_ip" placeholder="10.0.0.77"></div>
+          <div class="field"><label class="lbl">SSH-Benutzer</label><input type="text" id="np_user" value="linaro"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label class="lbl">Anzeigename</label><input type="text" id="np_name" placeholder="Wohnzimmer"></div>
+          <div class="field"><label class="lbl">Startansicht (Profil)</label><select id="np_panel"></select></div>
+        </div>
+        <div class="field"><label class="lbl">Server-Adresse (dieser Server)</label><input type="text" id="np_server" placeholder="10.0.0.55:8099"></div>
+        <div class="actions"><button class="btn" id="np_gen">Befehl erzeugen</button></div>
+        <pre id="np_out" class="cmdout" style="display:none"></pre>
+        <div class="actions" id="np_copyrow" style="display:none"><button class="btn ghost sm" id="np_copy">In Zwischenablage kopieren</button><span class="toast" id="np_toast"></span></div>
+      </div>
+    </section>
+  </main>
 </div>
 <script>
 const $=(s)=>document.querySelector(s);
 let META=null;
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+// ---- Reiter-Umschaltung ----
+function showPane(name){
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('active', p.dataset.pane===name));
+  document.querySelectorAll('.nitem').forEach(n=>n.classList.toggle('active', n.dataset.pane===name));
+  if(location.hash.slice(1)!==name) history.replaceState(null,'','#'+name);
+}
+document.querySelectorAll('.nitem').forEach(n=>n.onclick=()=>showPane(n.dataset.pane));
+(function initPane(){
+  const want=(location.hash||'').slice(1);
+  showPane(document.querySelector('.nitem[data-pane="'+want+'"]') ? want : 'miniserver');
+})();
 
 async function load(){
   const r=await fetch('/api/settings'); META=await r.json();
@@ -164,7 +235,7 @@ $('#ic_save').onclick=async()=>{
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
 
-// ---- Displays (Panel-Agenten) ----
+// ---- Panels (Panel-Agenten) ----
 let PANEL_IDS=[];
 async function loadPanelIds(){
   try{ const r=await fetch('/api/meta'); const m=await r.json(); PANEL_IDS=Object.keys(m.panels||{}); }catch(e){ PANEL_IDS=[]; }
@@ -202,6 +273,24 @@ async function agentCmd(ip,action,panel){
 }
 async function pollAgents(){ try{ const r=await fetch('/api/agents'); const j=await r.json(); renderAgents(j.agents||[]); }catch(e){} }
 
+// ---- Audio: Test-Ton ----
+function fillAudioPanels(){
+  const sel=$('#at_panel'); if(!sel) return;
+  sel.innerHTML='<option value="">Alle Panels</option>'+
+    PANEL_IDS.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
+}
+$('#at_send').onclick=async()=>{
+  const panel=$('#at_panel').value;
+  $('#at_send').disabled=true;
+  try{
+    const r=await fetch('/api/testtone',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({panel})});
+    const j=await r.json();
+    if(j.ok){ flash($('#at_toast'), j.sent? ('✓ an '+j.sent+' Panel'+(j.sent>1?'s':'')+' gesendet') : 'Kein Panel verbunden (Kiosk offen?)', j.sent>0); }
+    else flash($('#at_toast'), j.error||'Fehler', false);
+  }catch(e){ flash($('#at_toast'),'Fehler: '+e,false); }
+  $('#at_send').disabled=false;
+};
+
 // ---- Neues Panel: Befehl-Generator ----
 function fillNewPanel(){
   const srv=$('#np_server'); if(srv && !srv.value) srv.value=location.host;
@@ -222,7 +311,7 @@ $('#np_copy').onclick=()=>{ navigator.clipboard.writeText($('#np_out').textConte
   .catch(()=>flash($('#np_toast'),'Kopieren nicht möglich – bitte manuell markieren',false)); };
 
 load().catch(e=>{ $('#conn').innerHTML='Konnte Einstellungen nicht laden: '+esc(e); });
-loadPanelIds().then(()=>{ fillNewPanel(); pollAgents(); setInterval(pollAgents,6000); });
+loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); pollAgents(); setInterval(pollAgents,6000); });
 </script>
 </body>
 </html>

@@ -324,6 +324,27 @@ function stopAlarmTone(){
   if(_alarmTimer){ clearInterval(_alarmTimer); _alarmTimer=null; }
   clearTimeout(_alarmFailsafe); _alarmFailsafe=null;
 }
+// Kurzer Test-Ton (3 Pieptoene) von der Einstellungen-Seite ausgeloest — prueft
+// die Audio-Ausgabe am Panel. Eigener AudioContext, damit ein evtl. gerade
+// laufender echter Weckton unberuehrt bleibt.
+function playTestTone(){
+  try{
+    const actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==='suspended') actx.resume();
+    let t=actx.currentTime;
+    for(let i=0;i<3;i++){
+      const o=actx.createOscillator(), g=actx.createGain();
+      o.type='square'; o.frequency.value=880;
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.35,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.35);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t); o.stop(t+0.4);
+      t+=0.5;
+    }
+    setTimeout(()=>{ try{ actx.close(); }catch(e){} }, 2200);
+  }catch(e){}
+}
 
 function send(o){ ws && ws.readyState===1 && ws.send(JSON.stringify(o)); }
 function nav(route){ stack.push(route); send({t:'nav',route}); }
@@ -616,6 +637,7 @@ function connect(){
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
     if(msg.t==='alarm'){ if(msg.on){ startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
+    if(msg.t==='testtone'){ playTestTone(); return; }
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
