@@ -1189,6 +1189,9 @@ class App:
             ringing = bool(self._state(c, "isAlarmActive"))
             nxt = self._alarm_next_text(c)
             has = bool(self._alarm_entries(c))
+            rn = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
+            if rn:
+                it["room"] = rn   # Raum auf der Kachel zeigen (mehrere Wecker unterscheidbar)
             it.update(icon="alarm", on=ringing, tone=("crit" if ringing else None),
                       nav={"view": "control", "id": uuid},
                       sublabel=("Weckt!" if ringing else
@@ -1713,21 +1716,22 @@ class App:
             ringing = bool(self._state(c, "isAlarmActive"))
             nxt = self._alarm_next_text(c)
             entries = self._alarm_entries(c)
-            # Read-only: keine Eintrags-Bearbeitung am Panel — die angelegten
-            # Weckzeiten werden nur angezeigt (Liste). Klingelt der Wecker, gibt es
-            # genau EINEN Button, der den laufenden Alarm quittiert (Loxone
-            # 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
-            blocks = [{"k": "hero", "icon": "alarm"}]
+            room = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
+            # Layout wie IRR/Klima (anchor:bottom): grosse Statuszeile mittig oben,
+            # Raum darunter, die Weckzeit-Eintraege unten angedockt. Read-only —
+            # keine Eintrags-Bearbeitung; klingelt der Wecker, gibt es genau EINEN
+            # Button (Loxone 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
+            big = ({"k": "big", "text": "Weckt jetzt", "tone": "crit"} if ringing
+                   else {"k": "big", "text": (nxt or "Keine Weckzeit aktiv")})
+            blocks = [{"k": "hero", "icon": "alarm"}, big]
+            if room:
+                blocks.append({"k": "status", "text": room})
+            blocks.append({"k": "alarmlist", "entries": entries})
             if ringing:
-                blocks.append({"k": "big", "text": "Weckzeit!", "tone": "crit"})
                 blocks.append({"k": "row", "cells": [
                     {"label": "Wecker aus", "cmd": {"uuid": ua, "cmd": "dismiss"}}]})
-            else:
-                blocks.append({"k": "status",
-                               "text": (nxt and ("Nächste Weckzeit: " + nxt)) or "Keine Weckzeit aktiv"})
-            blocks.append({"k": "alarmlist", "entries": entries})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
-                    "anchor": ("bottom" if ringing else "top"), "blocks": blocks}
+                    "anchor": "bottom", "blocks": blocks}
         if t == "AcControl":
             ua = c.get("uuidAction")
             # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-
