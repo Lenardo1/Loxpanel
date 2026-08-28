@@ -202,7 +202,7 @@ const customFont=(f)=>!!f && !FONTS.some(x=>x.v===f);
 async function load(){
   const r = await fetch('/api/meta'); META = await r.json();
   PANELS = JSON.parse(JSON.stringify(META.panels||{}));
-  if(!PANELS.default) PANELS.default = {title:'LoxPanel', tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}};
+  if(!PANELS.default) PANELS.default = {title:'LoxPanel', tabs:defaultTabs(), rooms:[], cats:[], ui:{}, states:{}};
   // Virtuelles Global-Profil: bearbeitet theme.json (gilt fuer alle Panels)
   PANELS.__global__ = {title:'Global (alle Panels)', ui: JSON.parse(JSON.stringify((META.theme||{}).ui||{})),
                        catColors: JSON.parse(JSON.stringify((META.theme||{}).categories||{})), __global:true};
@@ -464,6 +464,8 @@ function renderChips(p){
       if(inp.value==='') delete p.ui[k]; else p.ui[k]=Number(inp.value); markDirty(); };
   });
 }
+function defaultTabs(){ // 4 Standard-Tabs (Favoriten, Zentral, Räume, Kategorien) – ohne Kategorie-Direkt-Tabs
+  return (META.tabs||[]).filter(t=>!t.cat).slice(0,4).map(t=>t.tab); }
 function firstTabIndex(p){ // kleinster Index in kanonischer Reihenfolge
   const order=META.tabs.map(t=>t.tab);
   let best=99,bt=null; p.tabs.forEach(tb=>{const i=order.indexOf(tb); if(i>-1&&i<best){best=i;bt=tb;}});
@@ -663,7 +665,7 @@ $('#addBtn').onclick=()=>{
   if(!id) return; id=id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
   if(!id){ alert('Ungültige ID.'); return; }
   if(PANELS[id]){ alert('Panel „'+id+'" gibt es schon.'); return; }
-  PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:META.tabs.map(t=>t.tab), rooms:[], cats:[], ui:{}, states:{}, tiles:{}};
+  PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:defaultTabs(), rooms:[], cats:[], ui:{}, states:{}, tiles:{}};
   cur=id; tileSel=null; renderList(); renderEditor(); markDirty();
 };
 
