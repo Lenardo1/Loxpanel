@@ -1006,6 +1006,44 @@ class App:
             return ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][dt.weekday()] + " " + hm
         return dt.strftime("%d.%m.") + " " + hm
 
+    def _alarm_entries(self, c: dict) -> list[dict]:
+        """Weckzeit-Eintraege eines Weckers aus dem State `entryList`. Loxone
+        liefert ein JSON-Objekt {entryID: {name, isActive, alarmTime (Sek seit
+        Mitternacht), modes:[...], daily, nightLight}} — ggf. als (prozentkodierter)
+        String. Gibt [{name, hm, active, repeat}] sortiert nach Uhrzeit zurueck;
+        [] wenn nichts parsebar (dann wird der Rohwert einmal geloggt)."""
+        raw = self._state(c, "entryList")
+        if raw in (None, ""):
+            return []
+        data = raw
+        if isinstance(raw, str):
+            txt = unquote(raw).strip()
+            try:
+                data = json.loads(txt)
+            except Exception:
+                log.warning("Wecker entryList nicht als JSON parsebar: %r", txt[:200])
+                return []
+        seq = data.values() if isinstance(data, dict) else data
+        if not isinstance(seq, (list, tuple)) and not hasattr(seq, "__iter__"):
+            return []
+        out = []
+        for e in seq:
+            if not isinstance(e, dict):
+                continue
+            try:
+                secs = int(float(e.get("alarmTime") or 0))
+            except (TypeError, ValueError):
+                secs = 0
+            hm = "%02d:%02d" % ((secs // 3600) % 24, (secs % 3600) // 60)
+            daily = bool(e.get("daily"))
+            modes = e.get("modes")
+            repeat = "Täglich" if daily else (
+                ("%d Betriebsarten" % len(modes)) if isinstance(modes, list) and modes else "")
+            out.append({"name": _clean(e.get("name")) or "Weckzeit", "hm": hm,
+                        "active": bool(e.get("isActive")), "repeat": repeat})
+        out.sort(key=lambda x: (not x["active"], x["hm"]))
+        return out
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
         c = self.controls.get(uuid)
@@ -1122,13 +1160,12 @@ class App:
                       sublabel=("Alarm!" if lvl else ("Scharf" if armed else "Unscharf")))
         elif t == "AlarmClock":
             ringing = bool(self._state(c, "isAlarmActive"))
-            enabled = self._state(c, "isEnabled")
-            enabled = True if enabled is None else bool(enabled)
             nxt = self._alarm_next_text(c)
+            has = bool(self._alarm_entries(c))
             it.update(icon="alarm", on=ringing, tone=("crit" if ringing else None),
                       nav={"view": "control", "id": uuid},
                       sublabel=("Weckt!" if ringing else
-                                (nxt if (enabled and nxt) else ("Kein Wecker" if enabled else "Aus"))))
+                                (nxt or ("Keine Weckzeit aktiv" if has else "Kein Wecker"))))
         elif t == "AcControl":
             modes = self._json_list_map(c, "operatingModes")
             tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
@@ -1647,25 +1684,23 @@ class App:
         if t == "AlarmClock":
             ua = c.get("uuidAction")
             ringing = bool(self._state(c, "isAlarmActive"))
-            enabled = self._state(c, "isEnabled")
-            enabled = True if enabled is None else bool(enabled)
             nxt = self._alarm_next_text(c)
-            # Read-only: keine Eintrags-Bearbeitung am Panel. Klingelt der Wecker,
-            # gibt es genau EINEN Button, der den laufenden Alarm quittiert
-            # (Loxone 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
+            entries = self._alarm_entries(c)
+            # Read-only: keine Eintrags-Bearbeitung am Panel — die angelegten
+            # Weckzeiten werden nur angezeigt (Liste). Klingelt der Wecker, gibt es
+            # genau EINEN Button, der den laufenden Alarm quittiert (Loxone
+            # 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
             blocks = [{"k": "hero", "icon": "alarm"}]
             if ringing:
                 blocks.append({"k": "big", "text": "Weckzeit!", "tone": "crit"})
-                blocks.append({"k": "status", "text": "Wecker klingelt"})
                 blocks.append({"k": "row", "cells": [
                     {"label": "Wecker aus", "cmd": {"uuid": ua, "cmd": "dismiss"}}]})
             else:
-                blocks.append({"k": "big", "text": (nxt or "Kein Wecker")})
                 blocks.append({"k": "status",
-                               "text": ("Nächste Weckzeit" if nxt else
-                                        ("Wecker aktiv" if enabled else "Wecker aus"))})
+                               "text": (nxt and ("Nächste Weckzeit: " + nxt)) or "Keine Weckzeit aktiv"})
+            blocks.append({"k": "alarmlist", "entries": entries})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
-                    "anchor": "bottom", "blocks": blocks}
+                    "anchor": ("bottom" if ringing else "top"), "blocks": blocks}
         if t == "AcControl":
             ua = c.get("uuidAction")
             # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-

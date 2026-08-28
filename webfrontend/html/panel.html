@@ -60,6 +60,17 @@
   .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
   .favs.wrap{flex-wrap:wrap;overflow-x:visible;justify-content:flex-start;gap:12px;}
   .phead{font-weight:650;font-size:15px;margin:10px 2px 2px;padding-bottom:6px;border-bottom:1px solid var(--line);text-align:left;}
+  /* Wecker: read-only Liste der Weckzeit-Eintraege */
+  .alist{display:flex;flex-direction:column;gap:10px;width:100%;max-width:520px;margin:6px auto 0;}
+  .arow{background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:13px 16px;
+    display:grid;grid-template-columns:auto 1fr auto;column-gap:12px;row-gap:3px;align-items:center;}
+  .arow .adot{width:10px;height:10px;border-radius:50%;background:var(--accent);grid-row:1;grid-column:1;}
+  .arow .anm{grid-row:1;grid-column:2;font-weight:600;font-size:16px;text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .arow .atime{grid-row:1;grid-column:3;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;}
+  .arow .arep{grid-row:2;grid-column:2/4;color:var(--muted);font-size:13px;text-align:left;}
+  .arow.off{opacity:.5;}
+  .arow.off .adot{background:var(--muted);}
   .fav{flex:0 0 auto;width:88px;cursor:pointer;text-align:center;}
   .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--muted);}
   .favc img{width:100%;height:100%;object-fit:cover;}
@@ -476,6 +487,16 @@ function renderPanel(blocks){
     if(b.k==='row') return '<div class="brow'+(b.cells.some(c=>c.icon)?' transport':'')+(b.wrap?' wraprow':'')+(b.hidden?' collapsed':'')+'"'+(b.id?' data-rowid="'+esc(b.id)+'"':'')+'>'+b.cells.map(cellHtml).join('')+'</div>';
     if(b.k==='head') return '<div class="phead">'+esc(b.text||'')+'</div>';
     if(b.k==='favs') return '<div class="favs'+(b.wrap?' wrap':'')+'">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
+    if(b.k==='alarmlist'){
+      if(!b.entries||!b.entries.length) return '<div class="status">Keine Weckzeiten angelegt</div>';
+      return '<div class="alist">'+b.entries.map(e=>
+        '<div class="arow'+(e.active?'':' off')+'">'+
+          '<span class="adot"></span>'+
+          '<span class="anm">'+esc(e.name)+'</span>'+
+          '<span class="atime">'+esc(e.hm)+'</span>'+
+          (e.repeat?'<span class="arep">'+esc(e.repeat)+'</span>':'')+
+        '</div>').join('')+'</div>';
+    }
     return '';
   };
   if(anchorBot){
