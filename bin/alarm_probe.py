@@ -48,6 +48,10 @@ async def main() -> None:
     task = asyncio.ensure_future(ws.stream(lambda u, v: st.__setitem__(u, v)))
     await asyncio.sleep(4.0)   # kurz sammeln, damit die States eintrudeln
 
+    op = structure.get("operatingModes") or {}
+    print("\n=== operatingModes (fuer Wecker-Wiederholung / modes) ===")
+    print(" ", json.dumps(op, ensure_ascii=False))
+
     controls = structure["controls"]
     clocks = [(u, c) for u, c in controls.items() if c.get("type") == "AlarmClock"]
     print(f"\n=== {len(clocks)} AlarmClock-Control(s) von {len(controls)} gesamt ===")

@@ -326,6 +326,9 @@ class App:
             key=lambda c: self.cats[c].get("name", ""))
         self.bell_map = {}
         self.alarm_map = {}
+        # Betriebsarten (id -> Name) fuer die Wecker-Wiederholung: die `modes`
+        # eines Eintrags verweisen hierauf (z.B. Wochentage Mo-So).
+        self.op_modes = {str(k): v for k, v in (st.get("operatingModes") or {}).items()}
         self.playerid_by_action = {}
         for _u, _c in self.controls.items():
             if _c.get("type") == "Intercom":
@@ -1035,14 +1038,38 @@ class App:
             except (TypeError, ValueError):
                 secs = 0
             hm = "%02d:%02d" % ((secs // 3600) % 24, (secs % 3600) // 60)
-            daily = bool(e.get("daily"))
-            modes = e.get("modes")
-            repeat = "Täglich" if daily else (
-                ("%d Betriebsarten" % len(modes)) if isinstance(modes, list) and modes else "")
+            repeat = self._alarm_repeat(e)
             out.append({"name": _clean(e.get("name")) or "Weckzeit", "hm": hm,
                         "active": bool(e.get("isActive")), "repeat": repeat})
         out.sort(key=lambda x: (not x["active"], x["hm"]))
         return out
+
+    _WD_ABBR = {"montag": "Mo", "dienstag": "Di", "mittwoch": "Mi", "donnerstag": "Do",
+                "freitag": "Fr", "samstag": "Sa", "sonntag": "So"}
+
+    def _alarm_repeat(self, e: dict) -> str:
+        """Wiederholungs-Text eines Weckzeit-Eintrags. `daily` -> „Täglich"; sonst
+        die `modes` (Betriebsart-IDs) ueber die globalen operatingModes zu Namen
+        aufloesen — Wochentage werden auf Mo/Di/… gekuerzt. Fallback, wenn keine
+        Namen ermittelbar: Anzahl der Betriebsarten."""
+        if e.get("daily"):
+            return "Täglich"
+        modes = e.get("modes")
+        if not isinstance(modes, list) or not modes:
+            return ""
+        op = getattr(self, "op_modes", {})
+        names = []
+        for m in modes:
+            nm = _clean(op.get(str(m)))
+            if not nm:
+                continue
+            names.append(self._WD_ABBR.get(nm.lower(), nm))
+        if not names:
+            return "%d Betriebsarten" % len(modes)
+        # Alle 7 Wochentage -> „Täglich" (kompakter)
+        if len(names) == 7 and all(v in names for v in self._WD_ABBR.values()):
+            return "Täglich"
+        return " ".join(names)
 
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
