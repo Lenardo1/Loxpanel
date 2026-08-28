@@ -28,8 +28,22 @@
   .pitem .pid{color:var(--muted);font-size:12px;font-family:ui-monospace,monospace;}
   .addbtn{margin-top:2px;background:transparent;color:var(--accent);border:1px dashed #3a3f49;border-radius:10px;padding:9px;cursor:pointer;font:inherit;}
   .addbtn:hover{border-color:var(--accent);}
-  .hint{margin-top:auto;color:var(--muted);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px;}
+  .hint{color:var(--muted);font-size:12.5px;padding-top:2px;}
   .hint code{background:var(--panel2);padding:1px 6px;border-radius:6px;font-size:12px;}
+  /* prominente Aktions-Buttons in der Sidebar */
+  .navacts{display:flex;flex-direction:column;gap:9px;margin-top:auto;border-top:1px solid var(--line);padding-top:14px;}
+  .navbtn{display:flex;align-items:center;gap:11px;padding:12px 14px;border-radius:11px;
+    border:1px solid var(--line);background:var(--panel2);color:var(--fg);cursor:pointer;
+    text-decoration:none;transition:border-color .15s,background .15s,transform .05s;}
+  .navbtn:hover{border-color:var(--accent);background:#252a33;}
+  .navbtn:active{transform:translateY(1px);}
+  .navbtn .nbico{flex:none;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;
+    background:rgba(224,162,77,.14);color:var(--accent);font-size:18px;}
+  .navbtn .nbtx{display:flex;flex-direction:column;gap:1px;min-width:0;}
+  .navbtn .nbt{font-weight:600;font-size:14px;color:var(--fg);}
+  .navbtn .nbs{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .navbtn .nbarrow{margin-left:auto;color:var(--muted);font-size:15px;}
+  .navbtn:hover .nbarrow{color:var(--accent);}
   /* Main */
   .main{padding:26px 30px;overflow-y:auto;max-height:100vh;}
   .ehead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px;}
@@ -154,9 +168,17 @@
     <div class="brand">LoxPanel<small>Konfiguration</small></div>
     <div class="plist" id="plist"></div>
     <button class="addbtn" id="addBtn">＋ Neues Panel</button>
-    <div class="hint">Auf jedem Wandpanel die Visu mit <code>?panel=&lt;id&gt;</code> öffnen.
-      <br><br><a href="/settings">⚙ Einstellungen (Miniserver / Intercom)</a>
-      <br><a href="/" target="_blank" id="openVisu">↗ Visu öffnen</a></div>
+    <div class="navacts">
+      <a class="navbtn" href="/settings">
+        <span class="nbico">⚙</span>
+        <span class="nbtx"><span class="nbt">Einstellungen</span><span class="nbs">Miniserver · Intercom</span></span>
+        <span class="nbarrow">›</span></a>
+      <a class="navbtn" href="/" target="_blank" id="openVisu">
+        <span class="nbico">↗</span>
+        <span class="nbtx"><span class="nbt">Visu öffnen</span><span class="nbs">Panel-Ansicht anzeigen</span></span>
+        <span class="nbarrow">›</span></a>
+    </div>
+    <div class="hint">Auf jedem Wandpanel die Visu mit <code>?panel=&lt;id&gt;</code> öffnen.</div>
   </aside>
   <main class="main" id="main"><div class="empty">lädt …</div></main>
 </div>
