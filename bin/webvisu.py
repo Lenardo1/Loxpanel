@@ -66,7 +66,7 @@ def _write_cfg(cfg: dict) -> None:
 LIGHT = LightControllerV2Adapter()
 JAL = JalousieAdapter()
 
-SWITCHY = {"Switch", "TimedSwitch"}
+SWITCHY = {"Switch"}   # TimedSwitch wird eigen behandelt (anderer State)
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
 
 
@@ -1123,6 +1123,24 @@ class App:
             on = bool(self._state(c, "active"))
             it.update(on=on, sublabel="Ein" if on else "Aus", icon="switch",
                       cmd={"uuid": c.get("uuidAction"), "cmd": "off" if on else "on"})
+        elif t == "TimedSwitch":
+            # Treppenhaus-/Zeitschalter: kein 'active'-State, sondern
+            # 'deactivationDelay' (>0 = laeuft noch N Sek, -1 = dauerhaft an,
+            # 0 = aus). 'pulse' startet den Timer, 'off' schaltet aus.
+            dd = self._state(c, "deactivationDelay")
+            try:
+                dd = float(dd if dd is not None else 0)
+            except (TypeError, ValueError):
+                dd = 0.0
+            on = dd != 0
+            if dd > 0:
+                sub = "noch %d:%02d" % (int(dd) // 60, int(dd) % 60)
+            elif dd < 0:
+                sub = "Ein"
+            else:
+                sub = "Aus"
+            it.update(on=on, sublabel=sub, icon="bulb",
+                      cmd={"uuid": c.get("uuidAction"), "cmd": "off" if on else "pulse"})
         elif t == "AudioZone":
             playing = self._state(c, "playState") == 2
             ua = c.get("uuidAction")
