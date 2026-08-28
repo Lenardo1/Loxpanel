@@ -64,10 +64,15 @@ CONF_PATHS = [os.environ.get("LOXPANEL_KIOSK_CONF", ""),
               "/etc/loxpanel/kiosk.conf"]
 
 
+CONF_FILE = ""
+
+
 def load_conf():
+    global CONF_FILE
     cfg = {}
     for p in CONF_PATHS:
         if p and os.path.isfile(p):
+            CONF_FILE = p
             with open(p, encoding="utf-8") as fh:
                 for line in fh:
                     line = line.strip()
@@ -119,9 +124,38 @@ BL_DEVICE = _cfg("BL_DEVICE", "").strip()
 # Announce-Antwort (reloadHours) ueberschreiben (Settings-Seite). Nur waehrend
 # der Kiosk laeuft; ein bewusst gestoppter Kiosk wird NICHT neu gestartet.
 RELOAD_HOURS = _cfg("RELOAD_HOURS", "0").strip()
+# STATE_FILE = persistente Merkdatei fuer die zuletzt (per Settings-Seite/Agent)
+# gewaehlte Panel-ID. Liegt bewusst NICHT im fluechtigen PROFILE_DIR (/tmp),
+# sondern neben der kiosk.conf (bzw. beim Agent-Skript), damit die Wahl einen
+# Reboot ueberlebt. Ueber die conf per STATE_FILE=<pfad> ueberschreibbar.
+STATE_FILE = _cfg("STATE_FILE", "") or os.path.join(
+    os.path.dirname(CONF_FILE) if CONF_FILE else _HERE, "loxpanel-agent-state.json")
+
+
+def _load_panel_state():
+    """Zuletzt gewaehlte Panel-ID aus der State-Datei lesen (leer bei Fehler)."""
+    try:
+        with open(STATE_FILE, encoding="utf-8") as fh:
+            return (json.load(fh) or {}).get("panel", "") or ""
+    except Exception:
+        return ""
+
+
+def _save_panel_state(panel):
+    """Gewaehlte Panel-ID persistieren, damit sie einen Reboot ueberlebt."""
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as fh:
+            json.dump({"panel": panel}, fh)
+    except Exception as e:
+        print("Panel-Wahl speichern fehlgeschlagen:", e)
+
 
 _proc = None
-_cur_panel = _cfg("PANEL", "")
+# Panel-Auswahl mit Prioritaet: Env-Override > gemerkte Laufzeit-Wahl (State-
+# Datei) > kiosk.conf > leer (=Default-Visu). Die gemerkte Wahl entsteht, sobald
+# das Panel per Settings-Seite/Agent auf ein Profil (z.B. "pool") gestellt wird,
+# und ueberlebt so Reboots — statt wieder auf die Default-Visu zurueckzufallen.
+_cur_panel = os.environ.get("LOXPANEL_PANEL") or _load_panel_state() or CFG.get("PANEL", "")
 _lock = threading.Lock()
 
 
@@ -364,8 +398,9 @@ def stop_kiosk():
 
 def start_kiosk(panel=None):
     global _proc, _cur_panel, _last_reload
-    if panel is not None:
+    if panel is not None and panel != _cur_panel:
         _cur_panel = panel
+        _save_panel_state(panel)   # Wahl merken -> ueberlebt Reboot
     stop_kiosk()
     chrome = shutil.which("chromium") or shutil.which("chromium-browser")
     if not chrome:
