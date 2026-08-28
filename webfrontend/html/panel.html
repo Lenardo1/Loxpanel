@@ -292,6 +292,39 @@ let sldDragging=false;
 function esc(s){return (s==null?'':String(s)).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
 function key(r){return JSON.stringify(r||{});}
 
+// ---- Weckton (Loxone-Wecker klingelt) ----
+// Synthetischer Piep-Loop per Web Audio API: kein Audio-Asset noetig, laeuft bis
+// der Server das Ende meldet ({t:'alarm',on:false}, nach 'dismiss' in Loxone/App
+// oder ueber den "Wecker aus"-Button am Panel). Der Kiosk startet Chromium mit
+// --autoplay-policy=no-user-gesture-required, darum spielt der Ton ohne vorherige
+// Nutzergeste. Zusaetzlich ein Failsafe, der nach 5 Min stoppt, falls das
+// Aus-Event mal ausbleibt (sonst piepte das Panel endlos).
+let _actx=null, _alarmTimer=null, _alarmFailsafe=null;
+function startAlarmTone(){
+  if(_alarmTimer) return;               // laeuft schon
+  try{
+    _actx = _actx || new (window.AudioContext||window.webkitAudioContext)();
+    if(_actx.state==='suspended') _actx.resume();
+    const beep=()=>{
+      const t=_actx.currentTime, o=_actx.createOscillator(), g=_actx.createGain();
+      o.type='square'; o.frequency.value=880;
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(0.35,t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.4);
+      o.connect(g); g.connect(_actx.destination);
+      o.start(t); o.stop(t+0.45);
+    };
+    beep();
+    _alarmTimer=setInterval(beep,700);
+    clearTimeout(_alarmFailsafe);
+    _alarmFailsafe=setTimeout(stopAlarmTone,5*60*1000);
+  }catch(e){}
+}
+function stopAlarmTone(){
+  if(_alarmTimer){ clearInterval(_alarmTimer); _alarmTimer=null; }
+  clearTimeout(_alarmFailsafe); _alarmFailsafe=null;
+}
+
 function send(o){ ws && ws.readyState===1 && ws.send(JSON.stringify(o)); }
 function nav(route){ stack.push(route); send({t:'nav',route}); }
 function goTab(tab){ stack=[{view:'tab',tab}]; send({t:'nav',route:stack[0]}); }
@@ -582,6 +615,7 @@ function connect(){
       if(msg.tabMeta) tabMeta=msg.tabMeta;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
+    if(msg.t==='alarm'){ if(msg.on){ startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }

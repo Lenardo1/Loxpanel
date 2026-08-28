@@ -24,6 +24,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import ssl as _ssl
@@ -298,6 +299,11 @@ class App:
         self.bell_map: dict[str, str] = {}
         self._bell_prev: dict[str, object] = {}
         self._pending_ring: str | None = None
+        # Wecker (AlarmClock): isAlarmActive-State-UUID -> Control-UUID. Flanke
+        # 0->1/1->0 wird als {"t":"alarm",...} ans Panel gepusht (Weckton an/aus).
+        self.alarm_map: dict[str, str] = {}
+        self._alarm_prev: dict[str, object] = {}
+        self._pending_alarm: list[dict] = []
         self.agents: dict[str, dict] = {}   # ip -> Panel-Agent (Fernstart)
         self.bg_tasks: set = set()          # laufende Hintergrund-Tasks (z.B. Favs anfordern)
 
@@ -319,20 +325,25 @@ class App:
             {c.get("cat") for c in self.controls.values() if c.get("cat") in self.cats},
             key=lambda c: self.cats[c].get("name", ""))
         self.bell_map = {}
+        self.alarm_map = {}
         self.playerid_by_action = {}
         for _u, _c in self.controls.items():
             if _c.get("type") == "Intercom":
                 _bu = (_c.get("states") or {}).get("bell")
                 if _bu:
                     self.bell_map[_bu] = _u
+            elif _c.get("type") == "AlarmClock":
+                _au = (_c.get("states") or {}).get("isAlarmActive")
+                if _au:
+                    self.alarm_map[_au] = _u
             elif _c.get("type") == "AudioZone":
                 _pid = (_c.get("details") or {}).get("playerid")
                 _ua = _c.get("uuidAction")
                 if _ua and _pid is not None:
                     self.playerid_by_action[_ua] = int(_pid)
-        log.info("Struktur: %d Controls, %d Räume, %d Kategorien, %d Intercom-Klingeln, %d AudioZones",
+        log.info("Struktur: %d Controls, %d Räume, %d Kategorien, %d Intercom-Klingeln, %d Wecker, %d AudioZones",
                  len(self.controls), len(self.rooms_with), len(self.cats_with),
-                 len(self.bell_map), len(self.playerid_by_action))
+                 len(self.bell_map), len(self.alarm_map), len(self.playerid_by_action))
 
     async def start(self) -> None:
         try:
@@ -970,6 +981,31 @@ class App:
                  if u in self.controls and self.controls[u].get("room") in self.rooms}
         return len(rooms) > 1
 
+    def _alarm_next_text(self, c: dict) -> str:
+        """Naechste Weckzeit eines Weckers (AlarmClock) als Text. Loxone liefert
+        `nextEntryTime` in Sekunden seit dem 1.1.2009 (lokale Wanduhr); 0/leer =
+        kein aktiver Eintrag. Ausgabe z.B. 'Heute 06:30', 'Morgen 06:30',
+        'Mo 06:30' oder '24.12. 06:30'."""
+        v = self._state(c, "nextEntryTime")
+        try:
+            ts = int(float(v))
+        except (TypeError, ValueError):
+            return ""
+        if ts <= 0:
+            return ""
+        # Wert als Wanduhr behandeln (TZ-neutral): 2009-Basis + Sekunden.
+        dt = datetime(2009, 1, 1) + timedelta(seconds=ts)
+        today = datetime.now().date()
+        d = (dt.date() - today).days
+        hm = dt.strftime("%H:%M")
+        if d == 0:
+            return "Heute " + hm
+        if d == 1:
+            return "Morgen " + hm
+        if 2 <= d <= 6:
+            return ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"][dt.weekday()] + " " + hm
+        return dt.strftime("%d.%m.") + " " + hm
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
         c = self.controls.get(uuid)
@@ -1084,6 +1120,15 @@ class App:
             it.update(icon="alarm", on=armed, tone=("crit" if lvl else None),
                       nav={"view": "control", "id": uuid},
                       sublabel=("Alarm!" if lvl else ("Scharf" if armed else "Unscharf")))
+        elif t == "AlarmClock":
+            ringing = bool(self._state(c, "isAlarmActive"))
+            enabled = self._state(c, "isEnabled")
+            enabled = True if enabled is None else bool(enabled)
+            nxt = self._alarm_next_text(c)
+            it.update(icon="alarm", on=ringing, tone=("crit" if ringing else None),
+                      nav={"view": "control", "id": uuid},
+                      sublabel=("Weckt!" if ringing else
+                                (nxt if (enabled and nxt) else ("Kein Wecker" if enabled else "Aus"))))
         elif t == "AcControl":
             modes = self._json_list_map(c, "operatingModes")
             tt = self._fmt_num(self._state(c, "targetTemperature"), "%.1f")
@@ -1599,6 +1644,28 @@ class App:
                 {"k": "status", "text": sub},
                 {"k": "row", "cells": cells},
             ]}
+        if t == "AlarmClock":
+            ua = c.get("uuidAction")
+            ringing = bool(self._state(c, "isAlarmActive"))
+            enabled = self._state(c, "isEnabled")
+            enabled = True if enabled is None else bool(enabled)
+            nxt = self._alarm_next_text(c)
+            # Read-only: keine Eintrags-Bearbeitung am Panel. Klingelt der Wecker,
+            # gibt es genau EINEN Button, der den laufenden Alarm quittiert
+            # (Loxone 'dismiss' -> isAlarmActive 0 -> Weckton stoppt).
+            blocks = [{"k": "hero", "icon": "alarm"}]
+            if ringing:
+                blocks.append({"k": "big", "text": "Weckzeit!", "tone": "crit"})
+                blocks.append({"k": "status", "text": "Wecker klingelt"})
+                blocks.append({"k": "row", "cells": [
+                    {"label": "Wecker aus", "cmd": {"uuid": ua, "cmd": "dismiss"}}]})
+            else:
+                blocks.append({"k": "big", "text": (nxt or "Kein Wecker")})
+                blocks.append({"k": "status",
+                               "text": ("Nächste Weckzeit" if nxt else
+                                        ("Wecker aktiv" if enabled else "Wecker aus"))})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
         if t == "AcControl":
             ua = c.get("uuidAction")
             # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-
@@ -1787,6 +1854,13 @@ class App:
             if value and not self._bell_prev.get(uuid):
                 self._pending_ring = self.bell_map[uuid]
             self._bell_prev[uuid] = value
+        if uuid in self.alarm_map:
+            now = bool(value)
+            if now != bool(self._alarm_prev.get(uuid)):
+                # Beide Flanken pushen: 0->1 startet den Weckton, 1->0 (z.B. in
+                # Loxone/App oder am Panel quittiert) stoppt ihn wieder.
+                self._pending_alarm.append({"id": self.alarm_map[uuid], "on": now})
+            self._alarm_prev[uuid] = value
 
     async def stream_task(self) -> None:
         # Dauer-Loop: Erstverbindung + Reconnect zum Miniserver. Bricht NIEMALS
@@ -1826,6 +1900,14 @@ class App:
                 for ws in list(self.conn_route):
                     try:
                         await ws.send_json({"t": "ring", "id": rid})
+                    except ConnectionError:
+                        self.conn_route.pop(ws, None)
+            while self._pending_alarm:
+                ev = self._pending_alarm.pop(0)
+                log.info("Wecker %s → %s", "an" if ev["on"] else "aus", ev["id"])
+                for ws in list(self.conn_route):
+                    try:
+                        await ws.send_json({"t": "alarm", "id": ev["id"], "on": ev["on"]})
                     except ConnectionError:
                         self.conn_route.pop(ws, None)
             if self._dirty and self.conn_route:
