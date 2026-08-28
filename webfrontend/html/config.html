@@ -433,7 +433,7 @@ function renderEditor(){
   renderTileList(); renderTileEditor();
   const tsr=$('#tileSearch'); if(tsr) tsr.oninput=()=>renderTileList();
   $('#clrRooms').onclick=()=>{ p.rooms=[]; renderChecklist(p,'rooms'); renderTileList(); markDirty(); };
-  $('#clrCats').onclick=()=>{ p.cats=[]; renderChecklist(p,'cats'); markDirty(); };
+  $('#clrCats').onclick=()=>{ p.cats=[]; renderChecklist(p,'cats'); renderTileList(); markDirty(); };
   $('#saveBtn').onclick=save;
   const del=$('#delBtn'); if(del) del.onclick=()=>{ if(confirm('Panel „'+cur+'" löschen?')){ delete PANELS[cur]; cur='default'; renderList(); renderEditor(); markDirty(); } };
 }
@@ -489,7 +489,7 @@ function renderChecklist(p,kind){
     d.className='opt'+(on?' on':'');
     d.innerHTML='<span class="box">'+(on?'✓':'')+'</span><span class="nm">'+esc(o.name)+'</span>';
     d.onclick=()=>{ const i=p[kind].indexOf(o.uuid); if(i>-1)p[kind].splice(i,1); else p[kind].push(o.uuid);
-      renderChecklist(p,kind); markDirty(); };
+      renderChecklist(p,kind); renderTileList(); markDirty(); };
     box.appendChild(d);
   });
   const cnt=$('#'+(kind==='rooms'?'cntRooms':'cntCats'));
@@ -523,15 +523,17 @@ async function save(){
 
 // ---- Kachel-Editor ----
 function panelControls(p){
-  const rs=p.rooms||[];
-  return (META.controls||[]).filter(c=> rs.length ? rs.includes(c.room) : true);
+  const rs=p.rooms||[], cs=p.cats||[];
+  return (META.controls||[]).filter(c=>
+    (rs.length ? rs.includes(c.room) : true) &&
+    (cs.length ? cs.includes(c.cat) : true));
 }
 function renderTileList(){
   const box=$('#tiles'); if(!box) return;
   const p=PANELS[cur]; const q=(($('#tileSearch')||{}).value||'').toLowerCase();
   const list=panelControls(p).filter(c=>c.name.toLowerCase().includes(q)||(c.roomName||'').toLowerCase().includes(q));
   box.innerHTML='';
-  if(!list.length){ box.innerHTML='<div class="muted">'+((p.rooms&&p.rooms.length)?'keine Kacheln in den gewählten Räumen':'nichts gefunden')+'</div>'; return; }
+  if(!list.length){ box.innerHTML='<div class="muted">'+(((p.rooms&&p.rooms.length)||(p.cats&&p.cats.length))?'keine Kacheln im gewählten Raum-/Kategorie-Filter':'nichts gefunden')+'</div>'; return; }
   list.slice(0,400).forEach(c=>{
     const has=p.tiles&&p.tiles[c.uuid];
     const hidden=p.hide&&p.hide.includes(c.uuid);

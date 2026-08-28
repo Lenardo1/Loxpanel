@@ -1880,6 +1880,7 @@ async def api_meta(request: web.Request) -> web.Response:
             "uuid": u, "name": _clean(c.get("name")), "type": c.get("type"),
             "room": room,
             "roomName": _clean((app.rooms.get(room) or {}).get("name", "")) if room else "",
+            "cat": c.get("cat"),
             "iconUrl": app._control_icon_url(c),
         })
     return web.json_response({
