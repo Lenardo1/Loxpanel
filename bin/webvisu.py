@@ -1190,10 +1190,21 @@ class App:
             it.update(icon="info", on=bool(self._state(c, "value")),
                       nav={"view": "control", "id": uuid},
                       sublabel=self._daytimer_value(c) + (" · Timer läuft" if ov else ""))
-        elif t == "Dimmer":
+        elif t in ("Dimmer", "EIBDimmer"):
             pos = self._state(c, "position") or 0
             it.update(icon="bulb", on=pos > 0, nav={"view": "control", "id": uuid},
                       sublabel=(f"{round(pos)} %" if pos > 0 else "Aus"))
+        elif t in ("ValueSelector", "UpDownAnalog"):
+            det = c.get("details") or {}
+            it.update(icon="switch", nav={"view": "control", "id": uuid},
+                      sublabel=self._fmt_num(self._state(c, "value"), det.get("format") or "%.1f"))
+        elif t == "TextInput":
+            it.update(icon="info", nav={"view": "control", "id": uuid},
+                      sublabel=str(self._state(c, "text") or ""))
+        elif t == "Fronius":
+            prod = self._state(c, "prodCurr")
+            it.update(icon="central", nav={"view": "control", "id": uuid},
+                      sublabel=(self._fmt_num(prod, "%.2fkW") if prod is not None else "PV-Anlage"))
         elif t == "Webpage":
             det = c.get("details") or {}
             host = re.sub(r"^https?://", "", det.get("url") or "").split("/")[0]
@@ -1847,7 +1858,7 @@ class App:
                 ]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "anchor": "bottom", "blocks": blocks}
-        if t == "Dimmer":
+        if t in ("Dimmer", "EIBDimmer"):
             ua = c.get("uuidAction")
             pos = self._state(c, "position") or 0
             mn = self._state(c, "min"); mx = self._state(c, "max"); stp = self._state(c, "step")
@@ -1863,6 +1874,42 @@ class App:
                 {"k": "row", "cells": [
                     {"label": "Aus", "cmd": {"uuid": ua, "cmd": "off"}},
                     {"label": "Ein", "cmd": {"uuid": ua, "cmd": "on"}}]},
+            ]}
+        if t == "ValueSelector":
+            ua = c.get("uuidAction")
+            det = c.get("details") or {}
+            val = self._state(c, "value") or 0
+            mn = self._state(c, "min"); mx = self._state(c, "max"); stp = self._state(c, "step")
+            mn = 0 if mn is None else mn
+            mx = 100 if mx is None else mx
+            stp = stp if isinstance(stp, (int, float)) and stp else 1
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
+                {"k": "hero", "icon": "switch"},
+                {"k": "big", "text": self._fmt_num(val, det.get("format") or "%.1f")},
+                {"k": "slider", "icon": "vol", "value": val, "min": mn,
+                 "max": mx, "step": stp, "cmd": {"uuid": ua, "tmpl": "{v}"}},
+            ]}
+        if t == "UpDownAnalog":
+            det = c.get("details") or {}
+            return self._big_view(uuid, "switch",
+                                  self._fmt_num(self._state(c, "value"), det.get("format", "%.1f")) or "–")
+        if t == "TextInput":
+            return self._big_view(uuid, "info", str(self._state(c, "text") or "–"))
+        if t == "Fronius":
+            prod = self._state(c, "prodCurr")
+            rows = []
+            for nm, lbl, unit in (("consCurr", "Verbrauch", "%.2fkW"),
+                                  ("prodCurrDay", "Heute erzeugt", "%.1fkWh"),
+                                  ("deliveryDay", "Heute eingespeist", "%.1fkWh")):
+                v = self._state(c, nm)
+                if v is not None:
+                    rows.append({"k": "status", "text": f"{lbl}: {self._fmt_num(v, unit)}"})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": [
+                {"k": "hero", "icon": "central"},
+                {"k": "big", "text": (self._fmt_num(prod, "%.2fkW") if prod is not None else "–")},
+                {"k": "status", "text": "Aktuelle Erzeugung"},
+                *rows,
             ]}
         if t == "Webpage":
             det = c.get("details") or {}
