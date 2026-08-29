@@ -1205,6 +1205,11 @@ class App:
             prod = self._state(c, "prodCurr")
             it.update(icon="central", nav={"view": "control", "id": uuid},
                       sublabel=(self._fmt_num(prod, "%.2fkW") if prod is not None else "PV-Anlage"))
+        elif t == "Window":
+            pct = round((self._state(c, "position") or 0) * 100)
+            it.update(icon="blind", on=pct > 0, nav={"view": "control", "id": uuid},
+                      sublabel=("Offen" if pct >= 100 else
+                                ("Geschlossen" if pct <= 0 else f"{pct}% offen")))
         elif t == "Webpage":
             det = c.get("details") or {}
             host = re.sub(r"^https?://", "", det.get("url") or "").split("/")[0]
@@ -1330,7 +1335,7 @@ class App:
             elif t == "CentralAudioZone":
                 n = sum(1 for mu in muuids if self._state(self.controls[mu], "playState") == 2)
                 it["sublabel"] = f"Spielt in {n} Räumen" if n else "Aus"
-            elif t == "CentralGate":
+            elif t in ("CentralGate", "CentralWindow"):
                 n = sum(1 for mu in muuids if (self._state(self.controls[mu], "position") or 0) > 0)
                 it["sublabel"] = f"{n} offen" if n else "Alle geschlossen"
             elif t == "CentralJalousie":
@@ -1889,6 +1894,19 @@ class App:
                 {"k": "big", "text": self._fmt_num(val, det.get("format") or "%.1f")},
                 {"k": "slider", "icon": "vol", "value": val, "min": mn,
                  "max": mx, "step": stp, "cmd": {"uuid": ua, "tmpl": "{v}"}},
+            ]}
+        if t == "Window":
+            ua = c.get("uuidAction")
+            pct = round((self._state(c, "position") or 0) * 100)
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
+                {"k": "hero", "icon": "blind"},
+                {"k": "big", "text": f"{pct}%"},
+                {"k": "slider", "icon": "blind", "value": pct, "min": 0, "max": 100, "step": 1,
+                 "cmd": {"uuid": ua, "tmpl": "moveToPosition/{v}"}},
+                {"k": "row", "cells": [
+                    {"label": "Zu", "cmd": {"uuid": ua, "cmd": "fullclose"}},
+                    {"label": "Auf", "cmd": {"uuid": ua, "cmd": "fullopen"}}]},
             ]}
         if t == "UpDownAnalog":
             det = c.get("details") or {}
