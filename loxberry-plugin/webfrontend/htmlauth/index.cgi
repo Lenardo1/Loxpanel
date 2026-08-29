@@ -78,11 +78,7 @@ LoxBerry::Web::lbheader("LoxPanel V$version", "https://github.com/Lenardo1/Loxpa
 print <<"HTML";
 <div class="panel panel-default">
   <div class="panel-heading"><b>Status:</b> $stat</div>
-  <div class="panel-body">
-    $msg
-    <a class="btn btn-primary" href="http://$lbhost:8099/config" target="_blank">Panels &amp; Kacheln &ouml;ffnen</a>
-    <a class="btn btn-default" href="http://$lbhost:8099/settings" target="_blank">Einstellungen &ouml;ffnen</a>
-  </div>
+  <div class="panel-body">$msg</div>
 </div>
 
 <div class="panel panel-default">
@@ -115,6 +111,9 @@ print <<"HTML";
         <div class="col-sm-offset-3 col-sm-6"><button class="btn btn-primary" type="submit">Verbinden &amp; Speichern</button></div>
       </div>
     </form>
+    <hr>
+    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/config" target="_blank" style="margin-right:10px">Panels &amp; Kacheln &ouml;ffnen</a>
+    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/settings" target="_blank">Panel Einstellungen</a>
   </div>
 </div>
 
