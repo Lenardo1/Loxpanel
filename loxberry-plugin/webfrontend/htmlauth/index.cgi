@@ -87,6 +87,16 @@ my $au_checked = (-f $auoff) ? "" : "checked";   # Standard: an (Datei fehlt)
 LoxBerry::Web::lbheader("LoxPanel V$version", "https://github.com/Lenardo1/Loxpanel", "");
 
 print <<"HTML";
+<style>
+  .lpbtn{display:inline-block;padding:11px 20px;border-radius:6px;text-decoration:none;
+    font-weight:600;font-size:14px;border:none;cursor:pointer;text-align:center;box-sizing:border-box;line-height:1.4}
+  .lpgreen{background:#5cb85c;color:#fff}        .lpgreen:hover{background:#4cae4c;color:#fff}
+  .lpblue{background:#337ab7;color:#fff}         .lpblue:hover{background:#2e6da4;color:#fff}
+  .lpgrey{background:#f2f2f2;color:#333;border:1px solid #ccc}  .lpgrey:hover{background:#e6e6e6;color:#333}
+  .lprow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .lprow .lpbtn,.lprow form{flex:1;min-width:170px}
+  .lprow form{margin:0}  .lprow form .lpbtn{width:100%}
+</style>
 <div class="panel panel-default">
   <div class="panel-heading"><b>Status:</b> $stat</div>
   <div class="panel-body">$msg</div>
@@ -119,12 +129,14 @@ print <<"HTML";
         </label></div></div>
       </div>
       <div class="form-group">
-        <div class="col-sm-offset-3 col-sm-6"><button class="btn btn-primary" type="submit">Verbinden &amp; Speichern</button></div>
+        <div class="col-sm-offset-3 col-sm-6"><button class="lpbtn lpblue" type="submit">Verbinden &amp; Speichern</button></div>
       </div>
     </form>
     <hr>
-    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/config" target="_blank" style="margin-right:10px">Panels &amp; Kacheln &ouml;ffnen</a>
-    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/settings" target="_blank">Settings &ouml;ffnen</a>
+    <div class="lprow">
+      <a class="lpbtn lpgreen" href="http://$lbhost:8099/config" target="_blank">Panels &amp; Kacheln &ouml;ffnen</a>
+      <a class="lpbtn lpgreen" href="http://$lbhost:8099/settings" target="_blank">Settings &ouml;ffnen</a>
+    </div>
   </div>
 </div>
 
@@ -138,9 +150,11 @@ print <<"HTML";
         <b>Automatische Updates</b> &ndash; hält die LoxPanel-App t&auml;glich aktuell (empfohlen)
       </label></div>
     </form>
-    <form method="post" style="display:inline"><input type="hidden" name="action" value="restart"><button class="btn btn-default" type="submit">Jetzt updaten / Neu starten</button></form>
-    <form method="post" style="display:inline"><input type="hidden" name="action" value="start"><button class="btn btn-default" type="submit">Starten</button></form>
-    <form method="post" style="display:inline"><input type="hidden" name="action" value="stop"><button class="btn btn-default" type="submit">Stoppen</button></form>
+    <div class="lprow">
+      <form method="post"><input type="hidden" name="action" value="restart"><button class="lpbtn lpgrey" type="submit">Jetzt updaten / Neu starten</button></form>
+      <form method="post"><input type="hidden" name="action" value="start"><button class="lpbtn lpgrey" type="submit">Starten</button></form>
+      <form method="post"><input type="hidden" name="action" value="stop"><button class="lpbtn lpgrey" type="submit">Stoppen</button></form>
+    </div>
   </div>
 </div>
 HTML
