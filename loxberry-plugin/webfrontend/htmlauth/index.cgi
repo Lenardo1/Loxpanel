@@ -53,7 +53,7 @@ elsif ($action eq 'autoupdate') {
         unlink $auoff;
         $msg = "<div class='alert alert-success'>Automatische Updates aktiviert (t&auml;glicher Pull).</div>";
     } else {
-        open(my $fh, '>', $auoff) and close($fh);
+        if (open(my $fh, '>', $auoff)) { close $fh; }
         $msg = "<div class='alert alert-success'>Automatische Updates deaktiviert.</div>";
     }
 }
