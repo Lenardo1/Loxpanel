@@ -17,6 +17,7 @@ my $cgi     = CGI->new;
 my $version = LoxBerry::System::pluginversion() // "";
 my $api     = "http://localhost:8099";
 my $ctl     = "REPLACELBPBINDIR/loxpanel-ctl.sh";
+my $auoff   = "REPLACELBPDATADIR/autoupdate_off";   # Datei existiert = Auto-Update AUS
 my $lbhost  = LoxBerry::System::get_localip() // "localhost";
 
 sub h { my $s = shift; $s = "" unless defined $s; $s =~ s/&/&amp;/g; $s =~ s/</&lt;/g; $s =~ s/>/&gt;/g; $s =~ s/"/&quot;/g; return $s; }
@@ -47,6 +48,15 @@ if ($action eq 'miniserver') {
         $msg = "<div class='alert alert-danger'>Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)</div>";
     }
 }
+elsif ($action eq 'autoupdate') {
+    if ($cgi->param('enabled')) {
+        unlink $auoff;
+        $msg = "<div class='alert alert-success'>Automatische Updates aktiviert (t&auml;glicher Pull).</div>";
+    } else {
+        open(my $fh, '>', $auoff) and close($fh);
+        $msg = "<div class='alert alert-success'>Automatische Updates deaktiviert.</div>";
+    }
+}
 elsif ($action =~ /^(start|stop|restart)$/) {
     system($ctl, $1);
     $msg = "<div class='alert alert-success'>Aktion &bdquo;$1&ldquo; ausgef&uuml;hrt.</div>";
@@ -71,6 +81,7 @@ my $stat = !$running ? "<span style='color:#a94442'>Container l&auml;uft nicht</
 
 my ($hh, $hu, $hp) = (h($mhost), h($muser), h($mport));
 my $passph = $haspass ? "unver&auml;ndert lassen" : "Passwort eingeben";
+my $au_checked = (-f $auoff) ? "" : "checked";   # Standard: an (Datei fehlt)
 
 # ---- Ausgabe im LoxBerry-Rahmen ----
 LoxBerry::Web::lbheader("LoxPanel V$version", "https://github.com/Lenardo1/Loxpanel", "");
@@ -118,9 +129,16 @@ print <<"HTML";
 </div>
 
 <div class="panel panel-default">
-  <div class="panel-heading">Container</div>
+  <div class="panel-heading">Container &amp; Updates</div>
   <div class="panel-body">
-    <form method="post" style="display:inline"><input type="hidden" name="action" value="restart"><button class="btn btn-default" type="submit">Neu starten / Update</button></form>
+    <form method="post" id="auform" style="margin-bottom:12px">
+      <input type="hidden" name="action" value="autoupdate">
+      <div class="checkbox"><label>
+        <input type="checkbox" name="enabled" $au_checked onchange="document.getElementById('auform').submit()">
+        <b>Automatische Updates</b> &ndash; hält die LoxPanel-App t&auml;glich aktuell (empfohlen)
+      </label></div>
+    </form>
+    <form method="post" style="display:inline"><input type="hidden" name="action" value="restart"><button class="btn btn-default" type="submit">Jetzt updaten / Neu starten</button></form>
     <form method="post" style="display:inline"><input type="hidden" name="action" value="start"><button class="btn btn-default" type="submit">Starten</button></form>
     <form method="post" style="display:inline"><input type="hidden" name="action" value="stop"><button class="btn btn-default" type="submit">Stoppen</button></form>
   </div>
