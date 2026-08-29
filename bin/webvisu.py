@@ -1093,6 +1093,27 @@ class App:
             return self._fmt_num(val, det.get("format") or "%.1f")
         return "Ein"
 
+    @staticmethod
+    def _color_parse(raw) -> tuple:
+        """Loxone color-State parsen. RGB: 'hsv(h,s,v)' (h 0-360, s/v 0-100) ->
+        ('rgb', h, s, v). Tunable White: 'temp(brightness,kelvin)' ->
+        ('temp', brightness, kelvin, None). Sonst ('none', 0, 0, 0)."""
+        s = str(raw or "")
+        m = re.match(r"hsv\((\d+),(\d+),(\d+)\)", s, re.I)
+        if m:
+            return ("rgb", int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        m = re.match(r"temp\((\d+),(\d+)\)", s, re.I)
+        if m:
+            return ("temp", int(m.group(1)), int(m.group(2)), None)
+        return ("none", 0, 0, 0)
+
+    @staticmethod
+    def _hsv_hex(h, s, v) -> str:
+        """HSV (h 0-360, s/v 0-100) -> #rrggbb fuer die Farb-Vorschau."""
+        import colorsys
+        r, g, b = colorsys.hsv_to_rgb((h % 360) / 360.0, s / 100.0, v / 100.0)
+        return "#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255))
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
         c = self.controls.get(uuid)
@@ -1184,6 +1205,14 @@ class App:
         elif t == "UpDownDigital":
             # Auf/Ab-Taster (keine States) -> Detailseite mit Auf/Ab/Stop.
             it.update(icon="blind", nav={"view": "control", "id": uuid}, sublabel="Auf / Ab")
+        elif t in ("Colorpicker", "ColorPickerV2"):
+            mode, a, b, v = self._color_parse(self._state(c, "color"))
+            bright = a if mode == "temp" else v
+            on = bright > 0
+            it.update(icon="bulb", on=on, nav={"view": "control", "id": uuid},
+                      sublabel=(f"{bright} %" if on else "Aus"))
+            if mode == "rgb" and on:
+                it["colorFixed"] = self._hsv_hex(a, b, v)   # Icon in aktueller Farbe
         elif t == "AudioZone":
             playing = self._state(c, "playState") == 2
             ua = c.get("uuidAction")
@@ -1856,6 +1885,41 @@ class App:
                     {"icon": "down", "hold": True, "cmd": {"uuid": ua, "cmd": "DownOn"},
                      "release": {"uuid": ua, "cmd": "DownOff"}}]},
             ]}
+        if t in ("Colorpicker", "ColorPickerV2"):
+            ua = c.get("uuidAction")
+            mode, a, b, v = self._color_parse(self._state(c, "color"))
+            if mode == "temp":
+                bright, kelvin = a, b
+                bset = bright or 100
+                blocks = [
+                    {"k": "hero", "icon": "bulb"},
+                    {"k": "big", "text": f"{bright} %"},
+                    {"k": "slider", "icon": "bulb", "value": bright, "min": 0, "max": 100,
+                     "step": 1, "cmd": {"uuid": ua, "tmpl": "temp({v}," + str(kelvin or 4000) + ")"}},
+                    {"k": "row", "wrap": True, "cells": [
+                        {"label": nm, "cmd": {"uuid": ua, "cmd": f"temp({bset},{k})"}}
+                        for nm, k in (("Warm", 2700), ("Neutral", 4000), ("Kalt", 6500))]},
+                    {"k": "row", "cells": [
+                        {"label": "Aus", "cmd": {"uuid": ua, "cmd": f"temp(0,{kelvin or 4000})"}}]},
+                ]
+            else:   # rgb (auch wenn noch kein Wert: als RGB behandeln)
+                hue, sat, val = a, (b or 100), v
+                bset = val or 100
+                blocks = [
+                    {"k": "hero", "icon": "bulb"},
+                    {"k": "big", "text": f"{val} %"},
+                    {"k": "slider", "icon": "bulb", "value": val, "min": 0, "max": 100,
+                     "step": 1, "cmd": {"uuid": ua, "tmpl": f"hsv({hue},{sat}," + "{v})"}},
+                    {"k": "row", "wrap": True, "cells": [
+                        {"label": nm, "cmd": {"uuid": ua, "cmd": f"hsv({h},{s},{bset})"}}
+                        for nm, h, s in (("Rot", 0, 100), ("Gelb", 55, 100), ("Grün", 120, 100),
+                                         ("Türkis", 180, 100), ("Blau", 225, 100),
+                                         ("Violett", 285, 100), ("Weiß", 0, 0))]},
+                    {"k": "row", "cells": [
+                        {"label": "Aus", "cmd": {"uuid": ua, "cmd": f"hsv({hue},{sat},0)"}}]},
+                ]
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
         if t == "AcControl":
             ua = c.get("uuidAction")
             # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-
