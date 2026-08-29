@@ -185,7 +185,16 @@ def _config() -> dict:
             "port": int(env.get("LOXPANEL_MS_PORT", "443")),
             "verify_tls": env.get("LOXPANEL_MS_VERIFY_TLS", "false").lower() in ("1", "true", "yes"),
         }
-    return json.loads((base / "loxpanel.cfg.example").read_text(encoding="utf-8")).get("miniserver", {})
+    # Beispiel-Config nur nutzen, wenn vorhanden. Beim LoxBerry-Plugin verdeckt
+    # das (leere) Daten-Volume die Image-Beispieldatei -> darf NICHT crashen.
+    # Ohne jede Config startet der Server trotzdem (Zugang via /settings).
+    ex = base / "loxpanel.cfg.example"
+    if ex.is_file():
+        try:
+            return json.loads(ex.read_text(encoding="utf-8")).get("miniserver", {})
+        except ValueError:
+            pass
+    return {}
 
 
 def _audio_config() -> dict:
@@ -201,7 +210,7 @@ def _audio_config() -> dict:
         f = base / "loxpanel.cfg.example"
     try:
         cfg = json.loads(f.read_text(encoding="utf-8")).get("audio", {})
-    except ValueError:
+    except (ValueError, OSError):
         return {}
     return cfg if isinstance(cfg, dict) else {}
 
@@ -213,7 +222,7 @@ def _intercom_config() -> dict:
         f = base / "loxpanel.cfg.example"
     try:
         cfg = json.loads(f.read_text(encoding="utf-8")).get("intercom", {})
-    except ValueError:
+    except (ValueError, OSError):
         return {}
     for k, v in cfg.items():
         if isinstance(v, dict) and isinstance(v.get("url"), str):
@@ -269,8 +278,10 @@ def load_panels() -> dict:
 
 class App:
     def __init__(self, ms: dict, audio: dict | None = None):
-        self.host, self.port = ms["host"], ms.get("port", 443)
-        self.user, self.password = ms["user"], ms["pass"]
+        # ms kann leer sein (noch kein Miniserver konfiguriert) -> Server startet
+        # trotzdem, /settings bleibt bedienbar; verbunden wird erst mit host.
+        self.host, self.port = ms.get("host", ""), ms.get("port", 443)
+        self.user, self.password = ms.get("user", ""), ms.get("pass", "")
         self.verify_tls = ms.get("verify_tls", False)
 
         self.audio_cfg = audio or {}
@@ -2232,6 +2243,11 @@ class App:
         # oder das Passwort falsch ist (dann bleibt /settings bedienbar).
         while True:
             try:
+                if not self.host:
+                    # Noch kein Miniserver konfiguriert -> auf /settings warten
+                    # (kein Verbindungsversuch, kein Log-Spam).
+                    await asyncio.sleep(5)
+                    continue
                 if self.client is None:
                     await self.start()          # Erstverbindung / nach hartem Reset
                 elif self.ws is None:
