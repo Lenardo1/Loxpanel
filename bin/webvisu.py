@@ -1788,12 +1788,19 @@ class App:
             if iu:
                 hero["iconUrl"] = iu
             blocks = [hero, {"k": "astat", "text": self._daytimer_value(c), "sub": sub}]
-            # Read-only-Anzeige. Laeuft ein manueller Timer (override), kann er hier
-            # beendet werden (Loxone 'stopOverride'). Das Starten mit Wert/Dauer
-            # (startOverride/{value}/{sek}) folgt in einem eigenen Schritt.
+            # Laeuft ein manueller Timer (override), kann er beendet werden
+            # (stopOverride). Sonst 4 feste Dauern zum Starten: startOverride/
+            # {value}/{sekunden} — value=1 (einschalten) fuer die gewaehlte Zeit.
             if ov:
                 blocks.append({"k": "row", "cells": [
                     {"label": "Timer beenden", "cmd": {"uuid": ua, "cmd": "stopOverride"}}]})
+            else:
+                blocks.append({"k": "row", "wrap": True, "cells": [
+                    {"label": "15 min", "cmd": {"uuid": ua, "cmd": "startOverride/1/900"}},
+                    {"label": "30 min", "cmd": {"uuid": ua, "cmd": "startOverride/1/1800"}},
+                    {"label": "60 min", "cmd": {"uuid": ua, "cmd": "startOverride/1/3600"}},
+                    {"label": "90 min", "cmd": {"uuid": ua, "cmd": "startOverride/1/5400"}},
+                ]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "anchor": "bottom", "blocks": blocks}
         if t == "AcControl":
