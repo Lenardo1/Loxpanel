@@ -1173,6 +1173,17 @@ class App:
             pos = self._state(c, "position") or 0
             it.update(icon="bulb", on=pos > 0, nav={"view": "control", "id": uuid},
                       sublabel=(f"{round(pos)} %" if pos > 0 else "Aus"))
+        elif t == "Webpage":
+            det = c.get("details") or {}
+            host = re.sub(r"^https?://", "", det.get("url") or "").split("/")[0]
+            it.update(icon="info", nav={"view": "control", "id": uuid},
+                      sublabel=(host or "Webseite"))
+            img = det.get("image")
+            if img and not it.get("iconUrl"):
+                it["iconUrl"] = "/icon?p=" + quote(img)
+        elif t == "UpDownDigital":
+            # Auf/Ab-Taster (keine States) -> Detailseite mit Auf/Ab/Stop.
+            it.update(icon="blind", nav={"view": "control", "id": uuid}, sublabel="Auf / Ab")
         elif t == "AudioZone":
             playing = self._state(c, "playState") == 2
             ua = c.get("uuidAction")
@@ -1823,6 +1834,27 @@ class App:
                 {"k": "row", "cells": [
                     {"label": "Aus", "cmd": {"uuid": ua, "cmd": "off"}},
                     {"label": "Ein", "cmd": {"uuid": ua, "cmd": "on"}}]},
+            ]}
+        if t == "Webpage":
+            det = c.get("details") or {}
+            url = (det.get("urlHd") or det.get("url") or "").strip()
+            if url and not re.match(r"^https?://", url):
+                url = "http://" + url
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "blocks": [{"k": "web", "url": url}]}
+        if t == "UpDownDigital":
+            # Auf/Ab-Taster ohne States: gedrueckt halten = fahren (UpOn), loslassen
+            # = stoppen (UpOff). Push&hold ist die sichere Taster-Semantik.
+            ua = c.get("uuidAction")
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
+                {"k": "hero", "icon": "blind"},
+                {"k": "status", "text": "Zum Fahren gedrückt halten"},
+                {"k": "row", "cells": [
+                    {"icon": "up", "hold": True, "cmd": {"uuid": ua, "cmd": "UpOn"},
+                     "release": {"uuid": ua, "cmd": "UpOff"}},
+                    {"icon": "down", "hold": True, "cmd": {"uuid": ua, "cmd": "DownOn"},
+                     "release": {"uuid": ua, "cmd": "DownOff"}}]},
             ]}
         if t == "AcControl":
             ua = c.get("uuidAction")

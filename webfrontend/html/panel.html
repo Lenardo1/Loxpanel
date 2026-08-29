@@ -161,6 +161,8 @@
   .cover .coverph svg{width:44px;height:44px;}
   .cover img{position:relative;object-fit:cover;opacity:0;transition:opacity .2s;
     box-shadow:0 8px 24px rgba(0,0,0,.45);}
+  .webframe{width:100%;height:74vh;border-radius:12px;overflow:hidden;background:#000;}
+  .webframe iframe{width:100%;height:100%;border:0;display:block;}
   .video{width:100%;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;
     display:grid;place-items:center;}
   .video img{width:100%;height:100%;object-fit:contain;}
@@ -483,6 +485,7 @@ function renderPanel(blocks){
       return '<div class="hero"><div class="circle">'+hic+'</div></div>'; }
     if(b.k==='cover') return '<div class="cover"><div class="coverph">'+svg(ICONS.music)+'</div><img id="coverimg" alt=""></div>';
     if(b.k==='video') return '<div class="video"><img alt=""></div>';
+    if(b.k==='web') return '<div class="webframe"><iframe src="'+esc(b.url||'')+'" referrerpolicy="no-referrer"></iframe></div>';
     if(b.k==='status') return '<div class="status">'+esc(b.text||'')+'</div>';
     if(b.k==='title') return '<div class="ptitle">'+esc(b.text||'')+'<div class="psub">'+esc(b.sub||'')+'</div></div>';
     if(b.k==='value') return '<div class="pbar">'+esc(b.text||'')+'</div>';
