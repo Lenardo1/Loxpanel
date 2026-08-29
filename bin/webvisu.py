@@ -1210,6 +1210,10 @@ class App:
             it.update(icon="blind", on=pct > 0, nav={"view": "control", "id": uuid},
                       sublabel=("Offen" if pct >= 100 else
                                 ("Geschlossen" if pct <= 0 else f"{pct}% offen")))
+        elif t == "Ventilation":
+            spd = self._state(c, "speed") or 0
+            it.update(icon="fan", on=spd > 0, nav={"view": "control", "id": uuid},
+                      sublabel=(f"{round(spd)} %" if spd > 0 else "Aus"))
         elif t == "Webpage":
             det = c.get("details") or {}
             host = re.sub(r"^https?://", "", det.get("url") or "").split("/")[0]
@@ -1908,6 +1912,10 @@ class App:
                     {"label": "Zu", "cmd": {"uuid": ua, "cmd": "fullclose"}},
                     {"label": "Auf", "cmd": {"uuid": ua, "cmd": "fullopen"}}]},
             ]}
+        if t == "Ventilation":
+            spd = self._state(c, "speed") or 0
+            return self._big_view(uuid, "fan", (f"{round(spd)} %" if spd else "Aus"),
+                                  sub="Lüftung")
         if t == "UpDownAnalog":
             det = c.get("details") or {}
             return self._big_view(uuid, "switch",
