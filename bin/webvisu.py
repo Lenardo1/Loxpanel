@@ -1169,6 +1169,10 @@ class App:
             it.update(icon="info", on=bool(self._state(c, "value")),
                       nav={"view": "control", "id": uuid},
                       sublabel=self._daytimer_value(c) + (" · Timer läuft" if ov else ""))
+        elif t == "Dimmer":
+            pos = self._state(c, "position") or 0
+            it.update(icon="bulb", on=pos > 0, nav={"view": "control", "id": uuid},
+                      sublabel=(f"{round(pos)} %" if pos > 0 else "Aus"))
         elif t == "AudioZone":
             playing = self._state(c, "playState") == 2
             ua = c.get("uuidAction")
@@ -1803,6 +1807,23 @@ class App:
                 ]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "anchor": "bottom", "blocks": blocks}
+        if t == "Dimmer":
+            ua = c.get("uuidAction")
+            pos = self._state(c, "position") or 0
+            mn = self._state(c, "min"); mx = self._state(c, "max"); stp = self._state(c, "step")
+            mn = 0 if mn is None else mn
+            mx = 100 if mx is None else mx
+            stp = stp if isinstance(stp, (int, float)) and stp else 1
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": [
+                {"k": "hero", "icon": "bulb"},
+                {"k": "big", "text": f"{round(pos)} %"},
+                {"k": "slider", "icon": "bulb", "value": round(pos), "min": round(mn),
+                 "max": round(mx), "step": stp, "cmd": {"uuid": ua, "tmpl": "{v}"}},
+                {"k": "row", "cells": [
+                    {"label": "Aus", "cmd": {"uuid": ua, "cmd": "off"}},
+                    {"label": "Ein", "cmd": {"uuid": ua, "cmd": "on"}}]},
+            ]}
         if t == "AcControl":
             ua = c.get("uuidAction")
             # An die IRR-Detailseite angeglichen: grosse Ist-Temp oben, Status-
