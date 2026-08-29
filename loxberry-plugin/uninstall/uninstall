@@ -1,0 +1,10 @@
+#!/bin/bash
+# Wird beim Deinstallieren ausgefuehrt: Container stoppen/entfernen + Image loeschen.
+echo "<INFO> Stoppe LoxPanel-Container..."
+docker rm -f loxpanel > /dev/null 2>&1
+
+echo "<INFO> Entferne LoxPanel-Image..."
+docker image rm ghcr.io/lenardo1/loxpanel:latest > /dev/null 2>&1
+
+echo "<OK> LoxPanel entfernt. (Panel-Daten im Plugin-data-Ordner werden von LoxBerry mitentfernt.)"
+exit 0

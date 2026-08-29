@@ -1,0 +1,4 @@
+#!/bin/bash
+# Alle 5 Minuten: LoxPanel neu starten, falls der Container unerwartet weg ist
+# (Absturz, OOM). Ein bewusst gestopptes Panel bleibt aus.
+REPLACELBPBINDIR/loxpanel-ctl.sh check > /dev/null 2>&1

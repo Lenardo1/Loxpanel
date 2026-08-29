@@ -1,0 +1,39 @@
+name: Plugin Release
+
+# Baut das LoxBerry-Plugin-ZIP (Inhalt von loxberry-plugin/ im ZIP-Root) und
+# haengt es an das GitHub-Release. release.cfg -> ARCHIVEURL zeigt auf
+# .../releases/latest/download/loxpanel-plugin.zip.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  zip:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Plugin-ZIP bauen
+        run: |
+          cd loxberry-plugin
+          zip -r ../loxpanel-plugin.zip . -x '*.DS_Store' '*/.gitkeep'
+          cd ..
+          unzip -l loxpanel-plugin.zip | head -30
+
+      - name: An Release anhaengen
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: loxpanel-plugin.zip
+
+      - name: Als Artefakt hochladen (bei manuellem Lauf)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: loxpanel-plugin
+          path: loxpanel-plugin.zip

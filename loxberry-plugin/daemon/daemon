@@ -1,0 +1,6 @@
+#!/bin/bash
+# Wird beim Boot von LoxBerry ausgefuehrt -> startet LoxPanel (sofern Docker
+# verfuegbar und das Panel nicht bewusst gestoppt wurde).
+if which docker > /dev/null 2>&1; then
+	su -s /bin/bash loxberry -c "REPLACELBPBINDIR/loxpanel-ctl.sh check"
+fi
