@@ -113,7 +113,7 @@ print <<"HTML";
     </form>
     <hr>
     <a class="btn btn-success btn-lg" href="http://$lbhost:8099/config" target="_blank" style="margin-right:10px">Panels &amp; Kacheln &ouml;ffnen</a>
-    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/settings" target="_blank">Panel Einstellungen</a>
+    <a class="btn btn-success btn-lg" href="http://$lbhost:8099/settings" target="_blank">Settings &ouml;ffnen</a>
   </div>
 </div>
 
