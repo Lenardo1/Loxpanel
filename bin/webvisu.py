@@ -1071,6 +1071,28 @@ class App:
             return "Täglich"
         return " ".join(names)
 
+    def _daytimer_mode(self, c: dict) -> str:
+        """Aktiver Modus/Tag eines Daytimers als Name. `mode` (Zahl) wird ueber
+        `modeList` aufgeloest, Format: '0:mode=0;name=\"Feiertag\",1:mode=3;
+        name=\"Montag\",...' (Anfuehrungszeichen escaped)."""
+        raw = str(self._state(c, "modeList") or "").replace('\\"', '"')
+        modes = {int(m): n for m, n in re.findall(r'mode=(\d+);name="([^"]*)"', raw)}
+        try:
+            return modes.get(int(float(self._state(c, "mode"))), "")
+        except (TypeError, ValueError):
+            return ""
+
+    def _daytimer_value(self, c: dict) -> str:
+        """Aktueller Wert eines Daytimers als Text: 0/leer -> „Aus"; analog ->
+        formatiert (details.format); digital -> „Ein"."""
+        val = self._state(c, "value")
+        if not val:
+            return "Aus"
+        det = c.get("details") or {}
+        if det.get("analog"):
+            return self._fmt_num(val, det.get("format") or "%.1f")
+        return "Ein"
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
         c = self.controls.get(uuid)
@@ -1141,6 +1163,12 @@ class App:
                 sub = "Aus"
             it.update(on=on, sublabel=sub, icon="bulb",
                       cmd={"uuid": c.get("uuidAction"), "cmd": "off" if on else "pulse"})
+        elif t == "Daytimer":
+            # Wochenschaltuhr: aktueller Wert + ob ein manueller Timer (override) laeuft.
+            ov = bool(self._state(c, "override"))
+            it.update(icon="info", on=bool(self._state(c, "value")),
+                      nav={"view": "control", "id": uuid},
+                      sublabel=self._daytimer_value(c) + (" · Timer läuft" if ov else ""))
         elif t == "AudioZone":
             playing = self._state(c, "playState") == 2
             ua = c.get("uuidAction")
@@ -1748,6 +1776,24 @@ class App:
             if ringing:
                 blocks.append({"k": "row", "cells": [
                     {"label": "Wecker aus", "cmd": {"uuid": ua, "cmd": "dismiss"}}]})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                    "anchor": "bottom", "blocks": blocks}
+        if t == "Daytimer":
+            ua = c.get("uuidAction")
+            ov = bool(self._state(c, "override"))
+            mode = self._daytimer_mode(c)
+            sub = ("Timer läuft · " + mode) if (ov and mode) else ("Timer läuft" if ov else mode)
+            hero = {"k": "hero", "icon": "info"}
+            iu = self._control_icon_url(c)
+            if iu:
+                hero["iconUrl"] = iu
+            blocks = [hero, {"k": "astat", "text": self._daytimer_value(c), "sub": sub}]
+            # Read-only-Anzeige. Laeuft ein manueller Timer (override), kann er hier
+            # beendet werden (Loxone 'stopOverride'). Das Starten mit Wert/Dauer
+            # (startOverride/{value}/{sek}) folgt in einem eigenen Schritt.
+            if ov:
+                blocks.append({"k": "row", "cells": [
+                    {"label": "Timer beenden", "cmd": {"uuid": ua, "cmd": "stopOverride"}}]})
             return {"t": "view", "title": _clean(c.get("name")), "route": route,
                     "anchor": "bottom", "blocks": blocks}
         if t == "AcControl":
