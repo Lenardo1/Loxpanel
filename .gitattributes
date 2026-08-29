@@ -5,6 +5,13 @@
 *.service   text eol=lf
 *.cfg       text eol=lf
 Dockerfile  text eol=lf
+*.cgi       text eol=lf
+# LoxBerry-Plugin-Skripte ohne Dateiendung (muessen auf Linux LF haben)
+loxberry-plugin/daemon/daemon        text eol=lf
+loxberry-plugin/cron/cron.05min      text eol=lf
+loxberry-plugin/uninstall/uninstall  text eol=lf
+loxberry-plugin/dpkg/apt             text eol=lf
+loxberry-plugin/sudoers/sudoers      text eol=lf
 # Bilder binaer
 *.png binary
 *.jpg binary
