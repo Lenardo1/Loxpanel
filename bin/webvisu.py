@@ -1244,6 +1244,19 @@ class App:
                            "cmd": {"uuid": ua, "cmd": "pause" if playing else "play"}},
                           {"icon": "next", "cmd": {"uuid": ua, "cmd": "queueplus"}},
                       ])
+        elif t == "AudioZoneV2":
+            # Audioserver Gen 2: wird ueber den Miniserver gesteuert (play/pause/
+            # prev/next/volume) — nicht ueber das Gen-1-Audio-Backend (kein playerid).
+            playing = self._state(c, "playState") == 2
+            ua = c.get("uuidAction")
+            it.update(on=playing, sublabel=(self._song(c) or ("Spielt" if playing else "Aus")),
+                      icon="music", nav={"view": "control", "id": uuid},
+                      controls=[
+                          {"icon": "prev", "cmd": {"uuid": ua, "cmd": "prev"}},
+                          {"icon": "pause" if playing else "play",
+                           "cmd": {"uuid": ua, "cmd": "pause" if playing else "play"}},
+                          {"icon": "next", "cmd": {"uuid": ua, "cmd": "next"}},
+                      ])
         elif t == "Pushbutton":
             it.update(icon="switch", sublabel="Taster",
                       cmd={"uuid": c.get("uuidAction"), "cmd": "pulse"})
@@ -1655,6 +1668,30 @@ class App:
             # Quellen (Radio/Playlist/Spotify) immer auf Unterseite erreichbar
             # (Favoriten werden dort per prime_favs frisch angefordert).
             blocks.append({"k": "more", "route": {"view": "sources", "id": uuid}})
+            return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+        if t == "AudioZoneV2":
+            ua = c.get("uuidAction")
+            playing = self._state(c, "playState") == 2
+            title = self._song(c) or ("Spielt" if playing else "Aus")
+            sub = self._text(c, "artist") or self._text(c, "album")
+            vol = int(self._state(c, "volume") or 0)
+            cover = self._state(c, "cover")
+            blocks = []
+            if cover:
+                blocks.append({"k": "cover", "src": "/cover?u=" + quote(str(cover), safe="")})
+            else:
+                blocks.append({"k": "hero", "icon": "music"})
+            blocks += [
+                {"k": "title", "text": title, "sub": sub},
+                {"k": "row", "cells": [
+                    {"icon": "prev", "cmd": {"uuid": ua, "cmd": "prev"}},
+                    {"icon": "pause" if playing else "play", "big": True,
+                     "cmd": {"uuid": ua, "cmd": "pause" if playing else "play"}},
+                    {"icon": "next", "cmd": {"uuid": ua, "cmd": "next"}},
+                ]},
+                {"k": "slider", "icon": "vol", "value": vol, "min": 0, "max": 100,
+                 "cmd": {"uuid": ua, "tmpl": "volume/{v}"}},
+            ]
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "Gate":
             ua = c.get("uuidAction")
