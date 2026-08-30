@@ -266,46 +266,48 @@ def _read_dpms_off():
     return off if "DPMS is Enabled" in out else 0
 
 
-def _find_backlight():
-    """Pfad zur brightness-Datei des Panel-Backlights (oder None). Bevorzugt das
-    Device namens 'backlight', sonst das erste unter /sys/class/backlight."""
+def _find_backlights():
+    """Alle brightness-Dateien unter /sys/class/backlight (Liste, leer wenn
+    keins). Manche Panels (z.B. PX30) haben MEHRERE Devices — 'backlight' UND
+    'backlight1' — die gemeinsam die LED speisen: schalten wir nur eines ab,
+    bleibt das Panel hell und wird warm. Darum ALLE steuern. BL_DEVICE (falls
+    gesetzt) beschraenkt bewusst auf ein einzelnes."""
     base = "/sys/class/backlight"
     if BL_DEVICE:
-        cand = [BL_DEVICE]
+        names = [BL_DEVICE]
     else:
         try:
             names = sorted(os.listdir(base))
         except OSError:
-            return None
-        cand = (["backlight"] if "backlight" in names else []) + \
-               [n for n in names if n != "backlight"]
-    for name in cand:
+            return []
+    paths = []
+    for name in names:
         p = os.path.join(base, name, "brightness")
         if os.path.exists(p):
-            return p
-    return None
+            paths.append(p)
+    return paths
 
 
-_BL_PATH = _find_backlight()
-_bl_on_value = None     # zuletzt bekannte "helle" Helligkeit
-_bl_off = False         # True = wir haben das Backlight abgeschaltet
+_BL_PATHS = _find_backlights()
+_bl_on_values = {}      # pro Device der zuletzt bekannte "helle" Wert
+_bl_off = False         # True = wir haben die Backlights abgeschaltet
 
 
-def _bl_read():
+def _bl_read(path):
     try:
-        with open(_BL_PATH, encoding="ascii") as fh:
+        with open(path, encoding="ascii") as fh:
             return int(fh.read().strip())
     except Exception:
         return None
 
 
-def _bl_write(val):
+def _bl_write(path, val):
     try:
-        with open(_BL_PATH, "w", encoding="ascii") as fh:
+        with open(path, "w", encoding="ascii") as fh:
             fh.write(str(int(val)))
         return True
     except Exception as e:
-        print("Backlight schreiben fehlgeschlagen:", e)
+        print("Backlight schreiben fehlgeschlagen (%s):" % path, e)
         return False
 
 
@@ -329,30 +331,36 @@ def _monitor_on():
 
 
 def backlight_loop():
-    """Koppelt die Hintergrundbeleuchtung an den X-DPMS-Status: schaltet X das
-    Bild nach Inaktivitaet ab (Monitor Off), ziehen wir das Backlight per sysfs
-    auf 0 nach (Panel wirklich aus, kein Aufheizen); beim Aufwachen zurueck auf
-    den letzten hellen Wert. Eine externe Helligkeitsaenderung (waehrend Monitor
-    On) wird als neuer Normalwert uebernommen."""
-    global _bl_on_value, _bl_off
-    _bl_on_value = _bl_read() or 255
+    """Koppelt ALLE Hintergrundbeleuchtungs-Devices an den X-DPMS-Status:
+    schaltet X das Bild nach Inaktivitaet ab (Monitor Off), ziehen wir jedes
+    Backlight per sysfs auf 0 nach (Panel wirklich aus, kein Aufheizen); beim
+    Aufwachen zurueck auf den letzten hellen Wert je Device. Eine externe
+    Helligkeitsaenderung (waehrend Monitor On) wird als neuer Normalwert
+    uebernommen."""
+    global _bl_off
+    for p in _BL_PATHS:
+        v = _bl_read(p)
+        _bl_on_values[p] = v if (v and v > 0) else 255
     while True:
         try:
             on = _monitor_on()
             if on is True:
                 if _bl_off:
-                    _bl_write(_bl_on_value)
+                    for p in _BL_PATHS:
+                        _bl_write(p, _bl_on_values.get(p, 255))
                     _bl_off = False
                 else:
-                    cur = _bl_read()
-                    if cur and cur > 0:
-                        _bl_on_value = cur
+                    for p in _BL_PATHS:
+                        cur = _bl_read(p)
+                        if cur and cur > 0:
+                            _bl_on_values[p] = cur
             elif on is False:
                 if not _bl_off:
-                    cur = _bl_read()
-                    if cur and cur > 0:
-                        _bl_on_value = cur
-                    _bl_write(0)
+                    for p in _BL_PATHS:
+                        cur = _bl_read(p)
+                        if cur and cur > 0:
+                            _bl_on_values[p] = cur
+                        _bl_write(p, 0)
                     _bl_off = True
         except Exception:
             pass
@@ -515,9 +523,9 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if _BL_PATH:
+    if _BL_PATHS:
         threading.Thread(target=backlight_loop, daemon=True).start()
-        print("Backlight-Steuerung aktiv:", _BL_PATH)
+        print("Backlight-Steuerung aktiv:", ", ".join(_BL_PATHS))
     else:
         print("Kein Backlight-Device gefunden — nur X-DPMS (Bildsignal) aktiv")
     if AUTOSTART and (os.environ.get("DISPLAY") or os.path.exists("/tmp/.X11-unix/X0")):
@@ -561,6 +569,22 @@ if ! command -v xset >/dev/null; then
   sudo apt-get install -y x11-xserver-utils 2>/dev/null \
     || echo "   WARN: x11-xserver-utils nicht installiert -> Display-Abschaltung inaktiv"
 fi
+
+echo "==> Backlight-Schreibrechte (echte Display-Abschaltung ohne sudo)"
+# Der Agent zieht bei Inaktivitaet ALLE /sys/class/backlight/*/brightness auf 0
+# (sonst bleibt eine zweite LED-Schiene wie 'backlight1' an -> Panel wird warm).
+# Dafuer braucht der Login-Benutzer Schreibrecht darauf: Gruppe 'video' + eine
+# udev-Regel, die ALLE Backlight-Devices fuer die Gruppe schreibbar macht.
+sudo usermod -aG video "$(id -un)" 2>/dev/null || true
+sudo tee /etc/udev/rules.d/90-loxpanel-backlight.rules >/dev/null <<'UDEV'
+# LoxPanel: brightness aller Backlight-Devices fuer Gruppe 'video' schreibbar.
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+UDEV
+sudo udevadm control --reload 2>/dev/null || true
+sudo udevadm trigger -s backlight 2>/dev/null || true
+# Sofort auch auf bereits vorhandene Devices anwenden (kein Reboot noetig):
+sudo chgrp video /sys/class/backlight/*/brightness 2>/dev/null || true
+sudo chmod g+w /sys/class/backlight/*/brightness 2>/dev/null || true
 
 echo "==> Chromium-Policies (kein Sign-in / Sync / Promo)"
 for pol in /etc/chromium/policies/managed /etc/chromium-browser/policies/managed; do
