@@ -17,12 +17,14 @@ my $cgi     = CGI->new;
 my $version = LoxBerry::System::pluginversion() // "";
 my $api     = "http://localhost:8099";
 my $ctl     = "REPLACELBPBINDIR/loxpanel-ctl.sh";
+my $log     = "REPLACELBPDATADIR/last_action.log";   # Verlauf der letzten Container-Aktion
 my $lbhost  = LoxBerry::System::get_localip() // "localhost";
 
 sub h { my $s = shift; $s = "" unless defined $s; $s =~ s/&/&amp;/g; $s =~ s/</&lt;/g; $s =~ s/>/&gt;/g; $s =~ s/"/&quot;/g; return $s; }
 
 # ---- POST verarbeiten (vor jeder Ausgabe) ----
 my $msg = "";
+my $refresh = 0;   # nach einer Aktion die Seite per GET nachladen (Live-Verlauf)
 my $action = $cgi->param('action') // '';
 
 if ($action eq 'miniserver') {
@@ -48,8 +50,21 @@ if ($action eq 'miniserver') {
     }
 }
 elsif ($action =~ /^(start|stop|restart)$/) {
-    system($ctl, $1);
-    $msg = "<div class='alert alert-success'>Aktion &bdquo;$1&ldquo; ausgef&uuml;hrt.</div>";
+    my $act = $1;   # durch Regex auf start|stop|restart begrenzt -> shell-sicher
+    # Nicht-blockierend im Hintergrund starten: 'docker compose pull/up' kann bei
+    # restart 1-2 Min dauern -> synchron liefe die CGI in den Apache-Timeout
+    # (Fehler 500, "man sieht nichts"). Die gesamte Ausgabe geht in $log, das
+    # unten live angezeigt wird. Alle drei Standard-Fds werden umgeleitet, damit
+    # Apache die Anfrage sofort abschliessen kann.
+    my $sh = "{ date '+[%d.%m %H:%M:%S] Aktion \"$act\" gestartet'; "
+           . "'$ctl' $act; "
+           . "date '+[%d.%m %H:%M:%S] \"$act\" abgeschlossen'; } "
+           . "> '$log' 2>&1 < /dev/null &";
+    system("/bin/bash", "-c", $sh);
+    $msg = "<div class='alert alert-info'>Aktion &bdquo;$act&ldquo; l&auml;uft &hellip; "
+         . "bei einem Update wird das Image geladen (kann 1&ndash;2&nbsp;Min dauern). "
+         . "Der Verlauf erscheint unten unter &bdquo;Letzte Aktion&ldquo; und aktualisiert sich automatisch.</div>";
+    $refresh = 1;
 }
 
 # ---- Status vom Container holen ----
@@ -71,6 +86,38 @@ my $stat = !$running ? "<span style='color:#a94442'>Container l&auml;uft nicht</
 
 my ($hh, $hu, $hp) = (h($mhost), h($muser), h($mport));
 my $passph = $haspass ? "unver&auml;ndert lassen" : "Passwort eingeben";
+
+# ---- Verlauf der letzten Aktion (Tail) ----
+my ($logtail, $busy) = ("", 0);
+if (open(my $lf, '<', $log)) {
+    my @lines = <$lf>;
+    close $lf;
+    # "busy", solange die Abschluss-Zeile noch fehlt -> Seite pollt dann weiter.
+    my $last = @lines ? $lines[-1] : '';
+    $busy = ($last !~ /abgeschlossen/) ? 1 : 0;
+    @lines = splice(@lines, -25) if @lines > 25;
+    $logtail = h(join('', @lines));
+}
+# Waehrend eine Aktion laeuft (frisch angestossen ODER Log noch offen) die Seite
+# per GET nachladen (kein erneutes POST -> keine Doppel-Aktion).
+my $poll = ($refresh || $busy) ? 1 : 0;
+my $refresh_html = $poll
+    ? "<script>setTimeout(function(){location.replace(location.pathname);},4000);</script>"
+    : "";
+
+my $log_html = "";
+if ($logtail ne "") {
+    my $spin = $busy ? " &middot; l&auml;uft&hellip;" : "";
+    $log_html = <<"LOGH";
+<div class="panel panel-default">
+  <div class="panel-heading">Letzte Aktion$spin</div>
+  <div class="panel-body">
+    <pre style="max-height:260px;overflow:auto;background:#1e1e1e;color:#d4d4d4;padding:10px;border-radius:6px;font-size:12px;line-height:1.45;white-space:pre-wrap">$logtail</pre>
+    <a class="lpbtn lpgrey" href="#" onclick="location.replace(location.pathname);return false;">Aktualisieren</a>
+  </div>
+</div>
+LOGH
+}
 
 # ---- Ausgabe im LoxBerry-Rahmen ----
 LoxBerry::Web::lbheader("LoxPanel V$version", "https://github.com/Lenardo1/Loxpanel", "");
@@ -139,6 +186,8 @@ print <<"HTML";
     </div>
   </div>
 </div>
+$log_html
+$refresh_html
 HTML
 
 LoxBerry::Web::lbfooter();
