@@ -1385,8 +1385,13 @@ class App:
             rgb = _hex_rgb(cs.get("on") if it.get("on") else cs.get("off"))
             if rgb:
                 st = it.setdefault("style", {})
-                st.setdefault("bg", "rgba(%s,.16)" % rgb)
-                st.setdefault("border", "rgba(%s,.55)" % rgb)
+                # Deckkraft folgt den Overlay-Reglern (--ov-fill/--ov-bord, Panel-
+                # bzw. Pro-Kachel-Einstellung, inkl. Modus nur-Rahmen/nur-Fuellung)
+                # statt fest .16/.55 -> "Hintergrund/Rahmen transparenter" wirkt
+                # damit auch auf die Kategorie-Ampel-Kacheln. Fallback = altes
+                # Aussehen, wenn kein Overlay konfiguriert ist.
+                st.setdefault("bg", "rgba(%s,var(--ov-fill,.16))" % rgb)
+                st.setdefault("border", "rgba(%s,var(--ov-bord,.55))" % rgb)
         return self._apply_tile_style(it, uuid, prof)
 
     def _apply_tile_style(self, it: dict, uuid: str, prof: dict | None) -> dict:
