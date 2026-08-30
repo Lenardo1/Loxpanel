@@ -1,10 +1,6 @@
 #!/bin/sh
-# Vor einem Update die Nutzerdaten (panels.json, theme.json, loxpanel.cfg im
-# Docker-Volume unter data/) sichern, damit sie ein Update sicher ueberleben.
-# Args: <TEMPFOLDER> <NAME> <FOLDER> <VERSION> <BASEFOLDER>
-ARGV1=$1
-ARGV3=$3
-ARGV5=$5
-mkdir -p "/tmp/${ARGV1}_lpupgrade"
-cp -a "$ARGV5/data/plugins/$ARGV3/." "/tmp/${ARGV1}_lpupgrade/" 2>/dev/null
+# No-op: Die Update-sichere Sicherung der Panel-Konfiguration passiert jetzt in
+# preroot.sh (laeuft als ROOT). Grund: die Config-Dateien im Docker-Volume
+# gehoeren root; ein als loxberry laufendes Skript kann sie nicht zuverlaessig
+# sichern/zurueckspielen. Siehe preroot.sh / postroot.sh.
 exit 0

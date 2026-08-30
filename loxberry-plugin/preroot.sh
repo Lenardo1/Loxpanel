@@ -26,6 +26,19 @@ if [ -f "$CONFIGDIR/docker-compose.yml" ]; then
 fi
 sudo docker rm -f loxpanel > /dev/null 2>&1
 
+# Panel-Konfiguration (panels.json/theme.json/loxpanel.cfg) VOR dem Update
+# sichern – als root, damit die root-eigenen Volume-Dateien lesbar sind.
+# LoxBerry entfernt gleich danach den Datenordner; postroot.sh spielt die
+# Konfiguration nach der Installation wieder zurueck.
+LPBK="/tmp/loxpanel-upgrade-backup"
+CFGDATA="$ARGV5/data/plugins/$ARGV3/config"
+if [ -d "$CFGDATA" ] && [ -n "$(ls -A "$CFGDATA" 2>/dev/null)" ]; then
+	rm -rf "$LPBK"; mkdir -p "$LPBK"
+	if cp -a "$CFGDATA/." "$LPBK/" 2>/dev/null; then
+		echo "<INFO> Panel-Konfiguration gesichert (Update-sicher)."
+	fi
+fi
+
 # Besitzrechte der Daten-/Config-Ordner auf loxberry setzen.
 chown -R loxberry:loxberry "$ARGV5/data/plugins/$ARGV3/" 2>/dev/null
 chown -R loxberry:loxberry "$ARGV5/config/plugins/$ARGV3/" 2>/dev/null

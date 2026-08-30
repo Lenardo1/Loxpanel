@@ -13,43 +13,59 @@
 COMPOSE="REPLACELBPCONFIGDIR/docker-compose.yml"
 STOPPED="REPLACELBPCONFIGDIR/loxpanel_stopped.cfg"
 # Konfig-Daten liegen im gemounteten Volume (panels.json, theme.json,
-# loxpanel.cfg). Backups daneben in data/ -> ueberleben Plugin-Updates, weil
-# pre-/postupgrade.sh das ganze data/-Verzeichnis sichern.
+# loxpanel.cfg) und gehoeren root (der Container schreibt als root). Backup/
+# Restore laufen deshalb als root IM Container (sonst darf der Widget-Benutzer
+# loxberry die root-Dateien nicht ueberschreiben -> "tar: Cannot open: File
+# exists"). Sicherungen liegen in data/backups und ueberleben Plugin-Updates
+# (pre-/postroot.sh sichern die Konfiguration ueber das Update hinweg).
+DATADIR="REPLACELBPDATADIR"
 CONFIGDATA="REPLACELBPDATADIR/config"
 BACKUPDIR="REPLACELBPDATADIR/backups"
 KEEP=20                 # so viele Backups behalten, aeltere werden entfernt
+
+# Image aus der Compose-Datei lesen (Fallback fest).
+_img() {
+	local i
+	i=$(sed -n 's/^[[:space:]]*image:[[:space:]]*//p' "$COMPOSE" | head -1)
+	[ -n "$i" ] && echo "$i" || echo "ghcr.io/lenardo1/loxpanel:latest"
+}
+
+# Einen sh-Befehl als root im Container ausfuehren. $DATADIR wird nach /data
+# gemountet -> config=/data/config, backups=/data/backups.
+_indocker() {
+	sudo docker run --rm -v "$DATADIR":/data "$(_img)" sh -c "$1"
+}
 
 running() {
 	[ -n "$(sudo docker ps --filter 'name=^/loxpanel$' --filter status=running -q 2>/dev/null)" ]
 }
 
 backup() {
-	[ -d "$CONFIGDATA" ] || { echo "Kein Konfig-Verzeichnis gefunden: $CONFIGDATA"; exit 1; }
-	mkdir -p "$BACKUPDIR"
+	mkdir -p "$BACKUPDIR"     # als loxberry -> Verzeichnis bleibt loxberry-eigen (Loeschen moeglich)
 	local ts f
 	ts=$(date +%Y%m%d-%H%M%S)
-	f="$BACKUPDIR/loxpanel-config-$ts.tar.gz"
-	if tar -czf "$f" -C "$CONFIGDATA" . 2>/dev/null; then
-		echo "Backup erstellt: $(basename "$f") ($(du -h "$f" 2>/dev/null | cut -f1))"
+	f="loxpanel-config-$ts.tar.gz"
+	if _indocker "cd /data/config 2>/dev/null && tar -czf /data/backups/$f . 2>/dev/null"; then
+		echo "Backup erstellt: $f ($(du -h "$BACKUPDIR/$f" 2>/dev/null | cut -f1))"
 	else
-		echo "Backup fehlgeschlagen."; exit 1
+		echo "Backup fehlgeschlagen (Konfiguration vorhanden?)."; exit 1
 	fi
 	# aelteste ueber KEEP hinaus loeschen (Sicherungen vor Restore eingeschlossen)
 	ls -1t "$BACKUPDIR"/loxpanel-config-*.tar.gz 2>/dev/null | tail -n +$((KEEP+1)) | xargs -r rm -f
 }
 
 restore() {
-	local bn src ts
+	local bn ts
 	bn=$(basename "$1")     # nur Dateiname, keine Pfad-Tricks
-	src="$BACKUPDIR/$bn"
-	[ -f "$src" ] || { echo "Backup nicht gefunden: $bn"; exit 1; }
-	mkdir -p "$CONFIGDATA"
-	# Ist-Stand vor dem Ueberschreiben sichern (Rueckweg offen halten)
+	[ -f "$BACKUPDIR/$bn" ] || { echo "Backup nicht gefunden: $bn"; exit 1; }
+	mkdir -p "$BACKUPDIR"
 	ts=$(date +%Y%m%d-%H%M%S)
-	tar -czf "$BACKUPDIR/loxpanel-config-$ts-vor-restore.tar.gz" -C "$CONFIGDATA" . 2>/dev/null \
+	# Ist-Stand vor dem Ueberschreiben sichern (Rueckweg offen halten)
+	_indocker "cd /data/config 2>/dev/null && tar -czf /data/backups/loxpanel-config-$ts-vor-restore.tar.gz . 2>/dev/null" \
 		&& echo "Aktuellen Stand gesichert (loxpanel-config-$ts-vor-restore.tar.gz)."
 	echo "Spiele $bn ein..."
-	if tar -xzf "$src" -C "$CONFIGDATA" 2>&1; then
+	# config leeren und Backup als root einspielen (ueberschreibt root-Dateien)
+	if _indocker "mkdir -p /data/config && cd /data/config && rm -rf ./* && tar -xzf /data/backups/$bn -C /data/config"; then
 		echo "Konfiguration wiederhergestellt."
 	else
 		echo "Wiederherstellung fehlgeschlagen."; exit 1

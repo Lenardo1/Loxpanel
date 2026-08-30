@@ -7,6 +7,17 @@ BINDIR="$ARGV5/bin/plugins/$ARGV3"
 
 chmod +x "$BINDIR/loxpanel-ctl.sh" 2>/dev/null
 
+# Vor dem Start die in preroot.sh gesicherte Panel-Konfiguration zurueckspielen
+# (als root -> keine Rechteprobleme). Muss VOR dem Container-Start passieren.
+LPBK="/tmp/loxpanel-upgrade-backup"
+DATADIR="$ARGV5/data/plugins/$ARGV3"
+if [ -d "$LPBK" ] && [ -n "$(ls -A "$LPBK" 2>/dev/null)" ]; then
+	mkdir -p "$DATADIR/config"
+	cp -a "$LPBK/." "$DATADIR/config/" 2>/dev/null
+	rm -rf "$LPBK"
+	echo "<OK> Panel-Konfiguration wiederhergestellt (Update-sicher)."
+fi
+
 # Reste eines alten Containers entfernen (Daten liegen im Volume -> verlustfrei).
 docker rm -f loxpanel > /dev/null 2>&1
 
