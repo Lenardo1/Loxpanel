@@ -37,6 +37,17 @@ sub launch_bg {
     system("/bin/bash", "-c", $sh);
 }
 
+# LoxBerry-Zugangsdaten robust auslesen: bevorzugt die dekodierte *_RAW-Variante,
+# sonst die (moeglicherweise URL-kodierte) Standardvariante selbst dekodieren.
+sub _lox_cred {
+    my ($raw, $enc) = @_;
+    return $raw if defined $raw && $raw ne '';
+    $enc = '' unless defined $enc;
+    $enc =~ s/\+/ /g;
+    $enc =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;
+    return $enc;
+}
+
 # Miniserver-Zugang an den Container weiterreichen und Ergebnis-HTML liefern.
 sub apply_miniserver {
     my ($data) = @_;
@@ -76,9 +87,9 @@ elsif ($action eq 'fromlox') {
     if ($m && ($m->{IPAddress} // '') ne '') {
         $msg = apply_miniserver({
             host       => $m->{IPAddress},
-            user       => ($m->{Admin_RAW} // $m->{Admin} // ''),
-            pass       => ($m->{Pass_RAW}  // $m->{Pass}  // ''),
-            port       => int($m->{Port} || 80),
+            user       => _lox_cred($m->{Admin_RAW}, $m->{Admin}),
+            pass       => _lox_cred($m->{Pass_RAW},  $m->{Pass}),
+            port       => 443,   # LoxPanel verbindet per HTTPS -> 443 (LoxBerry-Port ist oft 80/http)
             verify_tls => JSON::false,
         });
     } else {
@@ -241,9 +252,10 @@ print <<"HTML";
         <div class="lpf" style="flex:2"><label>Host / IP</label><input class="form-control" name="host" value="$hh" placeholder="192.168.1.50"></div>
         <div class="lpf" style="flex:1.4"><label>Benutzer</label><input class="form-control" name="user" value="$hu" autocomplete="off"></div>
         <div class="lpf" style="flex:1.4"><label>Passwort</label><input type="password" class="form-control" name="pass" placeholder="$passph"></div>
-        <div class="lpf" style="flex:.6;min-width:80px"><label>Port</label><input class="form-control" name="port" value="$hp"></div>
+        <div class="lpf" style="flex:.6;min-width:80px"><label>Port (HTTPS)</label><input class="form-control" name="port" value="$hp"></div>
       </div>
-      <div class="checkbox" style="margin:8px 0 12px"><label>
+      <p style="color:#8a6d3b;font-size:12px;margin:7px 0 8px">LoxPanel verbindet per <b>HTTPS</b> &ndash; bitte den HTTPS-Port verwenden (bei Loxone meist <b>443</b>), <b>nicht</b> Port&nbsp;80.</p>
+      <div class="checkbox" style="margin:2px 0 12px"><label>
         <input type="checkbox" name="tls"> Zertifikat pr&uuml;fen (Gen2 selbstsigniert: aus)
       </label></div>
     </form>
