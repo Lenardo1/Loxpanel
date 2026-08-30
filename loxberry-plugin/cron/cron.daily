@@ -1,5 +1,0 @@
-#!/bin/bash
-# Einmal taeglich: neues LoxPanel-App-Image ziehen und uebernehmen (Auto-Update).
-# Wird uebersprungen, wenn das Panel bewusst gestoppt oder Auto-Update in der
-# Plugin-Seite abgewaehlt wurde.
-REPLACELBPBINDIR/loxpanel-ctl.sh update > /dev/null 2>&1
