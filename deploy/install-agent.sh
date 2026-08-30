@@ -120,6 +120,10 @@ PROFILE_DIR = _cfg("PROFILE_DIR", "/tmp/kiosk_profile")
 # automatisch). Braucht Schreibrechte auf .../brightness (udev-Regel + Gruppe
 # video), sonst bleibt nur das reine X-DPMS aktiv.
 BL_DEVICE = _cfg("BL_DEVICE", "").strip()
+# BL_ON = feste Helligkeit im Ein-Zustand (0..max_brightness). Leer = volles
+# max_brightness des Geraets. Wird NICHT aus dem Ist-Wert gelernt, damit ein zu
+# dunkler Boot-Default das Panel nicht dauerhaft dunkel laesst.
+BL_ON = _cfg("BL_ON", "").strip()
 # PAUSE_ON_BLANK = Chromium-Kiosk pausieren (SIGSTOP), solange das Display aus
 # ist (Monitor Off), und beim Aufwachen fortsetzen (SIGCONT). Chromium rendert
 # sonst auch bei dunklem Bildschirm weiter und heizt den SoC -> spart CPU/Waerme.
@@ -317,6 +321,27 @@ def _bl_write(path, val):
         return False
 
 
+def _bl_max(path):
+    try:
+        with open(os.path.join(os.path.dirname(path), "max_brightness"),
+                  encoding="ascii") as fh:
+            return max(1, int(fh.read().strip()))
+    except Exception:
+        return 255
+
+
+def _bl_on_target(path):
+    """Feste Ziel-Helligkeit im Ein-Zustand: BL_ON (auf gueltigen Bereich
+    begrenzt) sonst max_brightness des Devices."""
+    mx = _bl_max(path)
+    if BL_ON:
+        try:
+            return max(1, min(mx, int(BL_ON)))
+        except ValueError:
+            pass
+    return mx
+
+
 def _monitor_on():
     """DPMS-Monitorstatus aus `xset q`: True=an, False=aus/standby/suspend,
     None=unbekannt (xset fehlt oder Fehler)."""
@@ -383,16 +408,21 @@ def _kiosk_resume():
 
 def backlight_loop():
     """Reagiert im Sekundentakt auf den X-DPMS-Status (Monitor On/Off):
-    - zieht ALLE Backlight-Devices auf 0 (Panel wirklich aus, kein Aufheizen)
-      bzw. beim Aufwachen zurueck auf den letzten hellen Wert je Device;
+    - setzt ALLE Backlight-Devices bei Aus auf 0 (Panel wirklich aus) und beim
+      Aufwachen auf die FESTE Ziel-Helligkeit (BL_ON bzw. max_brightness) — der
+      Ist-Wert wird bewusst nicht "gelernt", sonst laesst ein zu dunkler
+      Boot-Default das Panel dauerhaft dunkel;
     - pausiert optional den Chromium-Kiosk waehrend Display-Aus (SIGSTOP) und
-      setzt ihn beim Aufwachen fort (SIGCONT) -> spart CPU/Waerme.
-    Eine externe Helligkeitsaenderung (waehrend Monitor On) wird als neuer
-    Normalwert uebernommen."""
+      setzt ihn beim Aufwachen fort (SIGCONT) -> spart CPU/Waerme."""
     global _bl_off
     for p in _BL_PATHS:
-        v = _bl_read(p)
-        _bl_on_values[p] = v if (v and v > 0) else 255
+        _bl_on_values[p] = _bl_on_target(p)
+    # Beim Start Helligkeit sofort korrekt setzen, wenn der Monitor an ist
+    # (behebt einen zu dunklen Boot-Default direkt).
+    if _monitor_on() is not False:
+        for p in _BL_PATHS:
+            _bl_write(p, _bl_on_values[p])
+        _bl_off = False
     while True:
         try:
             on = _monitor_on()
@@ -400,19 +430,11 @@ def backlight_loop():
                 _kiosk_resume()
                 if _bl_off:
                     for p in _BL_PATHS:
-                        _bl_write(p, _bl_on_values.get(p, 255))
+                        _bl_write(p, _bl_on_values[p])
                     _bl_off = False
-                else:
-                    for p in _BL_PATHS:
-                        cur = _bl_read(p)
-                        if cur and cur > 0:
-                            _bl_on_values[p] = cur
             elif on is False:
                 if not _bl_off:
                     for p in _BL_PATHS:
-                        cur = _bl_read(p)
-                        if cur and cur > 0:
-                            _bl_on_values[p] = cur
                         _bl_write(p, 0)
                     _bl_off = True
                 _kiosk_pause()
