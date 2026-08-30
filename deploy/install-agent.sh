@@ -17,6 +17,7 @@ AUTOSTART="${AUTOSTART:-1}"              # 1 = Kiosk beim Booten; 0 = nur Agent,
 TIMEZONE="${TIMEZONE:-Europe/Vienna}"   # Systemzeitzone (Screensaver-Uhr); leer = unveraendert lassen
 NUDGE_X="${NUDGE_X:-}"                   # horiz. Feinversatz der Visu in px (z.B. -8 = 8px nach links); leer = 0
 DPMS_OFF="${DPMS_OFF:-180}"              # Sek. bis Display abschaltet (Backlight aus); 0 = nie
+BL_ON="${BL_ON:-200}"                    # Helligkeit im Ein-Zustand (0..max_brightness); leer = max
 # ================================================================================
 
 AGENT_DIR="/opt/loxpanel/agent"
@@ -632,6 +633,7 @@ AGENT_PORT=8130
 AUTOSTART=$AUTOSTART
 X=$NUDGE_X
 DPMS_OFF=$DPMS_OFF
+BL_ON=$BL_ON
 PAUSE_ON_BLANK=1
 EOF
 
