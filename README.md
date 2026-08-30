@@ -27,6 +27,10 @@ Browser – ganz ohne Programmierung und ohne die Loxone-App.
 
 ## Screenshots
 
+**Am Gerät** — 4-Zoll-Touchpanel (hier im 3D-gedruckten Tischständer) mit der Favoriten-Ansicht:
+
+![LoxPanel am Gerät](docs/screenshots/panel-stand.jpg)
+
 **Visu am Panel** — PIN-Tür, Intercom-Livebild, Garage/Favoriten, Screensaver-Uhr, Musik (Zentral & Raum-Player):
 
 ![Visu am Panel](docs/screenshots/visu-panel.png)
