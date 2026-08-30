@@ -51,6 +51,7 @@ Start am Panel aus dem X-Autostart:  python3 loxpanel-agent.py &
 import json
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import threading
@@ -119,6 +120,11 @@ PROFILE_DIR = _cfg("PROFILE_DIR", "/tmp/kiosk_profile")
 # automatisch). Braucht Schreibrechte auf .../brightness (udev-Regel + Gruppe
 # video), sonst bleibt nur das reine X-DPMS aktiv.
 BL_DEVICE = _cfg("BL_DEVICE", "").strip()
+# PAUSE_ON_BLANK = Chromium-Kiosk pausieren (SIGSTOP), solange das Display aus
+# ist (Monitor Off), und beim Aufwachen fortsetzen (SIGCONT). Chromium rendert
+# sonst auch bei dunklem Bildschirm weiter und heizt den SoC -> spart CPU/Waerme.
+# 0/false = aus.
+PAUSE_ON_BLANK = _cfg("PAUSE_ON_BLANK", "1").lower() not in ("0", "false", "no", "off")
 # RELOAD_HOURS = Stunden bis zum automatischen Kiosk-Neustart (gegen Einfrieren
 # des Panels/Chromium). 0 = aus. Der Server kann den Wert pro Panel per
 # Announce-Antwort (reloadHours) ueberschreiben (Settings-Seite). Nur waehrend
@@ -330,13 +336,59 @@ def _monitor_on():
     return None
 
 
+_kiosk_paused = False   # True = Chromium ist per SIGSTOP eingefroren
+
+
+def _chromium_pids():
+    try:
+        out = subprocess.run(["pgrep", "-f", "chromium"], capture_output=True,
+                             text=True, timeout=5).stdout
+        return [int(x) for x in out.split()]
+    except Exception:
+        return []
+
+
+def _kiosk_signal(sig):
+    n = 0
+    for pid in _chromium_pids():
+        try:
+            os.kill(pid, sig)
+            n += 1
+        except Exception:
+            pass
+    return n
+
+
+def _kiosk_pause():
+    """Chromium einfrieren (SIGSTOP) -> CPU/Waerme fast auf Leerlauf, solange das
+    Display aus ist. Idempotent."""
+    global _kiosk_paused
+    if not PAUSE_ON_BLANK or _kiosk_paused:
+        return
+    if _kiosk_signal(signal.SIGSTOP):
+        _kiosk_paused = True
+        print("Kiosk pausiert (Display aus)")
+
+
+def _kiosk_resume():
+    """Chromium fortsetzen (SIGCONT). Idempotent; laeuft auch, wenn die Pause
+    inzwischen abgeschaltet wurde."""
+    global _kiosk_paused
+    if not _kiosk_paused:
+        return
+    _kiosk_signal(signal.SIGCONT)
+    _kiosk_paused = False
+    print("Kiosk fortgesetzt (Display an)")
+
+
 def backlight_loop():
-    """Koppelt ALLE Hintergrundbeleuchtungs-Devices an den X-DPMS-Status:
-    schaltet X das Bild nach Inaktivitaet ab (Monitor Off), ziehen wir jedes
-    Backlight per sysfs auf 0 nach (Panel wirklich aus, kein Aufheizen); beim
-    Aufwachen zurueck auf den letzten hellen Wert je Device. Eine externe
-    Helligkeitsaenderung (waehrend Monitor On) wird als neuer Normalwert
-    uebernommen."""
+    """Reagiert im Sekundentakt auf den X-DPMS-Status (Monitor On/Off):
+    - zieht ALLE Backlight-Devices auf 0 (Panel wirklich aus, kein Aufheizen)
+      bzw. beim Aufwachen zurueck auf den letzten hellen Wert je Device;
+    - pausiert optional den Chromium-Kiosk waehrend Display-Aus (SIGSTOP) und
+      setzt ihn beim Aufwachen fort (SIGCONT) -> spart CPU/Waerme.
+    Eine externe Helligkeitsaenderung (waehrend Monitor On) wird als neuer
+    Normalwert uebernommen."""
     global _bl_off
     for p in _BL_PATHS:
         v = _bl_read(p)
@@ -345,6 +397,7 @@ def backlight_loop():
         try:
             on = _monitor_on()
             if on is True:
+                _kiosk_resume()
                 if _bl_off:
                     for p in _BL_PATHS:
                         _bl_write(p, _bl_on_values.get(p, 255))
@@ -362,6 +415,7 @@ def backlight_loop():
                             _bl_on_values[p] = cur
                         _bl_write(p, 0)
                     _bl_off = True
+                _kiosk_pause()
         except Exception:
             pass
         time.sleep(1)
@@ -394,6 +448,7 @@ def _clear_chrome_crash_state():
 
 def stop_kiosk():
     global _proc
+    _kiosk_resume()   # falls eingefroren: erst fortsetzen, sonst greift SIGTERM nicht
     with _lock:
         if _proc and _proc.poll() is None:
             _proc.terminate()
@@ -405,7 +460,7 @@ def stop_kiosk():
 
 
 def start_kiosk(panel=None):
-    global _proc, _cur_panel, _last_reload
+    global _proc, _cur_panel, _last_reload, _kiosk_paused
     if panel is not None and panel != _cur_panel:
         _cur_panel = panel
         _save_panel_state(panel)   # Wahl merken -> ueberlebt Reboot
@@ -428,6 +483,7 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
+    _kiosk_paused = False        # frisch gestarteter Kiosk laeuft (nicht eingefroren)
     _last_reload = time.time()   # Auto-Reload-Timer bei jedem Start zuruecksetzen
     # force: Chromium-(Neu)Start setzt DPMS auf den X-Default (600) zurueck —
     # deshalb hier immer neu erzwingen (kiosk.conf-Default; Server ueberschreibt).
@@ -523,11 +579,14 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
-    if _BL_PATHS:
+    if _BL_PATHS or PAUSE_ON_BLANK:
         threading.Thread(target=backlight_loop, daemon=True).start()
+    if _BL_PATHS:
         print("Backlight-Steuerung aktiv:", ", ".join(_BL_PATHS))
     else:
         print("Kein Backlight-Device gefunden — nur X-DPMS (Bildsignal) aktiv")
+    if PAUSE_ON_BLANK:
+        print("Kiosk-Pause bei Display-Aus: aktiv")
     if AUTOSTART and (os.environ.get("DISPLAY") or os.path.exists("/tmp/.X11-unix/X0")):
         start_kiosk(_cur_panel)
     threading.Thread(target=announce_loop, daemon=True).start()
@@ -551,6 +610,7 @@ AGENT_PORT=8130
 AUTOSTART=$AUTOSTART
 X=$NUDGE_X
 DPMS_OFF=$DPMS_OFF
+PAUSE_ON_BLANK=1
 EOF
 
 if [ -n "$TIMEZONE" ]; then
