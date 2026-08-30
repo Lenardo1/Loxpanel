@@ -39,13 +39,14 @@ def format_uuid(b: bytes) -> str:
 
 class LoxoneWS:
     def __init__(self, host: str, port: int, user: str, jwt: str,
-                 hash_alg: str = "SHA1", verify_tls: bool = False):
+                 hash_alg: str = "SHA1", verify_tls: bool = False, secure: bool = True):
         self.host = host
         self.port = port
         self.user = user
         self.jwt = jwt
         self.hash_alg = (hash_alg or "SHA1").upper()
         self.verify_tls = verify_tls
+        self.secure = secure          # False = Gen1 (ws:// statt wss://)
         self._session: aiohttp.ClientSession | None = None
         self._ws: aiohttp.ClientWebSocketResponse | None = None
 
@@ -58,10 +59,12 @@ class LoxoneWS:
 
     async def connect(self) -> None:
         self._session = aiohttp.ClientSession()
-        url = f"wss://{self.host}:{self.port}/ws/rfc6455"
+        scheme = "wss" if self.secure else "ws"
+        url = f"{scheme}://{self.host}:{self.port}/ws/rfc6455"
         log.info("WS verbinde %s", url)
         self._ws = await self._session.ws_connect(
-            url, ssl=self._ssl(), protocols=["remotecontrol"], max_msg_size=0)
+            url, ssl=(self._ssl() if self.secure else None),
+            protocols=["remotecontrol"], max_msg_size=0)
 
         # 1) getkey -> HMAC(token) -> authwithtoken
         key_hex = await self._cmd_value("jdev/sys/getkey")

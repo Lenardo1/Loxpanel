@@ -36,6 +36,24 @@ from aiohttp import WSMsgType, web
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from loxone_api import LoxoneClient  # noqa: E402
 from loxone_ws import LoxoneWS  # noqa: E402
+
+
+def _ms_https(port) -> bool:
+    """Schema-Wahl fuer den Miniserver: Loxone Gen1 spricht nur HTTP (Port 80),
+    Gen2+ nutzt HTTPS/TLS (443, …). Port 80 -> HTTP/ws, sonst HTTPS/wss."""
+    try:
+        return int(port) != 80
+    except (TypeError, ValueError):
+        return True
+
+
+def _make_client(host, user, password, port, verify_tls) -> LoxoneClient:
+    """LoxoneClient bauen und bei Gen1 (Port 80) auf HTTP umstellen – die
+    loxone_api setzt die Basis-URL sonst fest auf https://…"""
+    c = LoxoneClient(host=host, user=user, password=password, port=port, verify_tls=verify_tls)
+    if not _ms_https(port):
+        c.base_url = f"http://{host}:{port}/"
+    return c
 from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 from audioserver import make_backend, AudioBackend  # noqa: E402
 
@@ -361,8 +379,8 @@ class App:
 
     async def start(self) -> None:
         try:
-            self.client = LoxoneClient(host=self.host, user=self.user, password=self.password,
-                                       port=self.port, verify_tls=self.verify_tls)
+            self.client = _make_client(self.host, self.user, self.password,
+                                       self.port, self.verify_tls)
             await self.client.__aenter__()
             self.alg = (await self.client.getkey2()).hashAlg
             self.jwt = await self.client.authenticate()
@@ -388,8 +406,8 @@ class App:
         zurueck; wirft bei falschen Zugangsdaten. Alte Verbindung bleibt bei
         Fehler bestehen (neuer Client wird nur bei Erfolg uebernommen)."""
         ms = _config()
-        newc = LoxoneClient(host=ms["host"], user=ms["user"], password=ms["pass"],
-                            port=ms.get("port", 443), verify_tls=ms.get("verify_tls", False))
+        newc = _make_client(ms["host"], ms["user"], ms["pass"],
+                            ms.get("port", 443), ms.get("verify_tls", False))
         try:
             await newc.__aenter__()
             alg = (await newc.getkey2()).hashAlg
@@ -425,7 +443,8 @@ class App:
 
     async def _connect_ws(self) -> None:
         self.ws = LoxoneWS(host=self.host, port=self.port, user=self.user, jwt=self.jwt,
-                           hash_alg=self.alg, verify_tls=self.verify_tls)
+                           hash_alg=self.alg, verify_tls=self.verify_tls,
+                           secure=_ms_https(self.port))
         await self.ws.connect()
 
     async def _reauth(self) -> None:
@@ -962,7 +981,8 @@ class App:
             return self.icon_cache[path]
         if not self.icon_session:
             return None
-        url = f"https://{self.host}:{self.port}/{path.lstrip('/')}"
+        scheme = "https" if _ms_https(self.port) else "http"
+        url = f"{scheme}://{self.host}:{self.port}/{path.lstrip('/')}"
         headers = {"Authorization": f"Bearer {self.jwt}"} if self.jwt else {}
         try:
             async with self.icon_session.get(url, headers=headers) as r:
