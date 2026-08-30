@@ -27,29 +27,41 @@ Browser – ganz ohne Programmierung und ohne die Loxone-App.
 
 ## Screenshots
 
-**Visu am Panel** — Favoriten mit Status, Musik-Player, Musikauswahl, PIN-geschützte Tür, Intercom-Livebild, Räume:
+**Visu am Panel** — PIN-Tür, Intercom-Livebild, Garage/Favoriten, Screensaver-Uhr, Musik (Zentral & Raum-Player):
 
-![Visu](docs/screenshots/kiosk1.png)
+![Visu am Panel](docs/screenshots/visu-panel.png)
 
-**Am Wandpanel** (Linux-Panel im Chromium-Kiosk):
+**Am Wandpanel** (4-Zoll-Linux-Panel im Chromium-Kiosk):
 
 ![Wandpanel](docs/screenshots/kiosk2.png)
 
-**Konfiguration im Browser** — Panel-Profile: pro Gerät Räume, Kategorien und Tabs an-/abwählen:
+**Konfigurator – Übersicht** — Panels anlegen, Titel, untere Tab-Leiste und sichtbare Räume je Panel:
 
-![Panel-Profile](docs/screenshots/panel.png)
+![Konfigurator](docs/screenshots/config-overview.png)
 
-**Pro Kachel gestalten** — Hintergrund, Rahmen, Icon- und Textfarbe, Schrift und Icon (eingebaut / Loxone) je Kachel:
+**Name & Tabs** — bis zu 4 Buttons (Standard-Tabs und/oder Kategorie-Abkürzungen), erster aktiver = Startseite:
 
-![Kachel-Editor](docs/screenshots/kacheln.png)
+![Name & Tabs](docs/screenshots/name-tabs.png)
 
-**Einstellungen** — Miniserver und Intercom eintragen, **Panels automatisch finden und den Kiosk fernstarten**:
+**Räume & Kategorien** — Whitelist pro Panel: welche Räume/Kategorien das Gerät zeigt:
 
-![Einstellungen](docs/screenshots/intercom.png)
+![Räume & Kategorien](docs/screenshots/rooms-categories.png)
 
-**Layout-Varianten** je Detailseite (einzeln / gestapelt / 2×2 / Liste):
+**Kacheln gestalten & ausblenden** — pro Kachel Farben, Schrift und Icon (eingebaut / Loxone / Google / Upload); einzelne Kacheln ausblenden:
 
-![Layouts](docs/screenshots/kacheln2.png)
+![Kacheln gestalten](docs/screenshots/tiles-style-hide.png)
+
+**Globale Darstellung & Kategorie-Ampel** — Schrift/Größen systemweit; pro Kategorie Aktiv-/OK-Farbe (Zustands-Ampel):
+
+![Globale Darstellung](docs/screenshots/global-appearance.png)
+
+**Panel-Darstellung (optional) & Aktiv-Overlay** — je Panel Overrides, Display-Abschaltzeit, Auto-Neustart, Kacheln pro Zeile, Overlay-Transparenz:
+
+![Panel-Darstellung](docs/screenshots/panel-display-options.png)
+
+**Einstellungen – verwaltete Panels** — Panels mit [Agent](#der-panel-agent-wandpanel-kiosk) melden sich automatisch; Ansicht wählen, Kiosk Start/Reload/Stop:
+
+![Einstellungen – Panels](docs/screenshots/settings-panels.png)
 
 ## Funktionen
 
@@ -81,14 +93,87 @@ Browser – ganz ohne Programmierung und ohne die Loxone-App.
 
 ## Unterstützte Bausteine
 
-Aktuell rund **40 Loxone-Bausteine**, u. a.: Licht (LightControllerV2 mit
-Stimmungen), Jalousie/Rollladen, Tor/Gate, Taster/Schalter (Switch/Pushbutton),
-Heizung (IRoomControllerV2 – Ist/Soll, Betriebsmodi), Klima (AcControl),
-Zentralsteuerung (ClimateControllerUS), Wetter, Wecker (AlarmClock), Wochenschaltuhr
-(Daytimer), Tracker/Ereignisliste, Meter/Slider/Text, Alarmanlage, sowie diverse
-Zentralfunktionen (Central­Light/-Audio/-Gate/-Window …).
+LoxPanel erkennt die Bausteine automatisch aus der Miniserver-Struktur (kein manuelles Anlegen von Bedienelementen). Aktueller Stand: **39 voll unterstützt**, **6 teilweise**, **16 geplant**.
 
-Noch offen: u. a. Remote, AudioZoneV2 – siehe [Roadmap](#roadmap).
+**Legende:** ✅ unterstützt · 🟡 teilweise · ⬜ geplant
+
+<table>
+<thead><tr><th align="left">Loxone-Typ</th><th align="left">Baustein</th><th>Status</th><th align="left">Anmerkung</th></tr></thead>
+<tbody>
+<tr><th colspan="4" align="left">Audio / Multimedia</th></tr>
+<tr><td><code>CentralAudioZone</code></td><td>Zentral Audio</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Radio</code></td><td>Radio / Auswahlschalter</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>AudioZone</code></td><td>Audiozone (Music Server)</td><td align="center">🟡</td><td>Play/Pause/Skip; Musikauswahl Platzhalter</td></tr>
+<tr><td><code>MediaClient</code></td><td>Media Client</td><td align="center">⬜</td><td></td></tr>
+<tr><th colspan="4" align="left">Bedienelemente</th></tr>
+<tr><td><code>Pushbutton</code></td><td>Virtueller Taster</td><td align="center">✅</td><td>Puls</td></tr>
+<tr><td><code>Slider</code></td><td>Schieberegler / Analogwert</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Switch</code></td><td>Schalter</td><td align="center">✅</td><td>Ein/Aus</td></tr>
+<tr><td><code>ColorPicker</code></td><td>Farbauswahl (alt)</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>MoodSwitch</code></td><td>Stimmungsschalter</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Remote</code></td><td>Fernbedienung</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>TextInput</code></td><td>Texteingabe</td><td align="center">🟡</td><td></td></tr>
+<tr><td><code>UpDownAnalog</code></td><td>Auf/Ab (analog)</td><td align="center">🟡</td><td></td></tr>
+<tr><td><code>UpDownDigital</code></td><td>Auf/Ab-Taster (digital)</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>ValueSelector</code></td><td>Wertselektor</td><td align="center">✅</td><td></td></tr>
+<tr><th colspan="4" align="left">Beleuchtung</th></tr>
+<tr><td><code>CentralLightController</code></td><td>Zentral Beleuchtung</td><td align="center">✅</td><td>Sammelsteuerung</td></tr>
+<tr><td><code>LightController</code></td><td>Beleuchtung (Generation 1)</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>LightControllerV2</code></td><td>Beleuchtung (Lichtsteuerung)</td><td align="center">✅</td><td>Szenen/Stimmungen als Liste</td></tr>
+<tr><td><code>ColorPickerV2</code></td><td>Farbauswahl RGB/Lumitech</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Dimmer</code></td><td>Dimmer</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>LightsceneRGB</code></td><td>RGB-Lichtszene</td><td align="center">⬜</td><td></td></tr>
+<tr><th colspan="4" align="left">Beschattung</th></tr>
+<tr><td><code>CentralJalousie</code></td><td>Zentral Beschattung</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Jalousie</code></td><td>Beschattung / Jalousie</td><td align="center">✅</td><td>Auf/Ab/Stop, Position</td></tr>
+<tr><td><code>WindowMonitor</code></td><td>Fenster-Monitor</td><td align="center">✅</td><td>offen/gekippt-Uebersicht</td></tr>
+<tr><td><code>CentralWindow</code></td><td>Zentral Fenster</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Window</code></td><td>Fenster (Motor)</td><td align="center">✅</td><td></td></tr>
+<tr><th colspan="4" align="left">Energie</th></tr>
+<tr><td><code>EnergyManager2</code></td><td>Energiemanager</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Fronius</code></td><td>Fronius Wechselrichter</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>LoadManager</code></td><td>Lastmanager</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>SolarPumpController</code></td><td>Solarpumpen-Steuerung</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>SpotPriceOptimizer</code></td><td>Strompreis-Optimierer</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Wallbox</code></td><td>Wallbox / Ladestation</td><td align="center">⬜</td><td></td></tr>
+<tr><th colspan="4" align="left">Klima / Heizung</th></tr>
+<tr><td><code>AcControl</code></td><td>Klimaanlage / AC</td><td align="center">✅</td><td>Modus/Fan/Soll</td></tr>
+<tr><td><code>ClimateControllerUS</code></td><td>Klimaregelung (US)</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>IRoomControllerV2</code></td><td>Intelligente Raumregelung</td><td align="center">✅</td><td>Ist/Soll, Modi</td></tr>
+<tr><td><code>ClimateController</code></td><td>Klimaregelung (EU)</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Heatmixer</code></td><td>Heizungsmischer</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>IRoomController</code></td><td>Raumregelung (alt)</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Sauna</code></td><td>Sauna-Steuerung</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Ventilation</code></td><td>Lueftung</td><td align="center">🟡</td><td></td></tr>
+<tr><th colspan="4" align="left">Sensorik / Anzeige</th></tr>
+<tr><td><code>Hourcounter</code></td><td>Betriebsstundenzaehler</td><td align="center">✅</td><td>inkl. Wartung faellig</td></tr>
+<tr><td><code>InfoOnlyAnalog</code></td><td>Statusanzeige (analog)</td><td align="center">✅</td><td>Wert + Format</td></tr>
+<tr><td><code>InfoOnlyDigital</code></td><td>Statusanzeige (digital)</td><td align="center">✅</td><td>Ein/Aus-Text</td></tr>
+<tr><td><code>InfoOnlyText</code></td><td>Textanzeige</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Meter</code></td><td>Verbrauchszaehler</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>SystemScheme</code></td><td>Anlagenschema</td><td align="center">✅</td><td>nur Hinweis-Kachel</td></tr>
+<tr><td><code>TextState</code></td><td>Zustandstext</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Tracker</code></td><td>Ereignis-Logger</td><td align="center">✅</td><td>Verlaufszeilen</td></tr>
+<tr><th colspan="4" align="left">Sicherheit</th></tr>
+<tr><td><code>Alarm</code></td><td>Alarmanlage</td><td align="center">✅</td><td>scharf/unscharf, quittieren</td></tr>
+<tr><td><code>CentralAlarm</code></td><td>Zentral Alarm</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>PresenceDetector</code></td><td>Praesenzmelder</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>SmokeAlarm</code></td><td>Brandmelder / Rauchmelder</td><td align="center">✅</td><td></td></tr>
+<tr><th colspan="4" align="left">Sonstiges</th></tr>
+<tr><td><code>PoolController</code></td><td>Pool-Steuerung</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Sequential</code></td><td>Sequenzer</td><td align="center">⬜</td><td></td></tr>
+<tr><td><code>Webpage</code></td><td>Webseite (eingebettet)</td><td align="center">✅</td><td></td></tr>
+<tr><th colspan="4" align="left">Tor / Zutritt</th></tr>
+<tr><td><code>CentralGate</code></td><td>Zentral Tor</td><td align="center">✅</td><td></td></tr>
+<tr><td><code>Gate</code></td><td>Tor / Garagentor</td><td align="center">✅</td><td>Position, Auf/Zu</td></tr>
+<tr><td><code>Intercom</code></td><td>Tuersprechanlage</td><td align="center">🟡</td><td>Kamera/Klingel-Popup; SIP folgt</td></tr>
+<tr><td><code>NfcCodeTouch</code></td><td>NFC Code Touch</td><td align="center">⬜</td><td></td></tr>
+<tr><th colspan="4" align="left">Zeit / Automatik</th></tr>
+<tr><td><code>TimedSwitch</code></td><td>Treppenhaus-/Zeitschalter</td><td align="center">✅</td><td>Restzeit, pulse/off</td></tr>
+<tr><td><code>AlarmClock</code></td><td>Wecker</td><td align="center">🟡</td><td>read-only Anzeige + Weckton/Alarm (kein Bearbeiten)</td></tr>
+<tr><td><code>Daytimer</code></td><td>Wochenuhr / Zeitplan</td><td align="center">✅</td><td></td></tr>
+</tbody>
+</table>
 
 ## Der Panel-Agent (Wandpanel-Kiosk)
 
