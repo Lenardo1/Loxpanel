@@ -37,31 +37,52 @@ sub launch_bg {
     system("/bin/bash", "-c", $sh);
 }
 
+# Miniserver-Zugang an den Container weiterreichen und Ergebnis-HTML liefern.
+sub apply_miniserver {
+    my ($data) = @_;
+    my $ua = LWP::UserAgent->new(timeout => 25);
+    my $r  = $ua->post("$api/api/settings/miniserver",
+        'Content-Type' => 'application/json', Content => encode_json($data));
+    if ($r->is_success) {
+        my $j = eval { decode_json($r->decoded_content) };
+        return "<div class='alert alert-success'>Verbunden &ndash; " . ($j->{nControls} // 0) . " Controls geladen.</div>"
+            if $j && $j->{ok};
+        return "<div class='alert alert-danger'>Fehler: " . h($j ? ($j->{error} // 'unbekannt') : 'ungueltige Antwort') . "</div>";
+    }
+    return "<div class='alert alert-danger'>Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)</div>";
+}
+
 # ---- POST verarbeiten (vor jeder Ausgabe) ----
 my $msg = "";
 my $refresh = 0;   # nach einer Aktion die Seite per GET nachladen (Live-Verlauf)
 my $action = $cgi->param('action') // '';
 
 if ($action eq 'miniserver') {
-    my $data = {
+    $msg = apply_miniserver({
         host       => scalar($cgi->param('host')) // '',
         user       => scalar($cgi->param('user')) // '',
         pass       => scalar($cgi->param('pass')) // '',
         port       => int((scalar($cgi->param('port')) || 443)),
         verify_tls => ($cgi->param('tls') ? JSON::true : JSON::false),
-    };
-    my $ua = LWP::UserAgent->new(timeout => 25);
-    my $r  = $ua->post("$api/api/settings/miniserver",
-        'Content-Type' => 'application/json', Content => encode_json($data));
-    if ($r->is_success) {
-        my $j = eval { decode_json($r->decoded_content) };
-        if ($j && $j->{ok}) {
-            $msg = "<div class='alert alert-success'>Verbunden &ndash; " . ($j->{nControls} // 0) . " Controls geladen.</div>";
-        } else {
-            $msg = "<div class='alert alert-danger'>Fehler: " . h($j ? ($j->{error} // 'unbekannt') : 'ungueltige Antwort') . "</div>";
-        }
+    });
+}
+elsif ($action eq 'fromlox') {
+    # Miniserver-Zugang aus der zentralen LoxBerry-Konfiguration uebernehmen
+    # (erster/niedrigster Miniserver). Admin_RAW/Pass_RAW sind die dekodierten
+    # Zugangsdaten.
+    my %ms = LoxBerry::System::get_miniservers();
+    my $m;
+    for my $k (sort { $a <=> $b } keys %ms) { $m = $ms{$k}; last; }
+    if ($m && ($m->{IPAddress} // '') ne '') {
+        $msg = apply_miniserver({
+            host       => $m->{IPAddress},
+            user       => ($m->{Admin_RAW} // $m->{Admin} // ''),
+            pass       => ($m->{Pass_RAW}  // $m->{Pass}  // ''),
+            port       => int($m->{Port} || 80),
+            verify_tls => JSON::false,
+        });
     } else {
-        $msg = "<div class='alert alert-danger'>Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)</div>";
+        $msg = "<div class='alert alert-danger'>In LoxBerry ist kein Miniserver konfiguriert (Hauptmen&uuml; &rarr; Miniserver).</div>";
     }
 }
 elsif ($action =~ /^(start|stop|restart)$/) {
@@ -201,6 +222,10 @@ print <<"HTML";
   .lprow{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
   .lprow .lpbtn,.lprow form{flex:1;min-width:170px}
   .lprow form{margin:0}  .lprow form .lpbtn{width:100%}
+  .lpfields{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .lpfields .lpf{display:flex;flex-direction:column;gap:3px;min-width:120px}
+  .lpfields label{font-size:12px;color:#777;margin:0;font-weight:600}
+  .lpfields .form-control{width:100%}
 </style>
 <div class="panel panel-default">
   <div class="panel-heading"><b>Status:</b> $stat</div>
@@ -210,33 +235,22 @@ print <<"HTML";
 <div class="panel panel-default">
   <div class="panel-heading">Miniserver-Zugang</div>
   <div class="panel-body">
-    <form method="post" class="form-horizontal">
+    <form method="post" id="msform">
       <input type="hidden" name="action" value="miniserver">
-      <div class="form-group">
-        <label class="col-sm-3 control-label">Host / IP</label>
-        <div class="col-sm-6"><input class="form-control" name="host" value="$hh" placeholder="192.168.1.50"></div>
+      <div class="lpfields">
+        <div class="lpf" style="flex:2"><label>Host / IP</label><input class="form-control" name="host" value="$hh" placeholder="192.168.1.50"></div>
+        <div class="lpf" style="flex:1.4"><label>Benutzer</label><input class="form-control" name="user" value="$hu" autocomplete="off"></div>
+        <div class="lpf" style="flex:1.4"><label>Passwort</label><input type="password" class="form-control" name="pass" placeholder="$passph"></div>
+        <div class="lpf" style="flex:.6;min-width:80px"><label>Port</label><input class="form-control" name="port" value="$hp"></div>
       </div>
-      <div class="form-group">
-        <label class="col-sm-3 control-label">Benutzer</label>
-        <div class="col-sm-6"><input class="form-control" name="user" value="$hu" autocomplete="off"></div>
-      </div>
-      <div class="form-group">
-        <label class="col-sm-3 control-label">Passwort</label>
-        <div class="col-sm-6"><input type="password" class="form-control" name="pass" placeholder="$passph"></div>
-      </div>
-      <div class="form-group">
-        <label class="col-sm-3 control-label">Port</label>
-        <div class="col-sm-3"><input class="form-control" name="port" value="$hp"></div>
-      </div>
-      <div class="form-group">
-        <div class="col-sm-offset-3 col-sm-6"><div class="checkbox"><label>
-          <input type="checkbox" name="tls"> Zertifikat pr&uuml;fen (Gen2 selbstsigniert: aus)
-        </label></div></div>
-      </div>
-      <div class="form-group">
-        <div class="col-sm-offset-3 col-sm-6"><button class="lpbtn lpblue" type="submit">Verbinden &amp; Speichern</button></div>
-      </div>
+      <div class="checkbox" style="margin:8px 0 12px"><label>
+        <input type="checkbox" name="tls"> Zertifikat pr&uuml;fen (Gen2 selbstsigniert: aus)
+      </label></div>
     </form>
+    <div class="lprow" style="margin-top:0">
+      <button class="lpbtn lpblue" type="submit" form="msform">Verbinden &amp; Speichern</button>
+      <form method="post"><input type="hidden" name="action" value="fromlox"><button class="lpbtn lpgrey" type="submit">Aus LoxBerry &uuml;bernehmen</button></form>
+    </div>
     <hr>
     <div class="lprow">
       <a class="lpbtn lpgreen" href="http://$lbhost:8099/config" target="_blank">Panels &amp; Kacheln &ouml;ffnen</a>
