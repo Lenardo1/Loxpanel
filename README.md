@@ -35,10 +35,6 @@ Browser – ganz ohne Programmierung und ohne die Loxone-App.
 
 ![Visu am Panel](docs/screenshots/visu-panel.png)
 
-**Am Wandpanel** (4-Zoll-Linux-Panel im Chromium-Kiosk):
-
-![Wandpanel](docs/screenshots/kiosk2.png)
-
 **Konfigurator – Übersicht** — Panels anlegen, Titel, untere Tab-Leiste und sichtbare Räume je Panel:
 
 ![Konfigurator](docs/screenshots/config-overview.png)
