@@ -174,6 +174,7 @@
           Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint.
           Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
         <pre class="cmdout" id="mode_hint">GET http://<span id="mode_host">…</span>/api/mode/&lt;modus&gt;</pre>
+        <p class="note">Panels <b>mit Agent</b> (Linux) erscheinen automatisch. Ein Panel <b>ohne Agent</b> (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: <code>?panel=&lt;start&gt;&amp;device=&lt;name&gt;</code> — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
         <div id="dev_list"><div class="muted">Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div></div>
         <div class="actions"><button class="btn" id="dev_save">Automatik speichern</button><span class="toast" id="dev_toast"></span></div>
       </div>
@@ -285,8 +286,8 @@ $('#ic_save').onclick=async()=>{
 
 // ---- Panels (Panel-Agenten) ----
 let PANEL_IDS=[];
-let DEV={};            // Agent-Name -> {auto, modes:[[modus,profil],...]}  (Arbeitskopie)
-let AGENT_NAMES=[];    // bisher gesehene Panel-Namen
+let DEV={};            // Panel-Name -> {auto, modes:[[modus,profil],...]}  (Arbeitskopie)
+let AGENT_NAMES=[];    // bisher gesehene Panel-Namen (Agent ODER Browser ?device=)
 async function loadPanelIds(){
   try{
     const r=await fetch('/api/meta'); const m=await r.json();
@@ -295,6 +296,8 @@ async function loadPanelIds(){
     Object.entries(m.devices||{}).forEach(([name,d])=>{
       DEV[name]={auto:d.auto!==false, modes:Object.entries(d.modes||{})};
     });
+    // aktuell verbundene Browser-Panels (per ?device=) auch anbieten
+    (m.wsDevices||[]).forEach(n=>{ if(AGENT_NAMES.indexOf(n)<0) AGENT_NAMES.push(n); });
   }catch(e){ PANEL_IDS=[]; }
 }
 function agentRow(a,sel){

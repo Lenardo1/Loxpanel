@@ -334,6 +334,7 @@ class App:
         self.cats_with: list[str] = []
         self.conn_route: dict[web.WebSocketResponse, dict] = {}
         self.conn_prof: dict[web.WebSocketResponse, dict] = {}
+        self.conn_dev: dict[web.WebSocketResponse, str] = {}   # ws -> Geraete-Kennung (?device=)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self._dirty = True
@@ -808,7 +809,12 @@ class App:
     async def switch_mode(self, mode: str) -> list:
         """Betriebsmodus-Wechsel (von Loxone via /api/mode): jedes Panel mit
         aktiver Automatik und einer Zuordnung fuer diesen Modus auf sein Profil
-        umschalten. Panels werden ueber ihren Agent-Namen adressiert."""
+        umschalten. Zwei Wege je Panel (adressiert ueber seinen Namen):
+        1. geraeteunabhaengig: offene Browser-Verbindung mit `?device=<name>`
+           bekommt per WS ein `{t:'switch'}` -> laedt sich mit neuem Profil neu
+           (funktioniert auf jedem Browser/Kiosk, kein Agent noetig);
+        2. Fallback: Linux-Panel-Agent per Fernstart (`?device=` nicht gesetzt).
+        """
         mode = (mode or "").strip()
         results: list = []
         if not mode:
@@ -821,13 +827,29 @@ class App:
             profile = (cfg.get("modes") or {}).get(mode)
             if not profile:
                 continue
+            ws_targets = [ws for ws, dev in self.conn_dev.items() if dev == name]
+            if ws_targets:
+                sent = 0
+                for ws in ws_targets:
+                    if (self.conn_prof.get(ws) or {}).get("id") == profile:
+                        sent += 1            # zeigt bereits das richtige Profil
+                        continue
+                    try:
+                        await ws.send_json({"t": "switch", "panel": profile})
+                        sent += 1
+                    except ConnectionError:
+                        pass
+                results.append({"panel": name, "profile": profile,
+                                "ok": sent > 0, "via": "ws"})
+                continue
             agent = by_name.get(name)
-            if not agent:
+            if agent:
+                ok = await self._agent_start(agent, profile)
+                results.append({"panel": name, "profile": profile,
+                                "ok": ok, "via": "agent"})
+            else:
                 results.append({"panel": name, "profile": profile,
                                 "ok": False, "error": "Panel nicht online"})
-                continue
-            ok = await self._agent_start(agent, profile)
-            results.append({"panel": name, "profile": profile, "ok": ok})
         return results
 
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
@@ -2473,6 +2495,7 @@ async def api_meta(request: web.Request) -> web.Response:
            for cu in app.cats_with],
         "panels": panels,
         "devices": app.devices,
+        "wsDevices": sorted({d for d in app.conn_dev.values() if d}),
         "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
                          if k in ("iconSize", "nameSize", "subSize", "font",
                                   "textColor", "bold")},
@@ -2815,6 +2838,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     await ws.prepare(request)
     prof = app.resolve_profile(request.query.get("panel", ""))
     app.conn_prof[ws] = prof
+    app.conn_dev[ws] = (request.query.get("device", "") or "").strip()[:60]
     first_tab = prof["tabs"][0] if prof["tabs"] else "favoriten"
     app.conn_route[ws] = {"view": "tab", "tab": first_tab}
     log.info("Panel verbunden: '%s' (Tabs %s, Räume %s, Kategorien %s)", prof["id"],
@@ -2850,6 +2874,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     finally:
         app.conn_route.pop(ws, None)
         app.conn_prof.pop(ws, None)
+        app.conn_dev.pop(ws, None)
     return ws
 
 
