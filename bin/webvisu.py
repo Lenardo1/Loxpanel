@@ -294,6 +294,23 @@ def load_panels() -> dict:
     return {}
 
 
+def load_devices() -> dict:
+    """Geraete-Automatik aus config/panels.json (`devices`): pro physischem
+    Panel (Schluessel = Agent-Name) eine Zuordnung Betriebsmodus -> Panel-Profil.
+    Loxone schickt per virtuellem Ausgang nur den Modusnamen an /api/mode; der
+    Server schaltet dann jedes Panel mit passender Zuordnung auf sein Profil um.
+    """
+    f = Path(__file__).resolve().parent.parent / "config" / "panels.json"
+    if f.is_file():
+        try:
+            d = json.loads(f.read_text(encoding="utf-8")).get("devices")
+            if isinstance(d, dict):
+                return d
+        except ValueError:
+            pass
+    return {}
+
+
 class App:
     def __init__(self, ms: dict, audio: dict | None = None):
         # ms kann leer sein (noch kein Miniserver konfiguriert) -> Server startet
@@ -318,6 +335,7 @@ class App:
         self.conn_route: dict[web.WebSocketResponse, dict] = {}
         self.conn_prof: dict[web.WebSocketResponse, dict] = {}
         self.panels = load_panels()
+        self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self._dirty = True
         self.jwt: str | None = None
         self.alg: str = "SHA1"
@@ -774,6 +792,44 @@ class App:
         v = ui.get("reloadHours")
         return max(0, min(168, float(v))) if isinstance(v, (int, float)) else None
 
+    async def _agent_start(self, agent: dict, profile: str) -> bool:
+        """Startet den Kiosk eines Panel-Agenten mit einem Profil (Fernbefehl)."""
+        url = f"http://{agent['ip']}:{agent['port']}/start"
+        try:
+            async with aiohttp.ClientSession() as s:
+                async with s.post(url, json={"panel": profile},
+                                  timeout=aiohttp.ClientTimeout(total=8)) as r:
+                    return r.status == 200
+        except Exception as err:
+            log.warning("Agent %s Start(%s) fehlgeschlagen: %s",
+                        agent.get("name"), profile, err)
+            return False
+
+    async def switch_mode(self, mode: str) -> list:
+        """Betriebsmodus-Wechsel (von Loxone via /api/mode): jedes Panel mit
+        aktiver Automatik und einer Zuordnung fuer diesen Modus auf sein Profil
+        umschalten. Panels werden ueber ihren Agent-Namen adressiert."""
+        mode = (mode or "").strip()
+        results: list = []
+        if not mode:
+            return results
+        now = time.time()
+        by_name = {a["name"]: a for a in self.agents.values() if (now - a["ts"]) < 600}
+        for name, cfg in self.devices.items():
+            if not cfg.get("auto", True):
+                continue
+            profile = (cfg.get("modes") or {}).get(mode)
+            if not profile:
+                continue
+            agent = by_name.get(name)
+            if not agent:
+                results.append({"panel": name, "profile": profile,
+                                "ok": False, "error": "Panel nicht online"})
+                continue
+            ok = await self._agent_start(agent, profile)
+            results.append({"panel": name, "profile": profile, "ok": ok})
+        return results
+
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
         ar = prof.get("rooms") if prof else None
         if ar is None:
@@ -902,14 +958,49 @@ class App:
             out[pid] = e
         return out
 
-    def _write_panels(self, panels: dict) -> None:
-        doc = {"_comment": "Von der LoxPanel-Konfigurationsseite (/config) verwaltet. "
-                           "Jedes Panel oeffnet die Visu mit ?panel=<id>. "
-                           "rooms/cats leer = alle sichtbar.",
+    def _persist_panels_file(self, panels: dict, devices: dict) -> None:
+        """Schreibt config/panels.json (Profile + Geraete-Automatik) in einem Rutsch."""
+        doc = {"_comment": "Von der LoxPanel-Konfigurationsseite (/config bzw. "
+                           "/settings) verwaltet. Jedes Panel oeffnet die Visu mit "
+                           "?panel=<id>. rooms/cats leer = alle sichtbar. "
+                           "`devices` bildet Betriebsmodus -> Profil je Panel ab.",
                "panels": panels}
+        if devices:
+            doc["devices"] = devices
         PANELS_FILE.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
                                encoding="utf-8")
+
+    def _write_panels(self, panels: dict) -> None:
+        self._persist_panels_file(panels, self.devices)
         self.panels = load_panels()
+
+    def _write_devices(self, devices: dict) -> None:
+        self.devices = devices
+        self._persist_panels_file(self.panels, self.devices)
+
+    @staticmethod
+    def _sanitize_devices(devices: dict, panel_ids: set) -> dict:
+        """Geraete-Automatik validieren: Schluessel = Agent-Name; je Panel `auto`
+        (bool) + `modes` = {Modusname -> Profil-Id}. Nur existierende Profile
+        werden uebernommen; leere Geraete fallen weg."""
+        out: dict = {}
+        if not isinstance(devices, dict):
+            return out
+        for name, cfg in devices.items():
+            if not isinstance(name, str) or not name.strip() or not isinstance(cfg, dict):
+                continue
+            modes = {}
+            for mode, prof in (cfg.get("modes") or {}).items():
+                if not isinstance(mode, str) or not isinstance(prof, str):
+                    continue
+                mode = mode.strip()[:40]
+                prof = prof.strip()
+                if mode and prof and prof in panel_ids:
+                    modes[mode] = prof
+            if not modes:
+                continue
+            out[name.strip()[:60]] = {"auto": bool(cfg.get("auto", True)), "modes": modes}
+        return out
 
     @staticmethod
     def _sanitize_theme_ui(ui: dict) -> dict:
@@ -2381,6 +2472,7 @@ async def api_meta(request: web.Request) -> web.Response:
             "iconUrl": app._icon_url(app.cats[cu].get("image")), "cat": True}
            for cu in app.cats_with],
         "panels": panels,
+        "devices": app.devices,
         "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
                          if k in ("iconSize", "nameSize", "subSize", "font",
                                   "textColor", "bold")},
@@ -2588,6 +2680,43 @@ async def api_agent_command(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": str(err)})
 
 
+async def api_mode(request: web.Request) -> web.Response:
+    """Betriebsmodus-Wechsel von Loxone (virtueller Ausgang). Loxone schickt nur
+    den Modusnamen, z.B.  GET /api/mode/gaeste  oder  /api/mode?name=gaeste .
+    Die Zuordnung Modus -> Profil je Panel liegt in den Panel-Einstellungen."""
+    app: App = request.app["app"]
+    mode = request.match_info.get("mode", "")
+    if not mode:
+        mode = request.query.get("name") or request.query.get("mode") or ""
+    if not mode and request.method == "POST":
+        try:
+            d = await request.json()
+            mode = str(d.get("name") or d.get("mode") or "")
+        except (ValueError, aiohttp.ContentTypeError):
+            pass
+    if not mode:
+        return web.json_response({"ok": False, "error": "kein Modus angegeben"},
+                                 status=400)
+    results = await app.switch_mode(mode)
+    log.info("Betriebsmodus '%s' -> %d Panel(s) umgeschaltet", mode, len(results))
+    return web.json_response({"ok": True, "mode": mode, "switched": results})
+
+
+async def api_save_devices(request: web.Request) -> web.Response:
+    """Speichert die Betriebsmodus-Automatik je Panel (aus den Einstellungen)."""
+    app: App = request.app["app"]
+    try:
+        d = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein JSON"}, status=400)
+    devices = App._sanitize_devices(d.get("devices") or {}, set(app.panels))
+    try:
+        app._write_devices(devices)
+    except Exception as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
+    return web.json_response({"ok": True, "devices": devices})
+
+
 async def api_testtone(request: web.Request) -> web.Response:
     """Schickt einen kurzen Test-Weckton an die Panel-Browser (zum Pruefen der
     Audio-Ausgabe am Geraet, z.B. YC-41PM). Mit `panel` auf ein Profil begrenzt,
@@ -2760,6 +2889,11 @@ def main() -> None:
     a.router.add_post("/api/agent/announce", api_agent_announce)
     a.router.add_get("/api/agents", api_agents)
     a.router.add_post("/api/agent/command", api_agent_command)
+    a.router.add_post("/api/devices", api_save_devices)
+    a.router.add_get("/api/mode", api_mode)
+    a.router.add_post("/api/mode", api_mode)
+    a.router.add_get("/api/mode/{mode}", api_mode)
+    a.router.add_post("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/testtone", api_testtone)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
