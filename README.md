@@ -221,7 +221,7 @@ Einstellungen danach in `/etc/loxpanel/kiosk.conf` – u. a.:
 | `PANEL` | Panel-Profil / Startansicht (leer = Standard) |
 | `DPMS_OFF` | Sekunden bis zur Display-Abschaltung (0 = nie) |
 | `BL_ON` | Helligkeit im Ein-Zustand (0…max; leer = voll) |
-| `PAUSE_ON_BLANK` | Chromium bei dunklem Display pausieren (1 = an) |
+| `PAUSE_ON_BLANK` | Chromium bei dunklem Display einfrieren (Standard 0 = aus; 1 spart CPU/Wärme, verzögert aber das Reagieren nach dem Aufwachen um ~30 s) |
 | `AUTOSTART` | Kiosk beim Booten starten (1) oder nur auf Fernstart warten (0) |
 
 Details: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).

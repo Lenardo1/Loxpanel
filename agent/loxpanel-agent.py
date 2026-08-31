@@ -90,10 +90,15 @@ BL_DEVICE = _cfg("BL_DEVICE", "").strip()
 # dunkler Boot-Default das Panel nicht dauerhaft dunkel laesst.
 BL_ON = _cfg("BL_ON", "").strip()
 # PAUSE_ON_BLANK = Chromium-Kiosk pausieren (SIGSTOP), solange das Display aus
-# ist (Monitor Off), und beim Aufwachen fortsetzen (SIGCONT). Chromium rendert
-# sonst auch bei dunklem Bildschirm weiter und heizt den SoC -> spart CPU/Waerme.
-# 0/false = aus.
-PAUSE_ON_BLANK = _cfg("PAUSE_ON_BLANK", "1").lower() not in ("0", "false", "no", "off")
+# ist (Monitor Off), und beim Aufwachen fortsetzen (SIGCONT). Spart zwar
+# CPU/Waerme, hat aber einen gravierenden Nebeneffekt: waehrend des Einfrierens
+# stirbt die WebSocket-Verbindung zum Server, sodass das Panel nach dem
+# Aufwachen erst ein eingefrorenes altes Bild zeigt und ~30 s fuer den
+# WS-Reconnect braucht, bevor es wieder auf Aenderungen reagiert. Daher
+# standardmaessig AUS. Nur bei Bedarf per PAUSE_ON_BLANK=1 in der kiosk.conf
+# wieder aktivieren. Das echte Display-Aus (Backlight/DPMS) laeuft unabhaengig
+# davon weiter.
+PAUSE_ON_BLANK = _cfg("PAUSE_ON_BLANK", "0").lower() not in ("0", "false", "no", "off")
 # RELOAD_HOURS = Stunden bis zum automatischen Kiosk-Neustart (gegen Einfrieren
 # des Panels/Chromium). 0 = aus. Der Server kann den Wert pro Panel per
 # Announce-Antwort (reloadHours) ueberschreiben (Settings-Seite). Nur waehrend
