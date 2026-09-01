@@ -304,10 +304,11 @@ function bindAppearance(p){
     if(ci) ci.oninput=()=>{ p.ui=p.ui||{}; p.ui.textColor=ci.value; if(cv)cv.textContent=ci.value; markDirty(); };
     if(cc) cc.onclick=()=>{ if(p.ui) delete p.ui.textColor; if(cv)cv.textContent='Standard'; markDirty(); }; }
   { const b=$('#fBold'); if(b) b.onchange=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.bold=true:delete p.ui.bold; markDirty(); }; }
+  { const ls=$('#fLang'); if(ls) ls.onchange=()=>{ p.ui=p.ui||{}; ls.value?p.ui.lang=ls.value:delete p.ui.lang; markDirty(); }; }
 }
 function appearanceFields(ui){
   ui=ui||{};
-  return sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
+  return langField(ui)+sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
     '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
       '<select id="fFontSel">'+FONTS.map(f=>'<option value="'+esc(f.v)+'"'+(sameFont(ui.font,f.v)?' selected':'')+'>'+esc(f.label)+'</option>').join('')+
         '<option value="__custom"'+(customFont(ui.font)?' selected':'')+'>Eigene…</option></select>'+
@@ -464,6 +465,13 @@ function sizeField(label,key,ui){
   const v=(ui||{})[key];
   return '<div class="field"><label class="lbl">'+label+'</label>'+
     '<input type="number" min="8" max="80" data-ui="'+key+'" value="'+(v==null?'':v)+'" placeholder="—"></div>';
+}
+const LANGS=[['','Standard (Deutsch)'],['de','Deutsch'],['en','English'],['fr','Français'],['it','Italiano'],['es','Español'],['nl','Nederlands']];
+function langField(ui){
+  const cur=(ui||{}).lang||'';
+  return '<div class="field" style="max-width:220px"><label class="lbl">Sprache</label>'+
+    '<select id="fLang">'+LANGS.map(l=>'<option value="'+l[0]+'"'+(cur===l[0]?' selected':'')+'>'+esc(l[1])+'</option>').join('')+'</select>'+
+    '<div class="hint" style="padding-top:4px">Steuert vorerst Datum &amp; Uhr am Panel. Gerätenamen kommen aus dem Miniserver.</div></div>';
 }
 
 function renderChips(p){
