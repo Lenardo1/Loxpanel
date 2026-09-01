@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LoxPanel — Einstellungen</title>
+<script src="/i18n.js"></script>
 <style>
   :root{
     --bg:#16181c; --panel:#1c1f24; --panel2:#212530; --line:#2a2e35;
@@ -99,19 +100,20 @@
 <body>
 <div class="wrap">
   <aside class="side">
-    <div class="brand">LoxPanel<small>Einstellungen</small></div>
+    <div class="brand">LoxPanel<small data-i18n>Einstellungen</small></div>
     <nav class="nlist" id="nlist">
-      <div class="nitem" data-pane="miniserver"><span class="nico">🔌</span><span class="ntx">Miniserver</span></div>
-      <div class="nitem" data-pane="intercom"><span class="nico">📷</span><span class="ntx">Kamera / Türstation</span></div>
-      <div class="nitem soon-item" data-pane="sip"><span class="nico">☎</span><span class="ntx">SIP</span><span class="badge">bald</span></div>
-      <div class="nitem" data-pane="panels"><span class="nico">🖥</span><span class="ntx">Panels</span></div>
-      <div class="nitem" data-pane="audio"><span class="nico">🔊</span><span class="ntx">Audio</span></div>
-      <div class="nitem" data-pane="newpanel"><span class="nico">＋</span><span class="ntx">Neues Panel</span></div>
+      <div class="nitem" data-pane="miniserver"><span class="nico">🔌</span><span class="ntx" data-i18n>Miniserver</span></div>
+      <div class="nitem" data-pane="intercom"><span class="nico">📷</span><span class="ntx" data-i18n>Kamera / Türstation</span></div>
+      <div class="nitem soon-item" data-pane="sip"><span class="nico">☎</span><span class="ntx" data-i18n>SIP</span><span class="badge" data-i18n>bald</span></div>
+      <div class="nitem" data-pane="panels"><span class="nico">🖥</span><span class="ntx" data-i18n>Panels</span></div>
+      <div class="nitem" data-pane="audio"><span class="nico">🔊</span><span class="ntx" data-i18n>Audio</span></div>
+      <div class="nitem" data-pane="newpanel"><span class="nico">＋</span><span class="ntx" data-i18n>Neues Panel</span></div>
     </nav>
     <div class="foot">
       <a class="navbtn" href="/config">
         <span class="nbico">‹</span>
-        <span class="nbtx"><span class="nbt">Panels &amp; Kacheln</span><span class="nbs">Ansichten gestalten</span></span></a>
+        <span class="nbtx"><span class="nbt" data-i18n>Panels &amp; Kacheln</span><span class="nbs" data-i18n>Ansichten gestalten</span></span></a>
+      <div class="langrow" data-langsel></div>
       <div class="conn" id="conn">…</div>
     </div>
   </aside>
@@ -119,86 +121,86 @@
   <main class="main">
     <!-- Miniserver -->
     <section class="pane" data-pane="miniserver">
-      <h2>Miniserver</h2>
-      <p class="lead">Zugang zum Loxone Miniserver. Nach dem Speichern verbindet der Server sofort neu.</p>
+      <h2 data-i18n>Miniserver</h2>
+      <p class="lead" data-i18n>Zugang zum Loxone Miniserver. Nach dem Speichern verbindet der Server sofort neu.</p>
       <div class="card">
-        <div class="field"><label class="lbl">Host / IP</label><input type="text" id="ms_host" placeholder="192.168.1.50"></div>
+        <div class="field"><label class="lbl" data-i18n>Host / IP</label><input type="text" id="ms_host" placeholder="192.168.1.50"></div>
         <div class="row2">
-          <div class="field"><label class="lbl">Benutzer</label><input type="text" id="ms_user" autocomplete="off"></div>
-          <div class="field"><label class="lbl">Passwort</label><input type="password" id="ms_pass" autocomplete="new-password" placeholder="unverändert lassen"></div>
+          <div class="field"><label class="lbl" data-i18n>Benutzer</label><input type="text" id="ms_user" autocomplete="off"></div>
+          <div class="field"><label class="lbl" data-i18n>Passwort</label><input type="password" id="ms_pass" autocomplete="new-password" placeholder="unverändert lassen" data-i18n-ph></div>
         </div>
         <div class="row2">
-          <div class="field" style="max-width:120px"><label class="lbl">Port</label><input type="number" id="ms_port" value="443"></div>
+          <div class="field" style="max-width:120px"><label class="lbl" data-i18n>Port</label><input type="number" id="ms_port" value="443"></div>
         </div>
-        <label class="chk"><input type="checkbox" id="ms_tls"><span>Zertifikat prüfen (Gen2 mit selbstsigniertem Zertifikat: <b>aus</b>)</span></label>
-        <div class="actions"><button class="btn" id="ms_save">Verbinden &amp; Speichern</button><span class="toast" id="ms_toast"></span></div>
+        <label class="chk"><input type="checkbox" id="ms_tls"><span data-i18n>Zertifikat prüfen (Gen2 mit selbstsigniertem Zertifikat: aus)</span></label>
+        <div class="actions"><button class="btn" id="ms_save" data-i18n>Verbinden &amp; Speichern</button><span class="toast" id="ms_toast"></span></div>
       </div>
     </section>
 
     <!-- Kamera / Türstation -->
     <section class="pane" data-pane="intercom">
-      <h2>Kamera / Türstation</h2>
-      <p class="lead">Video-URL (MJPEG) und Login der Türstation(en). Wird für das Kamerabild im Intercom-Popup gebraucht. Die Liste kommt aus dem Miniserver.</p>
+      <h2 data-i18n>Kamera / Türstation</h2>
+      <p class="lead" data-i18n>Video-URL (MJPEG) und Login der Türstation(en). Wird für das Kamerabild im Intercom-Popup gebraucht. Die Liste kommt aus dem Miniserver.</p>
       <div class="card">
         <div id="ic_list"><div class="muted">…</div></div>
-        <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save">Speichern</button><span class="toast" id="ic_toast"></span></div>
+        <div class="actions" style="margin-top:12px"><button class="btn" id="ic_save" data-i18n>Speichern</button><span class="toast" id="ic_toast"></span></div>
       </div>
     </section>
 
     <!-- SIP (coming soon) -->
     <section class="pane" data-pane="sip">
-      <h2>SIP</h2>
-      <p class="lead">Gegensprechen über die Türstation direkt am Panel (SIP-Audio/-Video statt nur Kamerabild).</p>
+      <h2 data-i18n>SIP</h2>
+      <p class="lead" data-i18n>Gegensprechen über die Türstation direkt am Panel (SIP-Audio/-Video statt nur Kamerabild).</p>
       <div class="card">
         <div class="soon">
           <div class="ssico">☎</div>
-          <div>SIP-Anbindung ist in Arbeit.</div>
-          <div class="sstag">Coming soon</div>
+          <div data-i18n>SIP-Anbindung ist in Arbeit.</div>
+          <div class="sstag" data-i18n>Coming soon</div>
         </div>
       </div>
     </section>
 
     <!-- Panels (Displays / Agenten) -->
     <section class="pane" data-pane="panels">
-      <h2>Panels</h2>
-      <p class="lead">Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
+      <h2 data-i18n>Panels</h2>
+      <p class="lead" data-i18n>Panels mit installiertem Agent melden sich automatisch. Ansicht wählen und den Kiosk starten / aktualisieren.</p>
       <div class="card">
-        <div id="ag_list"><div class="muted">Suche Panels…</div></div>
+        <div id="ag_list"><div class="muted" data-i18n>Suche Panels…</div></div>
         <div class="toast" id="ag_toast" style="margin-top:8px"></div>
       </div>
     </section>
 
     <!-- Audio -->
     <section class="pane" data-pane="audio">
-      <h2>Audio</h2>
-      <p class="lead">Der Weckton (Loxone-Wecker) wird direkt im Kiosk-Browser des Panels erzeugt. Mit dem Test-Ton prüfst du, ob am Panel wirklich etwas zu hören ist — falls nicht, liegt es meist an der Lautstärke/Ausgabe am Gerät (ALSA/PulseAudio), nicht am Browser.</p>
+      <h2 data-i18n>Audio</h2>
+      <p class="lead" data-i18n>Der Weckton (Loxone-Wecker) wird direkt im Kiosk-Browser des Panels erzeugt. Mit dem Test-Ton prüfst du, ob am Panel wirklich etwas zu hören ist — falls nicht, liegt es meist an der Lautstärke/Ausgabe am Gerät (ALSA/PulseAudio), nicht am Browser.</p>
       <div class="card">
-        <h3>Test-Ton</h3>
-        <p class="note">Sendet 3 kurze Pieptöne an das/die gewählte(n) Panel(s). Es müssen dafür geöffnet sein (Kiosk läuft und zeigt die Visu).</p>
+        <h3 data-i18n>Test-Ton</h3>
+        <p class="note" data-i18n>Sendet 3 kurze Pieptöne an das/die gewählte(n) Panel(s). Es müssen dafür geöffnet sein (Kiosk läuft und zeigt die Visu).</p>
         <div class="row2">
-          <div class="field" style="max-width:280px"><label class="lbl">Ziel-Panel</label><select id="at_panel"></select></div>
+          <div class="field" style="max-width:280px"><label class="lbl" data-i18n>Ziel-Panel</label><select id="at_panel"></select></div>
         </div>
-        <div class="actions"><button class="btn" id="at_send">🔊 Test-Ton senden</button><span class="toast" id="at_toast"></span></div>
+        <div class="actions"><button class="btn" id="at_send" data-i18n>🔊 Test-Ton senden</button><span class="toast" id="at_toast"></span></div>
       </div>
     </section>
 
     <!-- Neues Panel -->
     <section class="pane" data-pane="newpanel">
-      <h2>Neues Panel einrichten</h2>
-      <p class="lead">Erzeugt den Befehl, der Agent + Config aufs Panel überträgt, den Autostart einrichtet und Chromium still stellt (keine Übersetzen-Leiste / Anmeldung). Einmal im Terminal ausführen — fragt nach dem SSH-/sudo-Passwort des Panels.</p>
+      <h2 data-i18n>Neues Panel einrichten</h2>
+      <p class="lead" data-i18n>Erzeugt den Befehl, der Agent + Config aufs Panel überträgt, den Autostart einrichtet und Chromium still stellt (keine Übersetzen-Leiste / Anmeldung). Einmal im Terminal ausführen — fragt nach dem SSH-/sudo-Passwort des Panels.</p>
       <div class="card">
         <div class="row2">
-          <div class="field"><label class="lbl">Panel-IP</label><input type="text" id="np_ip" placeholder="10.0.0.77"></div>
-          <div class="field"><label class="lbl">SSH-Benutzer</label><input type="text" id="np_user" value="linaro"></div>
+          <div class="field"><label class="lbl" data-i18n>Panel-IP</label><input type="text" id="np_ip" placeholder="10.0.0.77"></div>
+          <div class="field"><label class="lbl" data-i18n>SSH-Benutzer</label><input type="text" id="np_user" value="linaro"></div>
         </div>
         <div class="row2">
-          <div class="field"><label class="lbl">Anzeigename</label><input type="text" id="np_name" placeholder="Wohnzimmer"></div>
-          <div class="field"><label class="lbl">Startansicht (Profil)</label><select id="np_panel"></select></div>
+          <div class="field"><label class="lbl" data-i18n>Anzeigename</label><input type="text" id="np_name" placeholder="Wohnzimmer"></div>
+          <div class="field"><label class="lbl" data-i18n>Startansicht (Profil)</label><select id="np_panel"></select></div>
         </div>
-        <div class="field"><label class="lbl">Server-Adresse (dieser Server)</label><input type="text" id="np_server" placeholder="10.0.0.55:8099"></div>
-        <div class="actions"><button class="btn" id="np_gen">Befehl erzeugen</button></div>
+        <div class="field"><label class="lbl" data-i18n>Server-Adresse (dieser Server)</label><input type="text" id="np_server" placeholder="10.0.0.55:8099"></div>
+        <div class="actions"><button class="btn" id="np_gen" data-i18n>Befehl erzeugen</button></div>
         <pre id="np_out" class="cmdout" style="display:none"></pre>
-        <div class="actions" id="np_copyrow" style="display:none"><button class="btn ghost sm" id="np_copy">In Zwischenablage kopieren</button><span class="toast" id="np_toast"></span></div>
+        <div class="actions" id="np_copyrow" style="display:none"><button class="btn ghost sm" id="np_copy" data-i18n>In Zwischenablage kopieren</button><span class="toast" id="np_toast"></span></div>
       </div>
     </section>
   </main>
@@ -227,17 +229,17 @@ async function load(){
   $('#ms_port').value=m.port||443; $('#ms_tls').checked=!!m.verify_tls;
   $('#ms_pass').placeholder = m.hasPass ? 'unverändert lassen' : 'Passwort eingeben';
   const c=$('#conn');
-  if(META.connected){ c.innerHTML='Status: <b class="ok">verbunden</b> · '+META.nControls+' Controls'; }
-  else { c.innerHTML='Status: <b class="bad">nicht verbunden</b>'; }
+  if(META.connected){ c.innerHTML=T('Status:')+' <b class="ok">'+T('verbunden')+'</b> · '+META.nControls+' Controls'; }
+  else { c.innerHTML=T('Status:')+' <b class="bad">'+T('nicht verbunden')+'</b>'; }
   // Intercom
   const box=$('#ic_list');
-  if(!META.intercoms.length){ box.innerHTML='<div class="muted">Keine Intercom-Bausteine gefunden (Miniserver verbunden?).</div>'; }
+  if(!META.intercoms.length){ box.innerHTML='<div class="muted">'+T('Keine Intercom-Bausteine gefunden (Miniserver verbunden?).')+'</div>'; }
   else {
     box.innerHTML=META.intercoms.map(ic=>
       '<div class="ic" data-uuid="'+esc(ic.uuid)+'"><div class="icname">'+esc(ic.name)+'</div>'+
-      '<div class="field"><label class="lbl">Video-URL (MJPEG)</label><input type="text" class="ic_url" value="'+esc(ic.url)+'" placeholder="http://192.168.1.201/cgi-bin/faststream.jpg?stream=full&fps=8"></div>'+
-      '<div class="row2"><div class="field"><label class="lbl">Benutzer</label><input type="text" class="ic_user" value="'+esc(ic.user)+'" autocomplete="off"></div>'+
-      '<div class="field"><label class="lbl">Passwort</label><input type="password" class="ic_pass" autocomplete="new-password" placeholder="'+(ic.hasPass?'unverändert lassen':'')+'"></div></div></div>'
+      '<div class="field"><label class="lbl">'+T('Video-URL (MJPEG)')+'</label><input type="text" class="ic_url" value="'+esc(ic.url)+'" placeholder="http://192.168.1.201/cgi-bin/faststream.jpg?stream=full&fps=8"></div>'+
+      '<div class="row2"><div class="field"><label class="lbl">'+T('Benutzer')+'</label><input type="text" class="ic_user" value="'+esc(ic.user)+'" autocomplete="off"></div>'+
+      '<div class="field"><label class="lbl">'+T('Passwort')+'</label><input type="password" class="ic_pass" autocomplete="new-password" placeholder="'+(ic.hasPass?T('unverändert lassen'):'')+'"></div></div></div>'
     ).join('');
   }
 }
@@ -268,7 +270,7 @@ $('#ic_save').onclick=async()=>{
   try{
     const r=await fetch('/api/settings/intercom',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({intercoms})});
     const j=await r.json();
-    if(j.ok){ flash($('#ic_toast'),'✓ Gespeichert',true); load(); } else flash($('#ic_toast'),j.error||'Fehler',false);
+    if(j.ok){ flash($('#ic_toast'),T('✓ Gespeichert'),true); load(); } else flash($('#ic_toast'),j.error||T('Fehler'),false);
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
 
@@ -279,22 +281,22 @@ async function loadPanelIds(){
 }
 function agentRow(a,sel){
   const cur = (sel!==undefined)?sel:a.panel;
-  const opts=['<option value="">(Standard)</option>'].concat(
+  const opts=['<option value="">'+T('(Standard)')+'</option>'].concat(
     PANEL_IDS.map(id=>'<option value="'+esc(id)+'"'+(cur===id?' selected':'')+'>'+esc(id)+'</option>')).join('');
   return '<div class="ag" data-ip="'+esc(a.ip)+'">'+
     '<span class="dot'+(a.online?' on':'')+'"></span>'+
     '<span class="agn">'+esc(a.name)+'</span>'+
-    '<span class="agip">'+esc(a.ip)+(a.kiosk?' · Kiosk läuft':'')+'</span>'+
+    '<span class="agip">'+esc(a.ip)+(a.kiosk?(' · '+T('Kiosk läuft')):'')+'</span>'+
     '<span class="sp"></span>'+
     '<select class="agsel">'+opts+'</select>'+
-    '<button class="btn sm" data-act="start">Start</button>'+
-    '<button class="btn sm ghost" data-act="reload">Reload</button>'+
-    '<button class="btn sm ghost" data-act="stop">Stop</button></div>';
+    '<button class="btn sm" data-act="start">'+T('Start')+'</button>'+
+    '<button class="btn sm ghost" data-act="reload">'+T('Reload')+'</button>'+
+    '<button class="btn sm ghost" data-act="stop">'+T('Stop')+'</button></div>';
 }
 function renderAgents(agents){
   const box=$('#ag_list');
   const prev={}; box.querySelectorAll('.ag').forEach(n=>{ prev[n.dataset.ip]=n.querySelector('.agsel')?n.querySelector('.agsel').value:undefined; });
-  if(!agents.length){ box.innerHTML='<div class="muted">Noch kein Panel gefunden. Agent auf dem Panel starten (agent/loxpanel-agent.py).</div>'; return; }
+  if(!agents.length){ box.innerHTML='<div class="muted">'+T('Noch kein Panel gefunden. Agent auf dem Panel starten (agent/loxpanel-agent.py).')+'</div>'; return; }
   box.innerHTML=agents.map(a=>agentRow(a,prev[a.ip])).join('');
   box.querySelectorAll('.ag').forEach(n=>{
     const ip=n.dataset.ip;
@@ -313,7 +315,7 @@ async function pollAgents(){ try{ const r=await fetch('/api/agents'); const j=aw
 // ---- Audio: Test-Ton ----
 function fillAudioPanels(){
   const sel=$('#at_panel'); if(!sel) return;
-  sel.innerHTML='<option value="">Alle Panels</option>'+
+  sel.innerHTML='<option value="">'+T('Alle Panels')+'</option>'+
     PANEL_IDS.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
 }
 $('#at_send').onclick=async()=>{
@@ -331,21 +333,21 @@ $('#at_send').onclick=async()=>{
 // ---- Neues Panel: Befehl-Generator ----
 function fillNewPanel(){
   const srv=$('#np_server'); if(srv && !srv.value) srv.value=location.host;
-  const sel=$('#np_panel'); if(sel) sel.innerHTML='<option value="">(Standard)</option>'+
+  const sel=$('#np_panel'); if(sel) sel.innerHTML='<option value="">'+T('(Standard)')+'</option>'+
     PANEL_IDS.map(id=>'<option value="'+esc(id)+'">'+esc(id)+'</option>').join('');
 }
 function genPanelCmd(){
   const ip=$('#np_ip').value.trim(), user=($('#np_user').value.trim()||'linaro');
   const name=$('#np_name').value.trim(), panel=$('#np_panel').value, server=$('#np_server').value.trim();
-  if(!ip||!server){ flash($('#np_toast'),'Panel-IP und Server-Adresse nötig',false); return; }
+  if(!ip||!server){ flash($('#np_toast'),T('Panel-IP und Server-Adresse nötig'),false); return; }
   const cmd="ssh -t "+user+"@"+ip+" \"curl -fsSL http://"+server+"/install-agent.sh -o /tmp/lp-install.sh && "+
     "SERVER='"+server+"' AGENT_NAME='"+name+"' PANEL='"+panel+"' bash /tmp/lp-install.sh\"";
   $('#np_out').textContent=cmd; $('#np_out').style.display='block'; $('#np_copyrow').style.display='flex';
 }
 $('#np_gen').onclick=genPanelCmd;
 $('#np_copy').onclick=()=>{ navigator.clipboard.writeText($('#np_out').textContent)
-  .then(()=>flash($('#np_toast'),'✓ kopiert',true))
-  .catch(()=>flash($('#np_toast'),'Kopieren nicht möglich – bitte manuell markieren',false)); };
+  .then(()=>flash($('#np_toast'),T('✓ kopiert'),true))
+  .catch(()=>flash($('#np_toast'),T('Kopieren nicht möglich – bitte manuell markieren'),false)); };
 
 load().catch(e=>{ $('#conn').innerHTML='Konnte Einstellungen nicht laden: '+esc(e); });
 loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); pollAgents(); setInterval(pollAgents,6000); });

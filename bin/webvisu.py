@@ -62,6 +62,7 @@ _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
 HTML = _WEB / "panel.html"
 CONFIG_HTML = _WEB / "config.html"
 SETTINGS_HTML = _WEB / "settings.html"
+I18N_JS = _WEB / "i18n.js"
 INSTALL_SH = Path(__file__).resolve().parent.parent / "deploy" / "install-agent.sh"
 _CFGDIR = Path(__file__).resolve().parent.parent / "config"
 PANELS_FILE = _CFGDIR / "panels.json"
@@ -2373,6 +2374,12 @@ async def config_index(request: web.Request) -> web.Response:
                         content_type="text/html", headers=_NOCACHE)
 
 
+async def i18n_js(request: web.Request) -> web.Response:
+    """Gemeinsamer Uebersetzungs-Katalog fuer /settings und /config."""
+    return web.Response(text=I18N_JS.read_text(encoding="utf-8"),
+                        content_type="application/javascript", headers=_NOCACHE)
+
+
 async def api_meta(request: web.Request) -> web.Response:
     """Alle Räume/Kategorien der Anlage + aktuelle Profile (für den Editor)."""
     app: App = request.app["app"]
@@ -2772,6 +2779,7 @@ def main() -> None:
     a.router.add_get("/", index)
     a.router.add_get("/config", config_index)
     a.router.add_get("/settings", settings_index)
+    a.router.add_get("/i18n.js", i18n_js)
     a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_post("/api/panels", api_save_panels)
