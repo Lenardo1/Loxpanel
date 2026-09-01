@@ -2546,8 +2546,9 @@ async def api_save_panels(request: web.Request) -> web.Response:
         app._write_panels(clean)
     except OSError as err:
         return web.json_response({"ok": False, "error": str(err)}, status=500)
-    log.info("panels.json gespeichert: %d Profile", len(clean))
-    return web.json_response({"ok": True, "count": len(clean)})
+    n = await _push(app, {"t": "reload"})   # offene Panels sofort neu laden
+    log.info("panels.json gespeichert: %d Profile (%d Panels neu geladen)", len(clean), n)
+    return web.json_response({"ok": True, "count": len(clean), "reloaded": n})
 
 
 async def api_save_theme(request: web.Request) -> web.Response:
@@ -2567,9 +2568,10 @@ async def api_save_theme(request: web.Request) -> web.Response:
         app._write_theme(clean, clean_cats)
     except OSError as err:
         return web.json_response({"ok": False, "error": str(err)}, status=500)
-    log.info("theme.json (globale Darstellung%s) gespeichert",
-             " + Kategorie-Farben" if clean_cats is not None else "")
-    return web.json_response({"ok": True})
+    n = await _push(app, {"t": "reload"})   # offene Panels sofort neu laden
+    log.info("theme.json (globale Darstellung%s) gespeichert (%d Panels neu geladen)",
+             " + Kategorie-Farben" if clean_cats is not None else "", n)
+    return web.json_response({"ok": True, "reloaded": n})
 
 
 async def settings_index(request: web.Request) -> web.Response:
@@ -2768,6 +2770,95 @@ async def api_save_devices(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "devices": devices})
 
 
+async def _push(app: "App", msg: dict, panel: str = "", device: str = "") -> int:
+    """Push an offene Visu-Verbindungen (Server -> Browser). Optional gefiltert
+    auf ein Panel-Profil (`panel`) oder ein Geraet (`device`, aus ?device=).
+    Gibt die Anzahl erreichter Panels zurueck."""
+    panel = (panel or "").strip()
+    device = (device or "").strip()
+    n = 0
+    for ws in list(app.conn_prof):
+        if panel and (app.conn_prof.get(ws) or {}).get("id") != panel:
+            continue
+        if device and app.conn_dev.get(ws) != device:
+            continue
+        try:
+            await ws.send_json(msg)
+            n += 1
+        except ConnectionError:
+            app.conn_route.pop(ws, None)
+            app.conn_prof.pop(ws, None)
+            app.conn_dev.pop(ws, None)
+    return n
+
+
+def _push_filter(request: web.Request, d: dict) -> tuple:
+    """panel/device-Filter aus Query ODER JSON lesen."""
+    return (str(d.get("panel") or request.query.get("panel") or ""),
+            str(d.get("device") or request.query.get("device") or ""))
+
+
+async def _json_or_empty(request: web.Request) -> dict:
+    if request.method == "POST":
+        try:
+            return await request.json()
+        except (ValueError, aiohttp.ContentTypeError):
+            return {}
+    return {}
+
+
+async def api_reload(request: web.Request) -> web.Response:
+    """Laedt offene Panels neu (Server -> Browser). Optional ?panel= / ?device=.
+    Auch aus Loxone per virtuellem Ausgang nutzbar."""
+    app: App = request.app["app"]
+    d = await _json_or_empty(request)
+    panel, device = _push_filter(request, d)
+    n = await _push(app, {"t": "reload"}, panel, device)
+    return web.json_response({"ok": True, "reloaded": n})
+
+
+async def api_goto(request: web.Request) -> web.Response:
+    """Schickt offene Panels auf eine Seite. ?control=<uuid> (Detailseite) ODER
+    ?tab=<favoriten|zentral|raeume|kategorien>. Optional ?panel= / ?device=."""
+    app: App = request.app["app"]
+    d = await _json_or_empty(request)
+    control = str(d.get("control") or d.get("uuid") or request.query.get("control")
+                  or request.query.get("uuid") or "").strip()
+    tab = str(d.get("tab") or request.query.get("tab") or "").strip()
+    if control:
+        route = {"view": "control", "id": control}
+    elif _is_tab(tab):
+        route = {"view": "tab", "tab": tab}
+    else:
+        return web.json_response({"ok": False, "error": "control oder gueltiges tab noetig"},
+                                 status=400)
+    panel, device = _push_filter(request, d)
+    n = await _push(app, {"t": "goto", "route": route}, panel, device)
+    return web.json_response({"ok": True, "route": route, "sent": n})
+
+
+async def api_notify(request: web.Request) -> web.Response:
+    """Blendet auf offenen Panels eine kurze Nachricht ein.
+    ?text=... [&level=info|warn|crit] [&secs=5] [&panel=|&device=]."""
+    app: App = request.app["app"]
+    d = await _json_or_empty(request)
+    text = str(d.get("text") or request.query.get("text") or "").strip()[:200]
+    if not text:
+        return web.json_response({"ok": False, "error": "text fehlt"}, status=400)
+    level = str(d.get("level") or request.query.get("level") or "info").strip()
+    if level not in ("info", "warn", "crit"):
+        level = "info"
+    try:
+        secs = int(float(d.get("secs") or request.query.get("secs") or 5))
+    except (TypeError, ValueError):
+        secs = 5
+    secs = max(1, min(60, secs))
+    panel, device = _push_filter(request, d)
+    n = await _push(app, {"t": "notify", "text": text, "level": level, "secs": secs},
+                    panel, device)
+    return web.json_response({"ok": True, "sent": n})
+
+
 async def api_testtone(request: web.Request) -> web.Response:
     """Schickt einen kurzen Test-Weckton an die Panel-Browser (zum Pruefen der
     Audio-Ausgabe am Geraet, z.B. YC-41PM). Mit `panel` auf ein Profil begrenzt,
@@ -2950,6 +3041,12 @@ def main() -> None:
     a.router.add_get("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/testtone", api_testtone)
+    a.router.add_get("/api/reload", api_reload)
+    a.router.add_post("/api/reload", api_reload)
+    a.router.add_get("/api/goto", api_goto)
+    a.router.add_post("/api/goto", api_goto)
+    a.router.add_get("/api/notify", api_notify)
+    a.router.add_post("/api/notify", api_notify)
     a.router.add_get("/icon", icon_handler)
     a.router.add_get("/cover", cover_handler)
     a.router.add_get("/mjpeg", mjpeg_handler)

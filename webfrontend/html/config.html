@@ -542,7 +542,7 @@ async function save(){
                             body:JSON.stringify({ui:g.ui||{}, categories:g.catColors||{}})});
       const j2=await r2.json(); okT=j2.ok; errT=j2.error||'';
     }
-    if(j.ok&&okT){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels neu laden zum Übernehmen'; }
+    if(j.ok&&okT){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels wurden automatisch neu geladen'; }
     else { t.className='toast show err'; t.textContent='Fehler: '+(j.error||errT||'?'); }
   }catch(e){ t.className='toast show err'; t.textContent='Fehler: '+e; }
   setTimeout(()=>{ if(t) t.classList.remove('show'); }, 4000);

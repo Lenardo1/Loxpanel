@@ -704,6 +704,9 @@ function connect(){
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
+    if(msg.t==='reload'){ location.reload(); return; }                       // Server -> Panel neu laden
+    if(msg.t==='goto'){ if(msg.route){ hideSaver(); resetIdle(); nav(msg.route); } return; }  // auf Seite springen
+    if(msg.t==='notify'){ showNotify(msg.text, msg.level, msg.secs); return; }  // Nachricht einblenden
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
@@ -730,6 +733,22 @@ function tickClock(){
 function saverOn(){ return !el('saver').classList.contains('hidden'); }
 function showSaver(){ tickClock(); el('saver').classList.remove('hidden'); }
 function hideSaver(){ el('saver').classList.add('hidden'); }
+// Kurze Nachricht/Banner vom Server (t:'notify') oben im Panel einblenden.
+function showNotify(text, level, secs){
+  if(!text) return;
+  const s=document.querySelector('.screen'); if(!s) return;
+  let n=s.querySelector('.lpnotify');
+  if(!n){ n=document.createElement('div'); n.className='lpnotify';
+    n.style.cssText='position:absolute;left:10px;right:10px;top:10px;z-index:50;padding:12px 14px;'+
+      'border-radius:12px;font-size:15px;font-weight:600;line-height:1.25;text-align:center;'+
+      'box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none;word-break:break-word;';
+    s.appendChild(n); }
+  const col = level==='crit' ? '226,107,95' : (level==='warn' ? '224,162,77' : '82,184,129');
+  n.style.background='rgba('+col+',.96)'; n.style.color='#10140f';
+  n.textContent=text; hideSaver();
+  clearTimeout(n._t);
+  n._t=setTimeout(()=>{ if(n&&n.parentNode) n.parentNode.removeChild(n); }, Math.max(1,(secs||5))*1000);
+}
 function resetIdle(){ clearTimeout(idleTimer);
   idleTimer=setTimeout(()=>{ goTab(tabsCfg[0]||'favoriten'); showSaver(); }, SAVER_IDLE_MS); }
 el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); hideSaver(); resetIdle(); });
