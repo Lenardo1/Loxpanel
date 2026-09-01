@@ -62,6 +62,7 @@ _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
 HTML = _WEB / "panel.html"
 CONFIG_HTML = _WEB / "config.html"
 SETTINGS_HTML = _WEB / "settings.html"
+I18N_JS = _WEB / "i18n.js"
 INSTALL_SH = Path(__file__).resolve().parent.parent / "deploy" / "install-agent.sh"
 _CFGDIR = Path(__file__).resolve().parent.parent / "config"
 PANELS_FILE = _CFGDIR / "panels.json"
@@ -107,6 +108,19 @@ _TS_RE = re.compile(r"^\s*(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}[ ,]+\d{1,2}:\d{2}(?
 
 def _color_ok(v) -> bool:
     return isinstance(v, str) and bool(_COLOR_RE.match(v.strip()))
+
+
+# Unterstuetzte Panel-Sprachen (Basis-Codes). Steuert vorerst nur Datum/Uhr am
+# Panel; die Uebersetzung der festen UI-/Statustexte folgt (i18n-Ausbau).
+SUPPORTED_LANGS = ("de", "en", "fr", "it", "es", "nl")
+
+
+def _clean_lang(v):
+    """Sprach-Code validieren (z.B. 'de', 'en', 'en-US'); '' wenn nicht unterstuetzt."""
+    if not isinstance(v, str):
+        return ""
+    v = v.strip().lower()[:8]
+    return v if v.split("-")[0] in SUPPORTED_LANGS else ""
 
 
 def _clean_icon(ic):
@@ -762,6 +776,7 @@ class App:
             "vars": self._theme_vars(states, ui),
             "tiles": prof.get("tiles") or {},
             "hide": {u for u in (prof.get("hide") or []) if isinstance(u, str)},
+            "lang": (ui.get("lang") or "de"),   # Panel-Sprache (Datum/Uhr; spaeter i18n der Texte)
         }
 
     def _tab_meta(self, tab_keys) -> dict:
@@ -883,7 +898,8 @@ class App:
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
                    if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                            "dpmsOff", "reloadHours", "cols", "overlay", "textColor", "bold")},
+                            "dpmsOff", "reloadHours", "cols", "overlay", "textColor",
+                            "bold", "lang")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -942,6 +958,9 @@ class App:
                 cui["textColor"] = ui["textColor"].strip()   # globale Schriftfarbe (Name)
             if ui.get("bold"):
                 cui["bold"] = True                            # Kachel-Namen fett
+            lang = _clean_lang(ui.get("lang"))
+            if lang:
+                cui["lang"] = lang                            # Panel-Sprache (Datum/Uhr, i18n)
             ovc = _sanitize_overlay(ui.get("overlay"))
             if ovc:
                 cui["overlay"] = ovc            # Aussehen des Aktiv-Overlays
@@ -1038,6 +1057,9 @@ class App:
             out["textColor"] = ui["textColor"].strip()
         if ui.get("bold"):
             out["bold"] = True
+        lang = _clean_lang(ui.get("lang"))
+        if lang:
+            out["lang"] = lang
         return out
 
     @staticmethod
@@ -1075,7 +1097,7 @@ class App:
         except ValueError:
             doc = {}
         cur = doc.get("ui") if isinstance(doc.get("ui"), dict) else {}
-        for k in ("iconSize", "nameSize", "subSize", "font", "textColor", "bold"):
+        for k in ("iconSize", "nameSize", "subSize", "font", "textColor", "bold", "lang"):
             if k in ui:
                 cur[k] = ui[k]
             else:
@@ -2465,6 +2487,12 @@ async def config_index(request: web.Request) -> web.Response:
                         content_type="text/html", headers=_NOCACHE)
 
 
+async def i18n_js(request: web.Request) -> web.Response:
+    """Gemeinsamer Uebersetzungs-Katalog fuer /settings und /config."""
+    return web.Response(text=I18N_JS.read_text(encoding="utf-8"),
+                        content_type="application/javascript", headers=_NOCACHE)
+
+
 async def api_meta(request: web.Request) -> web.Response:
     """Alle Räume/Kategorien der Anlage + aktuelle Profile (für den Editor)."""
     app: App = request.app["app"]
@@ -2498,7 +2526,7 @@ async def api_meta(request: web.Request) -> web.Response:
         "wsDevices": sorted({d for d in app.conn_dev.values() if d}),
         "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
                          if k in ("iconSize", "nameSize", "subSize", "font",
-                                  "textColor", "bold")},
+                                  "textColor", "bold", "lang")},
                   "categories": {k: v for k, v in (app.theme.get("categories") or {}).items()
                                  if not str(k).startswith("_")}},
     })
@@ -2845,7 +2873,8 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
              prof["tabs"], "alle" if prof["rooms"] is None else len(prof["rooms"]),
              "alle" if prof["cats"] is None else len(prof["cats"]))
     await ws.send_json({"t": "theme", "vars": prof["vars"], "tabs": prof["tabs"],
-                        "tabMeta": app._tab_meta(prof["tabs"]), "title": prof["title"]})
+                        "tabMeta": app._tab_meta(prof["tabs"]), "title": prof["title"],
+                        "lang": prof["lang"]})
     await ws.send_json(app.render(app.conn_route[ws], prof))
     try:
         async for msg in ws:
@@ -2904,6 +2933,7 @@ def main() -> None:
     a.router.add_get("/", index)
     a.router.add_get("/config", config_index)
     a.router.add_get("/settings", settings_index)
+    a.router.add_get("/i18n.js", i18n_js)
     a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_post("/api/panels", api_save_panels)

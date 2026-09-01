@@ -670,6 +670,7 @@ const PANEL_ID = new URLSearchParams(location.search).get('panel') || '';
 // Betriebsmodus automatisch umgeschaltet werden soll (Server adressiert es
 // darueber). Ohne Agent: einfach ?device=<name> an die Kiosk-URL haengen.
 const DEVICE_ID = new URLSearchParams(location.search).get('device') || '';
+let LANG='de-DE';   // Panel-Sprache (aus dem Profil, Server sendet sie im theme); steuert Datum/Uhr
 // Horizontaler Feinversatz der ganzen Visu — live einstellbar ohne Redeploy:
 //   ?x=-6  -> 6px nach links     ?x=8 -> nach rechts     ?x=0 -> zuruecksetzen
 // Der Wert wird gemerkt (localStorage) und gilt dann auch ohne Parameter weiter.
@@ -693,6 +694,7 @@ function connect(){
     const msg=JSON.parse(e.data);
     if(msg.t==='theme'){ const v=msg.vars||{}; for(const k in v){ if(v[k]) document.documentElement.style.setProperty(k,v[k]); }
       gridCols = (v['--cols']?(parseInt(v['--cols'])||2):2);
+      if(msg.lang){ LANG=msg.lang; tickClock(); }   // Panel-Sprache -> Datum/Uhr sofort aktualisieren
       if(msg.title) document.title=msg.title;
       if(msg.tabMeta) tabMeta=msg.tabMeta;
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs; renderTabs(); return; }
@@ -722,8 +724,8 @@ let idleTimer=null;
 function tickClock(){
   const d=new Date();
   const t=el('svTime'), dd=el('svDate');
-  if(t) t.textContent=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
-  if(dd) dd.textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  if(t) t.textContent=d.toLocaleTimeString(LANG,{hour:'2-digit',minute:'2-digit'});
+  if(dd) dd.textContent=d.toLocaleDateString(LANG,{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 }
 function saverOn(){ return !el('saver').classList.contains('hidden'); }
 function showSaver(){ tickClock(); el('saver').classList.remove('hidden'); }

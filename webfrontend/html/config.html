@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LoxPanel — Konfiguration</title>
+<script src="/i18n.js"></script>
 <style>
   :root{
     --bg:#16181c; --panel:#1c1f24; --panel2:#212530; --line:#2a2e35;
@@ -179,6 +180,7 @@
         <span class="nbarrow">›</span></a>
     </div>
     <div class="hint">Auf jedem Wandpanel die Visu mit <code>?panel=&lt;id&gt;</code> öffnen.</div>
+    <div class="langrow" data-langsel style="margin-top:4px"></div>
   </aside>
   <main class="main" id="main"><div class="empty">lädt …</div></main>
 </div>
@@ -304,10 +306,11 @@ function bindAppearance(p){
     if(ci) ci.oninput=()=>{ p.ui=p.ui||{}; p.ui.textColor=ci.value; if(cv)cv.textContent=ci.value; markDirty(); };
     if(cc) cc.onclick=()=>{ if(p.ui) delete p.ui.textColor; if(cv)cv.textContent='Standard'; markDirty(); }; }
   { const b=$('#fBold'); if(b) b.onchange=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.bold=true:delete p.ui.bold; markDirty(); }; }
+  { const ls=$('#fLang'); if(ls) ls.onchange=()=>{ p.ui=p.ui||{}; ls.value?p.ui.lang=ls.value:delete p.ui.lang; markDirty(); }; }
 }
 function appearanceFields(ui){
   ui=ui||{};
-  return sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
+  return langField(ui)+sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
     '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
       '<select id="fFontSel">'+FONTS.map(f=>'<option value="'+esc(f.v)+'"'+(sameFont(ui.font,f.v)?' selected':'')+'>'+esc(f.label)+'</option>').join('')+
         '<option value="__custom"'+(customFont(ui.font)?' selected':'')+'>Eigene…</option></select>'+
@@ -323,13 +326,12 @@ function appearanceFields(ui){
 function renderGlobalEditor(p){
   $('#main').innerHTML =
     '<div class="ehead"><h2>🌐 Globale Darstellung</h2><span class="badge">alle Panels</span></div>'+
-    '<div class="url">Standard-Aussehen für <b>alle</b> Panels. Einzelne Panels können es unter „Darstellung" überschreiben (leer = erbt global).</div>'+
+    '<div class="url">'+T('Standard-Aussehen für <b>alle</b> Panels. Einzelne Panels können es unter „Darstellung" überschreiben (leer = erbt global).')+'</div>'+
     '<div class="card"><h3>Darstellung</h3>'+
       '<p class="note">Schrift, Größe, Farbe und Stärke der Kachel-Beschriftung — gilt global für alle Panels.</p>'+
       '<div class="sizes">'+appearanceFields(p.ui)+'</div></div>'+
     '<div class="card"><h3>Kategorie-Farben (Ampel)</h3>'+
-      '<p class="note">Pro Kategorie eine <b>Aktiv-</b> und <b>OK-Farbe</b> für Kachel-Hintergrund und Rahmen — gilt systemweit auf allen Panels (Wiedererkennung). '+
-        '◐ einschalten = Zustands-Ampel (z. B. Alarm rot/grün, Tor gelb/grün). Aus = neutral. Analoge Messwerte bleiben immer neutral.</p>'+
+      '<p class="note">'+T('Pro Kategorie eine <b>Aktiv-</b> und <b>OK-Farbe</b> für Kachel-Hintergrund und Rahmen — gilt systemweit auf allen Panels (Wiedererkennung). ◐ einschalten = Zustands-Ampel (z. B. Alarm rot/grün, Tor gelb/grün). Aus = neutral. Analoge Messwerte bleiben immer neutral.')+'</p>'+
       '<div class="cclist" id="catcolors"></div></div>'+
     '<div class="actions"><button class="btn save" id="saveBtn">Speichern</button>'+
       '<span class="toast" id="toast"></span></div>';
@@ -374,34 +376,31 @@ function renderEditor(){
   const m=$('#main');
   m.innerHTML =
    '<div class="ehead"><h2 id="hTitle">'+esc(p.title||cur)+'</h2><span class="badge">'+esc(cur)+'</span></div>'+
-   '<div class="url">Kiosk-URL: <code>'+esc(urlTxt)+'</code></div>'+
+   '<div class="url">'+T('Kiosk-URL:')+' <code>'+esc(urlTxt)+'</code></div>'+
 
    '<div class="card"><h3>Titel</h3><p class="note">Fenstertitel des Panels.</p>'+
      '<div class="field"><input type="text" id="fTitle" value="'+esc(p.title||'')+'" placeholder="'+esc(cur)+'"></div></div>'+
 
    '<div class="card"><h3>Untere Leiste (Tabs)</h3>'+
-     '<p class="note">Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne '+
-       'Kategorien als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★). '+
+     '<p class="note">'+T('Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne Kategorien als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★). ')+
        '<span id="tabcount"></span></p>'+
      '<div class="chips" id="chips"></div></div>'+
 
    '<div class="card"><h3>Räume</h3>'+
-     '<p class="note">Welche Räume dieses Panel zeigt. <b>Nichts angehakt = alle Räume.</b></p>'+
+     '<p class="note">'+T('Welche Räume dieses Panel zeigt. <b>Nichts angehakt = alle Räume.</b>')+'</p>'+
      '<div class="toolbar"><span class="count" id="cntRooms"></span>'+
        '<button class="minibtn" id="clrRooms">Alle abwählen</button></div>'+
      '<div class="grid" id="rooms"></div></div>'+
 
    '<div class="card"><h3>Kategorien</h3>'+
-     '<p class="note">Welche Kategorien im Tab „Kategorien" erscheinen. <b>Nichts angehakt = alle.</b> '+
-       'Bei gesetzter Raum-Auswahl werden Kategorien zusätzlich auf diese Räume gefiltert.</p>'+
+     '<p class="note">'+T('Welche Kategorien im Tab „Kategorien" erscheinen. <b>Nichts angehakt = alle.</b> Bei gesetzter Raum-Auswahl werden Kategorien zusätzlich auf diese Räume gefiltert.')+'</p>'+
      '<div class="toolbar"><span class="count" id="cntCats"></span>'+
        '<button class="minibtn" id="clrCats">Alle abwählen</button></div>'+
      '<div class="grid" id="cats"></div></div>'+
 
    '<div class="card"><h3>Kacheln gestalten</h3>'+
-     '<p class="note">Klicke eine Kachel an und ändere <b>Farben, Schrift und Icon nur für diese Kachel</b> (auf diesem Panel). Farbiger Punkt = schon angepasst. '+
-       'Mit dem <b>Auge</b> rechts blendest du eine Kachel auf diesem Panel ganz aus. <span id="tileHidden" class="thidden"></span></p>'+
-     '<input type="text" id="tileSearch" placeholder="Kachel suchen…" style="max-width:280px;margin-bottom:10px">'+
+     '<p class="note">'+T('Klicke eine Kachel an und ändere <b>Farben, Schrift und Icon nur für diese Kachel</b> (auf diesem Panel). Farbiger Punkt = schon angepasst. Mit dem <b>Auge</b> rechts blendest du eine Kachel auf diesem Panel ganz aus. ')+'<span id="tileHidden" class="thidden"></span></p>'+
+     '<input type="text" id="tileSearch" placeholder="'+T('Kachel suchen…')+'" style="max-width:280px;margin-bottom:10px">'+
      '<div class="tlist" id="tiles"></div>'+
      '<div id="tileEditor"></div></div>'+
 
@@ -425,10 +424,7 @@ function renderEditor(){
      '</div></div>'+
 
    '<div class="card"><h3>Aktiv-Overlay</h3>'+
-     '<p class="note">Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird '+
-       '(an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. '+
-       'Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. '+
-       'Gilt für dieses Panel — einzelne Kacheln können unten abweichen.</p>'+
+     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
      '<div class="ovwrap">'+
        '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div></div>'+
        '<div class="ovctrl">'+overlayFields((p.ui||{}).overlay,'ov_')+
@@ -464,6 +460,13 @@ function sizeField(label,key,ui){
   const v=(ui||{})[key];
   return '<div class="field"><label class="lbl">'+label+'</label>'+
     '<input type="number" min="8" max="80" data-ui="'+key+'" value="'+(v==null?'':v)+'" placeholder="—"></div>';
+}
+const LANGS=[['','Standard (Deutsch)'],['de','Deutsch'],['en','English'],['fr','Français'],['it','Italiano'],['es','Español'],['nl','Nederlands']];
+function langField(ui){
+  const cur=(ui||{}).lang||'';
+  return '<div class="field" style="max-width:220px"><label class="lbl">Sprache</label>'+
+    '<select id="fLang">'+LANGS.map(l=>'<option value="'+l[0]+'"'+(cur===l[0]?' selected':'')+'>'+esc(l[1])+'</option>').join('')+'</select>'+
+    '<div class="hint" style="padding-top:4px">Steuert vorerst Datum &amp; Uhr am Panel. Gerätenamen kommen aus dem Miniserver.</div></div>';
 }
 
 function renderChips(p){
@@ -683,9 +686,9 @@ function renderIconPick(src){
 }
 
 $('#addBtn').onclick=()=>{
-  let id=prompt('ID des neuen Panels (klein, ohne Leerzeichen), z. B. wohnzimmer:');
+  let id=prompt(T('ID des neuen Panels (klein, ohne Leerzeichen), z. B. wohnzimmer:'));
   if(!id) return; id=id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
-  if(!id){ alert('Ungültige ID.'); return; }
+  if(!id){ alert(T('Ungültige ID.')); return; }
   if(PANELS[id]){ alert('Panel „'+id+'" gibt es schon.'); return; }
   PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:defaultTabs(), rooms:[], cats:[], ui:{}, states:{}, tiles:{}};
   cur=id; tileSel=null; renderList(); renderEditor(); markDirty();
@@ -693,6 +696,9 @@ $('#addBtn').onclick=()=>{
 
 window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 load().catch(e=>{ $('#main').innerHTML='<div class="empty">Konnte Daten nicht laden: '+esc(e)+'</div>'; });
+// Admin-UI-Uebersetzung: uebersetzt JS-generierte Chrome-Texte nach jedem Render
+// (Blatt-Elemente der Selektoren; Miniserver-Namen bleiben unberuehrt).
+if(window.I18N) I18N.autoChrome('h2, h3, label.lbl, .btn, .minibtn, .addbtn, .navbtn .nbt, .navbtn .nbs, .brand small, .itab, .cclbl, .ccmut, .empty, .muted, .note, .lead, .hint, option');
 </script>
 </body>
 </html>
