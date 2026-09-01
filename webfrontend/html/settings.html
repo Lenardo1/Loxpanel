@@ -166,6 +166,18 @@
         <div id="ag_list"><div class="muted">Suche Panels…</div></div>
         <div class="toast" id="ag_toast" style="margin-top:8px"></div>
       </div>
+
+      <div class="card">
+        <h3>Betriebsmodus-Automatik</h3>
+        <p class="note">Loxone schaltet die Ansicht automatisch um: in Loxone Config einen
+          <b>virtuellen HTTP-Ausgang</b> anlegen, der pro Betriebsart einen Modusnamen an diesen
+          Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint.
+          Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
+        <pre class="cmdout" id="mode_hint">GET http://<span id="mode_host">…</span>/api/mode/&lt;modus&gt;</pre>
+        <p class="note">Panels <b>mit Agent</b> (Linux) erscheinen automatisch. Ein Panel <b>ohne Agent</b> (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: <code>?panel=&lt;start&gt;&amp;device=&lt;name&gt;</code> — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
+        <div id="dev_list"><div class="muted">Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div></div>
+        <div class="actions"><button class="btn" id="dev_save">Automatik speichern</button><span class="toast" id="dev_toast"></span></div>
+      </div>
     </section>
 
     <!-- Audio -->
@@ -274,8 +286,19 @@ $('#ic_save').onclick=async()=>{
 
 // ---- Panels (Panel-Agenten) ----
 let PANEL_IDS=[];
+let DEV={};            // Panel-Name -> {auto, modes:[[modus,profil],...]}  (Arbeitskopie)
+let AGENT_NAMES=[];    // bisher gesehene Panel-Namen (Agent ODER Browser ?device=)
 async function loadPanelIds(){
-  try{ const r=await fetch('/api/meta'); const m=await r.json(); PANEL_IDS=Object.keys(m.panels||{}); }catch(e){ PANEL_IDS=[]; }
+  try{
+    const r=await fetch('/api/meta'); const m=await r.json();
+    PANEL_IDS=Object.keys(m.panels||{});
+    DEV={};
+    Object.entries(m.devices||{}).forEach(([name,d])=>{
+      DEV[name]={auto:d.auto!==false, modes:Object.entries(d.modes||{})};
+    });
+    // aktuell verbundene Browser-Panels (per ?device=) auch anbieten
+    (m.wsDevices||[]).forEach(n=>{ if(AGENT_NAMES.indexOf(n)<0) AGENT_NAMES.push(n); });
+  }catch(e){ PANEL_IDS=[]; }
 }
 function agentRow(a,sel){
   const cur = (sel!==undefined)?sel:a.panel;
@@ -308,7 +331,82 @@ async function agentCmd(ip,action,panel){
     flash($('#ag_toast'), j.ok?('✓ '+action+' gesendet'):('Fehler: '+(j.error||('HTTP '+j.status))), j.ok);
   }catch(e){ flash($('#ag_toast'),'Fehler: '+e,false); }
 }
-async function pollAgents(){ try{ const r=await fetch('/api/agents'); const j=await r.json(); renderAgents(j.agents||[]); }catch(e){} }
+async function pollAgents(){
+  try{
+    const r=await fetch('/api/agents'); const j=await r.json(); const ags=j.agents||[];
+    renderAgents(ags);
+    const names=ags.map(a=>a.name).filter(Boolean);
+    const isNew=names.some(n=>AGENT_NAMES.indexOf(n)<0);
+    AGENT_NAMES=Array.from(new Set(AGENT_NAMES.concat(names)));
+    if(isNew){ readDevFromDom(); renderDevices(); }   // neues Panel -> Editor ergaenzen (Eingaben behalten)
+  }catch(e){}
+}
+
+// ---- Betriebsmodus-Automatik (Modus -> Profil je Panel) ----
+function profOpts(sel){
+  return '<option value="">— Ansicht wählen —</option>'+
+    PANEL_IDS.map(id=>'<option'+(sel===id?' selected':'')+'>'+esc(id)+'</option>').join('');
+}
+function devRow(name){
+  const d=DEV[name]||{auto:true,modes:[]};
+  const pairs=d.modes&&d.modes.length?d.modes:[['','']];
+  const rows=pairs.map(([m,p])=>
+    '<div class="dmrow" style="display:flex;gap:6px;align-items:center;margin:4px 0">'+
+      '<input class="dm_mode" placeholder="Modus (z.B. gaeste)" value="'+esc(m)+'" style="flex:1;min-width:120px">'+
+      '<span style="opacity:.6">→</span>'+
+      '<select class="dm_prof" style="flex:1;min-width:120px">'+profOpts(p)+'</select>'+
+      '<button class="btn sm ghost dm_del" type="button" title="Zeile entfernen">✕</button>'+
+    '</div>').join('');
+  return '<div class="dev" data-name="'+esc(name)+'" style="border-top:1px solid rgba(255,255,255,.08);padding:10px 0">'+
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">'+
+      '<b>'+esc(name)+'</b>'+
+      '<label style="margin-left:auto;font-size:13px;opacity:.85"><input type="checkbox" class="dev_auto"'+(d.auto?' checked':'')+'> Automatik aktiv</label>'+
+    '</div>'+
+    '<div class="dmrows">'+rows+'</div>'+
+    '<button class="btn sm ghost dm_add" type="button" style="margin-top:4px">+ Modus</button>'+
+  '</div>';
+}
+function readDevFromDom(){
+  const box=$('#dev_list'); if(!box) return;
+  box.querySelectorAll('.dev').forEach(n=>{
+    const modes=[];
+    n.querySelectorAll('.dmrow').forEach(r=>{
+      modes.push([r.querySelector('.dm_mode').value, r.querySelector('.dm_prof').value]);
+    });
+    DEV[n.dataset.name]={auto:n.querySelector('.dev_auto').checked, modes};
+  });
+}
+function renderDevices(){
+  const box=$('#dev_list'); if(!box) return;
+  const names=Array.from(new Set(AGENT_NAMES.concat(Object.keys(DEV)))).sort();
+  if(!names.length){ box.innerHTML='<div class="muted">Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div>'; return; }
+  box.innerHTML=names.map(devRow).join('');
+  box.querySelectorAll('.dm_add').forEach(b=>b.onclick=()=>{
+    readDevFromDom(); const name=b.closest('.dev').dataset.name;
+    (DEV[name]=DEV[name]||{auto:true,modes:[]}).modes.push(['','']); renderDevices();
+  });
+  box.querySelectorAll('.dm_del').forEach(b=>b.onclick=()=>{
+    const dev=b.closest('.dev'), name=dev.dataset.name;
+    const idx=Array.from(dev.querySelectorAll('.dmrow')).indexOf(b.closest('.dmrow'));
+    readDevFromDom(); DEV[name].modes.splice(idx,1); renderDevices();
+  });
+}
+$('#dev_save').onclick=async()=>{
+  readDevFromDom();
+  const devices={};
+  Object.entries(DEV).forEach(([name,d])=>{
+    const modes={};
+    (d.modes||[]).forEach(([m,p])=>{ m=(m||'').trim(); if(m&&p) modes[m]=p; });
+    if(Object.keys(modes).length) devices[name]={auto:d.auto!==false, modes};
+  });
+  $('#dev_save').disabled=true;
+  try{
+    const r=await fetch('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+    const j=await r.json();
+    if(j.ok){ flash($('#dev_toast'),'✓ Gespeichert',true); } else flash($('#dev_toast'),j.error||'Fehler',false);
+  }catch(e){ flash($('#dev_toast'),'Fehler: '+e,false); }
+  $('#dev_save').disabled=false;
+};
 
 // ---- Audio: Test-Ton ----
 function fillAudioPanels(){
@@ -348,7 +446,8 @@ $('#np_copy').onclick=()=>{ navigator.clipboard.writeText($('#np_out').textConte
   .catch(()=>flash($('#np_toast'),'Kopieren nicht möglich – bitte manuell markieren',false)); };
 
 load().catch(e=>{ $('#conn').innerHTML='Konnte Einstellungen nicht laden: '+esc(e); });
-loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); pollAgents(); setInterval(pollAgents,6000); });
+{ const mh=$('#mode_host'); if(mh) mh.textContent=location.host; }
+loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); renderDevices(); pollAgents(); setInterval(pollAgents,6000); });
 </script>
 </body>
 </html>

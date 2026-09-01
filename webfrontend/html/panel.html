@@ -666,6 +666,10 @@ g.addEventListener('touchend',e=>{
 
 let booted=false;
 const PANEL_ID = new URLSearchParams(location.search).get('panel') || '';
+// Geraete-Kennung (physisches Panel). Nur noetig, wenn dieses Geraet per
+// Betriebsmodus automatisch umgeschaltet werden soll (Server adressiert es
+// darueber). Ohne Agent: einfach ?device=<name> an die Kiosk-URL haengen.
+const DEVICE_ID = new URLSearchParams(location.search).get('device') || '';
 // Horizontaler Feinversatz der ganzen Visu — live einstellbar ohne Redeploy:
 //   ?x=-6  -> 6px nach links     ?x=8 -> nach rechts     ?x=0 -> zuruecksetzen
 // Der Wert wird gemerkt (localStorage) und gilt dann auch ohne Parameter weiter.
@@ -676,8 +680,11 @@ const PANEL_ID = new URLSearchParams(location.search).get('panel') || '';
   if(v!==null && v!=='') document.documentElement.style.setProperty('--nudge-x',(parseFloat(v)||0)+'px');
 })();
 function connect(){
+  const q=[];
+  if(PANEL_ID) q.push('panel='+encodeURIComponent(PANEL_ID));
+  if(DEVICE_ID) q.push('device='+encodeURIComponent(DEVICE_ID));
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/ws'
-                   +(PANEL_ID?('?panel='+encodeURIComponent(PANEL_ID)):''));
+                   +(q.length?('?'+q.join('&')):''));
   // Erststart: Startseite kommt vom Server (erster Tab des Profils). Nach einem
   // Reconnect stattdessen die zuletzt betrachtete Seite wiederherstellen.
   ws.onopen=()=>{ el('conn').classList.add('ok'); if(booted) send({t:'nav',route:stack[stack.length-1]}); };
@@ -692,6 +699,9 @@ function connect(){
     if(msg.t==='ring'){ if(msg.id) nav({view:'control',id:msg.id}); return; }
     if(msg.t==='alarm'){ if(msg.on){ startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
     if(msg.t==='testtone'){ playTestTone(); return; }
+    if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
+        if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
+        location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
