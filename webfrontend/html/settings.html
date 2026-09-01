@@ -170,15 +170,12 @@
       </div>
 
       <div class="card">
-        <h3>Betriebsmodus-Automatik</h3>
-        <p class="note">Loxone schaltet die Ansicht automatisch um: in Loxone Config einen
-          <b>virtuellen HTTP-Ausgang</b> anlegen, der pro Betriebsart einen Modusnamen an diesen
-          Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint.
-          Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
+        <h3 data-i18n>Betriebsmodus-Automatik</h3>
+        <p class="note" data-i18n>Loxone schaltet die Ansicht automatisch um: in Loxone Config einen virtuellen HTTP-Ausgang anlegen, der pro Betriebsart einen Modusnamen an diesen Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint. Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
         <pre class="cmdout" id="mode_hint">GET http://<span id="mode_host">…</span>/api/mode/&lt;modus&gt;</pre>
-        <p class="note">Panels <b>mit Agent</b> (Linux) erscheinen automatisch. Ein Panel <b>ohne Agent</b> (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: <code>?panel=&lt;start&gt;&amp;device=&lt;name&gt;</code> — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
-        <div id="dev_list"><div class="muted">Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div></div>
-        <div class="actions"><button class="btn" id="dev_save">Automatik speichern</button><span class="toast" id="dev_toast"></span></div>
+        <p class="note" data-i18n>Panels mit Agent (Linux) erscheinen automatisch. Ein Panel ohne Agent (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: ?panel=&lt;start&gt;&amp;device=&lt;name&gt; — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
+        <div id="dev_list"><div class="muted" data-i18n>Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div></div>
+        <div class="actions"><button class="btn" id="dev_save" data-i18n>Automatik speichern</button><span class="toast" id="dev_toast"></span></div>
       </div>
     </section>
 
@@ -346,7 +343,7 @@ async function pollAgents(){
 
 // ---- Betriebsmodus-Automatik (Modus -> Profil je Panel) ----
 function profOpts(sel){
-  return '<option value="">— Ansicht wählen —</option>'+
+  return '<option value="">'+T('— Ansicht wählen —')+'</option>'+
     PANEL_IDS.map(id=>'<option'+(sel===id?' selected':'')+'>'+esc(id)+'</option>').join('');
 }
 function devRow(name){
@@ -354,18 +351,18 @@ function devRow(name){
   const pairs=d.modes&&d.modes.length?d.modes:[['','']];
   const rows=pairs.map(([m,p])=>
     '<div class="dmrow" style="display:flex;gap:6px;align-items:center;margin:4px 0">'+
-      '<input class="dm_mode" placeholder="Modus (z.B. gaeste)" value="'+esc(m)+'" style="flex:1;min-width:120px">'+
+      '<input class="dm_mode" placeholder="'+T('Modus (z.B. gaeste)')+'" value="'+esc(m)+'" style="flex:1;min-width:120px">'+
       '<span style="opacity:.6">→</span>'+
       '<select class="dm_prof" style="flex:1;min-width:120px">'+profOpts(p)+'</select>'+
-      '<button class="btn sm ghost dm_del" type="button" title="Zeile entfernen">✕</button>'+
+      '<button class="btn sm ghost dm_del" type="button" title="'+T('Zeile entfernen')+'">✕</button>'+
     '</div>').join('');
   return '<div class="dev" data-name="'+esc(name)+'" style="border-top:1px solid rgba(255,255,255,.08);padding:10px 0">'+
     '<div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">'+
       '<b>'+esc(name)+'</b>'+
-      '<label style="margin-left:auto;font-size:13px;opacity:.85"><input type="checkbox" class="dev_auto"'+(d.auto?' checked':'')+'> Automatik aktiv</label>'+
+      '<label style="margin-left:auto;font-size:13px;opacity:.85"><input type="checkbox" class="dev_auto"'+(d.auto?' checked':'')+'> '+T('Automatik aktiv')+'</label>'+
     '</div>'+
     '<div class="dmrows">'+rows+'</div>'+
-    '<button class="btn sm ghost dm_add" type="button" style="margin-top:4px">+ Modus</button>'+
+    '<button class="btn sm ghost dm_add" type="button" style="margin-top:4px">'+T('+ Modus')+'</button>'+
   '</div>';
 }
 function readDevFromDom(){
@@ -381,7 +378,7 @@ function readDevFromDom(){
 function renderDevices(){
   const box=$('#dev_list'); if(!box) return;
   const names=Array.from(new Set(AGENT_NAMES.concat(Object.keys(DEV)))).sort();
-  if(!names.length){ box.innerHTML='<div class="muted">Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.</div>'; return; }
+  if(!names.length){ box.innerHTML='<div class="muted">'+T('Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.')+'</div>'; return; }
   box.innerHTML=names.map(devRow).join('');
   box.querySelectorAll('.dm_add').forEach(b=>b.onclick=()=>{
     readDevFromDom(); const name=b.closest('.dev').dataset.name;
@@ -405,7 +402,7 @@ $('#dev_save').onclick=async()=>{
   try{
     const r=await fetch('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
     const j=await r.json();
-    if(j.ok){ flash($('#dev_toast'),'✓ Gespeichert',true); } else flash($('#dev_toast'),j.error||'Fehler',false);
+    if(j.ok){ flash($('#dev_toast'),T('✓ Gespeichert'),true); } else flash($('#dev_toast'),j.error||T('Fehler'),false);
   }catch(e){ flash($('#dev_toast'),'Fehler: '+e,false); }
   $('#dev_save').disabled=false;
 };

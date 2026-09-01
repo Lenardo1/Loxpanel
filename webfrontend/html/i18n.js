@@ -86,6 +86,21 @@
       'verbunden': 'connected',
       'nicht verbunden': 'not connected',
 
+      // ---- Betriebsmodus-Automatik (/settings) ----
+      'Betriebsmodus-Automatik': 'Operating-mode automation',
+      'Loxone schaltet die Ansicht automatisch um: in Loxone Config einen virtuellen HTTP-Ausgang anlegen, der pro Betriebsart einen Modusnamen an diesen Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint. Panel ohne Eintrag für einen Modus bleibt unverändert.':
+        'Loxone switches the view automatically: in Loxone Config create a virtual HTTP output that sends a mode name to this server per operating mode. Here you define, per panel, which view appears for which mode. A panel without an entry for a mode stays unchanged.',
+      'Panels mit Agent (Linux) erscheinen automatisch. Ein Panel ohne Agent (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: ?panel=<start>&device=<name> — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).':
+        'Panels with an agent (Linux) appear automatically. A panel without an agent (e.g. NSPanel Pro, tablet) just opens the visu with a device id: ?panel=<start>&device=<name> — then it is listed here and switched live (the browser reloads with the new profile, no agent needed).',
+      'Noch kein Panel bekannt. Ein Panel muss sich einmal gemeldet haben (Agent läuft), dann erscheint es hier.':
+        'No panel known yet. A panel must have reported in once (agent running), then it appears here.',
+      'Automatik speichern': 'Save automation',
+      '— Ansicht wählen —': '— choose view —',
+      'Modus (z.B. gaeste)': 'Mode (e.g. guests)',
+      'Automatik aktiv': 'Automation active',
+      '+ Modus': '+ Mode',
+      'Zeile entfernen': 'Remove row',
+
       // ---- /config (Panel-Editor) ----
       'Konfiguration': 'Configuration',
       '＋ Neues Panel': '＋ New panel',
