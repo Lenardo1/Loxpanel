@@ -351,6 +351,7 @@ class App:
         self.conn_dev: dict[web.WebSocketResponse, str] = {}   # ws -> Geraete-Kennung (?device=)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
+        self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
         self._dirty = True
         self.jwt: str | None = None
         self.alg: str = "SHA1"
@@ -834,6 +835,7 @@ class App:
         results: list = []
         if not mode:
             return results
+        self.last_mode = mode   # merken -> frisch verbundene Geraete ziehen darauf nach
         now = time.time()
         by_name = {a["name"]: a for a in self.agents.values() if (now - a["ts"]) < 600}
         for name, cfg in self.devices.items():
@@ -2955,9 +2957,20 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     app: App = request.app["app"]
     ws = web.WebSocketResponse()
     await ws.prepare(request)
-    prof = app.resolve_profile(request.query.get("panel", ""))
+    dev = (request.query.get("device", "") or "").strip()[:60]
+    pid = request.query.get("panel", "")
+    # Frisch verbundenes Geraet direkt auf den aktuell laufenden Betriebsmodus
+    # setzen (statt der Start-Ansicht aus ?panel=), falls dafuer eine Zuordnung
+    # existiert -> ohne Reload-Flackern gleich die richtige Visu.
+    if dev and app.last_mode:
+        cfg = app.devices.get(dev)
+        if cfg and cfg.get("auto", True):
+            mapped = (cfg.get("modes") or {}).get(app.last_mode)
+            if mapped:
+                pid = mapped
+    prof = app.resolve_profile(pid)
     app.conn_prof[ws] = prof
-    app.conn_dev[ws] = (request.query.get("device", "") or "").strip()[:60]
+    app.conn_dev[ws] = dev
     first_tab = prof["tabs"][0] if prof["tabs"] else "favoriten"
     app.conn_route[ws] = {"view": "tab", "tab": first_tab}
     log.info("Panel verbunden: '%s' (Tabs %s, Räume %s, Kategorien %s)", prof["id"],
