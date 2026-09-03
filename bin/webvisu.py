@@ -749,8 +749,10 @@ class App:
             v["--font"] = ui["font"]
         if ui.get("textColor"):
             v["--name-color"] = ui["textColor"]
-        if ui.get("cols") == 3:
-            v["--cols"] = "3"          # 3x2-Kachelraster (Tablet); Default 2x2
+        if ui.get("cols") in (3, 4):
+            v["--cols"] = str(int(ui["cols"]))   # 3x2 (Tablet) / 4x3 (grosses Tablet); Default 2x2
+        if ui.get("rows") == 3:
+            v["--rows"] = "3"          # 3 Zeilen (nur 4x3); Default 2
         nudge = ui.get("nudgeX")
         if nudge not in (None, ""):
             # Horizontaler Feinversatz der ganzen Visu (px, negativ = nach links)
@@ -778,6 +780,7 @@ class App:
             "tiles": prof.get("tiles") or {},
             "hide": {u for u in (prof.get("hide") or []) if isinstance(u, str)},
             "lang": (ui.get("lang") or "de"),   # Panel-Sprache (Datum/Uhr; spaeter i18n der Texte)
+            "fill": bool(ui.get("fill")),       # Visu fuellt grosse Screens (quadratische Kacheln)
         }
 
     def _tab_meta(self, tab_keys) -> dict:
@@ -900,8 +903,8 @@ class App:
             "cats": [u for u in self.cats_with if c and u in c],
             "ui": {k: v for k, v in (raw.get("ui") or {}).items()
                    if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                            "dpmsOff", "reloadHours", "cols", "overlay", "textColor",
-                            "bold", "lang")},
+                            "dpmsOff", "reloadHours", "cols", "rows", "fill",
+                            "overlay", "textColor", "bold", "lang")},
             "states": {k: v for k, v in (raw.get("states") or {}).items()
                        if k in ("active", "good", "warn", "crit")},
             "tiles": raw.get("tiles") if isinstance(raw.get("tiles"), dict) else {},
@@ -954,8 +957,12 @@ class App:
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
             if isinstance(ui.get("reloadHours"), (int, float)):
                 cui["reloadHours"] = max(0, min(168, float(ui["reloadHours"])))  # Auto-Neustart Std.
-            if ui.get("cols") in (2, 3):
-                cui["cols"] = int(ui["cols"])   # Kacheln pro Zeile (2x2 oder 3x2)
+            if ui.get("cols") in (2, 3, 4):
+                cui["cols"] = int(ui["cols"])   # Spalten: 2x2 / 3x2 / 4x3
+            if ui.get("rows") in (2, 3):
+                cui["rows"] = int(ui["rows"])   # Zeilen (nur 4x3 nutzt 3)
+            if ui.get("fill"):
+                cui["fill"] = True              # Visu fuellt grosse Screens (quadratische Kacheln)
             if _color_ok(ui.get("textColor")):
                 cui["textColor"] = ui["textColor"].strip()   # globale Schriftfarbe (Name)
             if ui.get("bold"):
@@ -2978,7 +2985,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
              "alle" if prof["cats"] is None else len(prof["cats"]))
     await ws.send_json({"t": "theme", "vars": prof["vars"], "tabs": prof["tabs"],
                         "tabMeta": app._tab_meta(prof["tabs"]), "title": prof["title"],
-                        "lang": prof["lang"]})
+                        "lang": prof["lang"], "fill": prof["fill"]})
     await ws.send_json(app.render(app.conn_route[ws], prof))
     try:
         async for msg in ws:

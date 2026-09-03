@@ -416,10 +416,16 @@ function renderEditor(){
        '<div class="field" style="max-width:180px"><label class="lbl">Auto-Neustart alle (Std.)</label>'+
          '<input type="number" min="0" max="168" step="1" data-ui="reloadHours" value="'+
          (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="0 = aus"></div>'+
-       '<div class="field" style="max-width:180px"><label class="lbl">Kacheln pro Zeile</label>'+
-         '<select id="fCols">'+
-           '<option value="2"'+(((p.ui||{}).cols==3)?'':' selected')+'>2 × 2 (4″-Panel)</option>'+
-           '<option value="3"'+(((p.ui||{}).cols==3)?' selected':'')+'>3 × 2 (Tablet)</option>'+
+       '<div class="field" style="max-width:200px"><label class="lbl">Kachel-Layout</label>'+
+         '<select id="fLayout">'+
+           '<option value="2x2"'+(((p.ui||{}).cols==3||(p.ui||{}).cols==4)?'':' selected')+'>2 × 2 (4″-Panel)</option>'+
+           '<option value="3x2"'+(((p.ui||{}).cols==3)?' selected':'')+'>3 × 2 (Tablet)</option>'+
+           '<option value="4x3"'+(((p.ui||{}).cols==4)?' selected':'')+'>4 × 3 (großes Tablet)</option>'+
+         '</select></div>'+
+       '<div class="field" style="max-width:220px"><label class="lbl">Bildschirm füllen</label>'+
+         '<select id="fFill">'+
+           '<option value=""'+(((p.ui||{}).fill)?'':' selected')+'>Aus (feste Kachelgröße)</option>'+
+           '<option value="1"'+(((p.ui||{}).fill)?' selected':'')+'>An (füllt große Screens)</option>'+
          '</select></div>'+
      '</div></div>'+
 
@@ -439,8 +445,13 @@ function renderEditor(){
   // Titel live
   $('#fTitle').oninput=e=>{ p.title=e.target.value; $('#hTitle').textContent=e.target.value||cur; markDirty(); };
   bindAppearance(p);
-  { const fc=$('#fCols'); if(fc) fc.onchange=e=>{ p.ui=p.ui||{}; const v=Number(e.target.value);
-      if(v===3) p.ui.cols=3; else delete p.ui.cols; markDirty(); }; }
+  { const fl=$('#fLayout'); if(fl) fl.onchange=e=>{ p.ui=p.ui||{}; const v=e.target.value;
+      if(v==='4x3'){ p.ui.cols=4; p.ui.rows=3; }
+      else if(v==='3x2'){ p.ui.cols=3; delete p.ui.rows; }
+      else { delete p.ui.cols; delete p.ui.rows; }
+      markDirty(); }; }
+  { const ff=$('#fFill'); if(ff) ff.onchange=e=>{ p.ui=p.ui||{};
+      if(e.target.value) p.ui.fill=true; else delete p.ui.fill; markDirty(); }; }
 
   bindOverlay('ov_', ()=>{ p.ui=p.ui||{}; p.ui.overlay=p.ui.overlay||{}; return p.ui.overlay; },
               ()=>{ pruneOverlay(p.ui); ovPreview('ovPrev',(p.ui||{}).overlay); markDirty(); });
