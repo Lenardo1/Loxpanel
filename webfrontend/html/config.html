@@ -249,6 +249,28 @@
   .ovbox:hover,.ovbox:focus-visible{border-color:var(--accent);background:var(--panel2);outline:none;}
   .ovbox b{display:block;font-size:14px;color:var(--fg);margin-bottom:2px;}
   .ovbox span{font-size:12.5px;color:var(--muted);line-height:1.45;}
+
+  /* ---------- Rubrik „unterstützte Geräte" (Geräte-Katalog) ---------- */
+  .ovw .devcat{display:flex;flex-wrap:wrap;gap:24px 22px;align-items:flex-start;}
+  .ovw .devcat figure{width:150px;margin:0;}
+  .ovw .devcat figure.wide{width:auto;min-width:150px;max-width:230px;}
+  .ovw .devcat .nm{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px;font-weight:600;font-size:13px;color:var(--fg);}
+  .ovw .devcat .spec{font-family:ui-monospace,monospace;font-size:10.5px;color:var(--smut);margin-top:4px;letter-spacing:.02em;}
+  .ovw .devcat .desc{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45;}
+  .ovw .devcat .badge{font-family:ui-monospace,monospace;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:999px;padding:1px 7px;}
+  .ovw .devcat .badge.ref{color:#52b881;border-color:color-mix(in srgb,#52b881 50%,transparent);}
+  /* Physische Formfaktoren proportional zur mm-Groesse */
+  .ovw .faceplate{background:#0a0c10;border:1px solid var(--tline);border-radius:12px;position:relative;max-width:100%;
+    display:flex;align-items:center;justify-content:center;gap:6px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03);}
+  .ovw .miniscr{aspect-ratio:1;background:var(--scr);border:1px solid var(--tline);border-radius:6px;padding:5px;flex:none;overflow:hidden;}
+  .ovw .miniscr .visu,.ovw .miniscr .p2{height:100%;}
+  .ovw .fpmm{position:absolute;bottom:5px;left:0;right:0;text-align:center;font-family:ui-monospace,monospace;font-size:8px;color:var(--smut);letter-spacing:.05em;}
+  .ovw .fp120{width:96px;aspect-ratio:76/120;align-items:flex-start;padding-top:10px;}
+  .ovw .fp120 .miniscr{width:76%;}
+  .ovw .fpx2{width:214px;aspect-ratio:176/87;padding:0 8px;}
+  .ovw .fpx2 .miniscr{height:82%;}
+  .ovw .fptab{width:198px;aspect-ratio:16/10;}
+  .ovw .fptab .miniscr{height:72%;}
 </style>
 </head>
 <body>
@@ -275,6 +297,7 @@
         <button class="rub active" data-rub="overview">Übersicht</button>
         <button class="rub" data-rub="pconf">Panel Configuration</button>
         <button class="rub" data-rub="settings">Settings</button>
+        <button class="rub" data-rub="devices">unterstützte Geräte</button>
       </div>
       <div id="phead"></div>
     </div>
@@ -332,6 +355,76 @@
             <button class="ovbox" data-goto="settings:panels"><b>Panels &amp; Geräte</b><span>Alle Anzeigegeräte, Online-Status, Ansicht wechseln, Betriebsmodus-Automatik.</span></button>
             <button class="ovbox" data-goto="settings:newpanel"><b>Neues Panel</b><span>Start-URL für ein Android/Tablet erzeugen oder Agent per SSH aufs Linux-Panel.</span></button>
           </div>
+        </div>
+      </div>
+
+      <!-- unterstützte Geräte -->
+      <div id="devicesHost" class="ovw" style="display:none">
+        <p class="lead">LoxPanel läuft auf <b>Android-Wandpanels</b> (Fully Kiosk per <code>adb</code>) im Zielformat <b>480×480</b>. Diese Geräte sind erprobt – 4″-Panels 1:1, höher aufgelöste oder größere per Zoom, breite Geräte als zwei Panes.</p>
+        <h3>Wandpanels · ein Pane</h3>
+        <div class="devcat">
+
+          <figure>
+            <div class="pane"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+            <div class="nm">4″-Standardpanel <span class="badge ref">Referenz</span></div>
+            <div class="spec">480×480 · Android 11 / Debian 11</div>
+            <div class="desc">YC-SM41P (Portworld) &amp; baugleiche. 1 Pane, fix – native Auflösung. Debian + Chromium-Kiosk = primäres Ziel.</div>
+          </figure>
+
+          <figure>
+            <div class="pane"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+            <div class="nm">Sonoff NSPanel Pro 86 <span class="badge">1 Pane · Fix</span></div>
+            <div class="spec">3,95″ · 480×480 · Android</div>
+            <div class="desc">Natives Format, 1:1. Android gesperrt → Fully Kiosk per adb. 2 Relais onboard.</div>
+          </figure>
+
+          <figure>
+            <div class="pane"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+            <div class="nm">Shelly Wall Display X1i <span class="badge">1 Pane · Zoom</span></div>
+            <div class="spec">4″ · 720×720 · Android 11</div>
+            <div class="desc">Quadratisch, höher aufgelöst – das 480×480-Pane wird sauber auf 720² gezoomt.</div>
+          </figure>
+
+          <figure class="wide">
+            <div class="faceplate fp120">
+              <div class="miniscr"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+              <span class="fpmm">76 × 120 mm</span>
+            </div>
+            <div class="nm">Sonoff NSPanel Pro 120 <span class="badge">1 Pane · Zoom</span></div>
+            <div class="spec">4,7″ · Hochformat 76×120 mm</div>
+            <div class="desc">Anderer Formfaktor als die quadratischen 4″-Panels: höher als breit. Ein Pane, gezoomt.</div>
+          </figure>
+
+        </div>
+
+        <h3>Shelly Wall Display X2 / X2i · zwei Panes</h3>
+        <div class="devcat">
+
+          <figure class="wide">
+            <div class="faceplate fpx2">
+              <div class="miniscr"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+              <div class="miniscr"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+            </div>
+            <div class="nm">Shelly Wall Display X2 / X2i <span class="badge">2 Panes</span></div>
+            <div class="spec">6,95″ · 87×176 mm · Android 11</div>
+            <div class="desc">Breites Gerät (~2:1): ein Gerät mit zwei 480×480-Panes nebeneinander. Wie zwei 4″-Displays in einem Rahmen.</div>
+          </figure>
+
+        </div>
+
+        <h3>Tablets · zwei Panes</h3>
+        <div class="devcat">
+
+          <figure class="wide">
+            <div class="faceplate fptab">
+              <div class="miniscr"><div class="visu"><i></i><i></i><i></i><i></i></div></div>
+              <div class="miniscr"><div class="p2"><div class="p2h">Wetter</div><div class="wxr"><svg viewBox="0 0 24 24" fill="none" stroke="#5aa9e6" stroke-width="1.7" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/></svg><b>13°</b></div><div class="fore"><span></span><span></span><span></span><span></span></div></div></div>
+            </div>
+            <div class="nm">7–8″-Tablet <span class="badge">2 Panes / Zoom</span></div>
+            <div class="spec">~1024×600 / 1280×800 · Android · quer</div>
+            <div class="desc">Zwei Panes (Visu + Zusatz) nebeneinander – oder Zoom auf den ganzen Schirm.</div>
+          </figure>
+
         </div>
       </div>
 
@@ -575,14 +668,15 @@ function renderList(){
 function setRubric(r){
   rubric=r;
   document.querySelectorAll('.rub').forEach(b=>b.classList.toggle('active',b.dataset.rub===r));
-  const ov=r==='overview', pc=r==='pconf';
+  const ov=r==='overview', pc=r==='pconf', dv=r==='devices';
   const oh=$('#overviewHost'); if(oh) oh.style.display = ov?'':'none';
+  const dh=$('#devicesHost'); if(dh) dh.style.display = dv?'':'none';
   $('#pconfHost').style.display = pc?'':'none';
-  $('#setHost').style.display = (ov||pc)?'none':'';
+  $('#setHost').style.display = (ov||pc||dv)?'none':'';
   $('#savebar').style.display = pc?'':'none';
   $('#phead').style.display = pc?'':'none';
-  $('#subtabs').style.display = ov?'none':'';
-  if(ov) return;
+  $('#subtabs').style.display = (ov||dv)?'none':'';
+  if(ov||dv) return;
   if(pc){ renderEditor(); }
   else { renderSubtabs(); showSub(subSet); }
 }
