@@ -368,6 +368,16 @@ Loxone Miniserver ──WebSocket(Token)──►  webvisu.py (aiohttp)   ─┐
 - **0.2.4** – Container-Aktionen laufen im Hintergrund + Live-Statuslog (kein Timeout mehr).
 - **0.2.x** – erstes öffentliches LoxBerry-Plugin (Docker, automatische Installation).
 
+## Lizenz
+
+LoxPanel steht unter der [PolyForm Noncommercial License 1.0.0](LICENSE.md).
+
+Kurz gesagt: Jede **nicht-kommerzielle** Nutzung ist frei erlaubt – privat,
+Hobby, Bildung, gemeinnützige Organisationen –, einschließlich Ändern und
+Weitergeben. **Kommerzielle Nutzung ist nur mit vorheriger Zustimmung** möglich;
+dafür bitte über ein [GitHub-Issue](https://github.com/Lenardo1/Loxpanel/issues)
+oder [@Lenardo1](https://github.com/Lenardo1) Kontakt aufnehmen.
+
 ## Support & Quellcode
 
 Fragen, Ideen und Fehlerberichte gerne als GitHub-Issue:
