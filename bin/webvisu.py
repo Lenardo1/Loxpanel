@@ -3263,32 +3263,44 @@ class App:
         try:
             if pin is not None:
                 return await self._secured_command(uuid, cmd, pin)
-            # AudioZone-Steuerung laeuft ueber den Audioserver (Loxone-Music-
-            # Server-Protokoll, Port 7091), NICHT ueber den Miniserver: play,
-            # pause, queueplus/-minus, volume/{n}, roomfav/play/{slot} werden zu
-            # audio/{playerid}/{cmd}. uuid = AudioZone-uuidAction -> Loxone-
-            # playerid; der Audioserver mappt sie intern auf den realen Player,
-            # die Anzeige folgt ueber die Loxone-States. Ausnahme roomfav/get:
-            # die Favoriten-Abfrage muss ueber den Miniserver laufen, sie
-            # befuellt den sourceList-State fuer die Anzeige.
+            # AudioZone-Steuerung: Ein mit dem Miniserver GEKOPPELTER Loxone-
+            # Audioserver lehnt Befehle auf Port 7091 OHNE Anmeldung ab
+            # ("command not allowed when paired") und schliesst die Verbindung.
+            # Transportbefehle (play/pause/next/prev/volume/{n}) laufen bei ihm
+            # deshalb ueber den Miniserver (sps/io/{uuid}/{cmd}), wie in
+            # audioserver_events.py dokumentiert. Nur ein NACHWEISLICH nicht
+            # gekoppelter Audioserver (Nachbau Sonn/MS4H bzw. Musikserver Gen 1,
+            # paired=False) nimmt Direktbefehle an -> dann direkt an Port 7091
+            # (audio/{playerid}/{cmd}, schneller, und roomfav/play laeuft dort
+            # ohne Anmeldung). Ist der Kopplungsstatus (noch) unbekannt
+            # (Event-Client noch nicht gesondet, HTTP-Probe fehlgeschlagen oder
+            # audiometa aus), wird sicher ueber den Miniserver geleitet. Ausnahme
+            # roomfav/get: immer ueber den Miniserver, sie befuellt den
+            # sourceList-State fuer die Anzeige.
             pid = self.playerid_by_action.get(uuid)
+            host = self.audiohost_by_action.get(uuid)
+            acl = self.audio_clients.get(host) if host else None
+            # Direkt an den Audioserver nur bei positiv bekanntem Nachbau
+            # (acl.paired is False). None (unbekannt) / kein Event-Client /
+            # gekoppelt -> Miniserver.
+            direct_ok = acl is not None and acl.paired is False
             # Raumfavorit abspielen: bei einem gekoppelten Audioserver ueber die
             # angemeldete Ereignis-Verbindung (der Direktkanal ohne Anmeldung
-            # wuerde die Verbindung schliessen). Nachbauten (Sonn) haben authed=
-            # False -> dieser Zweig wird uebersprungen, Steuerung wie bisher.
+            # wuerde die Verbindung schliessen). Nachbauten (authed=False)
+            # ueberspringen das und spielen unten direkt ab (direct_ok).
             if pid is not None and cmd.startswith("roomfav/play/"):
-                host = self.audiohost_by_action.get(uuid)
-                acl = self.audio_clients.get(host) if host else None
                 if acl is not None and acl.authed:
                     ok = await acl.play_roomfav(pid, cmd.rsplit("/", 1)[-1])
                     return "200" if ok else None
-            if pid is not None and not cmd.startswith("roomfav/get"):
+            if pid is not None and not cmd.startswith("roomfav/get") and direct_ok:
                 backend = self._audio_backend_for(uuid)
                 if backend:
                     ok = await backend.command(pid, cmd)
                     return "200" if ok else None
                 log.warning("AudioZone-Befehl ohne Audio-Backend (uuid=%s, cmd=%s)", uuid, cmd)
                 return None
+            # Miniserver: gekoppelte Zonen (Transport + roomfav-Fallback),
+            # unbekannter Kopplungsstatus, roomfav/get und Nicht-Audio-Befehle.
             log.info("cmd %s/%s", uuid, cmd)
             await self.client.jdev_get(f"sps/io/{uuid}/{cmd}")
             return "200"
