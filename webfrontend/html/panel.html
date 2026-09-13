@@ -160,6 +160,26 @@
   .grid.list .tctrls{margin-top:0;}
   /* Detail-Panel (z.B. Jalousie) */
   .grid.panel{display:flex;flex-direction:column;gap:10px;align-items:stretch;grid-auto-rows:initial;}
+  /* Anlagenschema (SystemScheme): Titel oben, darunter ein Zoom-/Pan-Viewport.
+     .schemestage ist das Original-Koordinatensystem (schemeSize), per transform
+     skaliert/verschoben. Die Werte liegen absolut an ihren pos-Koordinaten. */
+  .grid.scheme{display:flex;flex-direction:column;gap:0;padding:0;grid-auto-rows:initial;overflow:hidden;}
+  .schemetitle{flex:0 0 auto;text-align:center;font-weight:600;font-size:16px;
+    padding:10px 12px 8px;border-bottom:1px solid var(--line);}
+  .schemeview{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;
+    background:var(--screen);}
+  .schemestage{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+  .schemeimg{position:absolute;top:0;left:0;width:100%;height:100%;user-select:none;-webkit-user-drag:none;}
+  .schemeval{position:absolute;display:flex;align-items:center;justify-content:center;
+    font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+    color:#12140f;background:rgba(255,255,255,.82);border-radius:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);padding:0 4px;overflow:hidden;white-space:nowrap;}
+  .schemeval span{overflow:hidden;text-overflow:ellipsis;}
+  .schemeval.on{background:rgba(82,184,129,.9);color:#08130c;}
+  .schemeval.crit{background:rgba(226,105,95,.92);color:#fff;}
+  .schemeval.tap{cursor:pointer;box-shadow:0 0 0 2px var(--accent),0 1px 3px rgba(0,0,0,.25);}
+  .schemehint{position:absolute;right:8px;bottom:6px;font-size:11px;color:var(--muted);
+    background:rgba(0,0,0,.35);border-radius:6px;padding:2px 7px;pointer-events:none;}
   .hero{display:grid;place-items:center;padding:6px 0 2px;}
   .hero .circle{width:84px;height:84px;border-radius:50%;background:var(--tile);
     border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);}
@@ -698,7 +718,7 @@ function renderPanel(blocks){
   setMore((blocks.find(b=>b.k==='more')||{}).route||null);
   el('conn').classList.remove('vis');
   el('grid').classList.add('panel');
-  el('grid').classList.remove('list','snapy');
+  el('grid').classList.remove('list','snapy','scheme');
   el('grid').classList.toggle('bigpage', blocks.some(b=>b.k==='big'));
   const g=el('grid');
   // anchor:bottom -> Anzeige (big/status) oben zentriert, Bedienung unten
@@ -904,7 +924,7 @@ function render(){
   closeMenu();
   setMore(null);
   el('conn').classList.toggle('vis', !!(view.route && view.route.view==='tab'));
-  el('grid').classList.remove('panel','bigpage','anchorbot');
+  el('grid').classList.remove('panel','bigpage','anchorbot','scheme');
   el('grid').classList.toggle('list', view.layout==='list');
   const items = view.items || [];
   const g = el('grid');
@@ -958,12 +978,95 @@ function render(){
   renderTabs();
 }
 
+// ---- Anlagenschema (SystemScheme) ----
+// Hintergrundbild + Live-Werte als Overlay. Der Viewport zeigt das Schema
+// fit-to-width; Pinch/Pan zoomt und verschiebt. Antippbare Werte (nav)
+// springen zur Detailansicht des Bausteins.
+let schemeFit=null;
+function schemeValHtml(it,i){
+  const w=it.w||120, h=it.h||30;
+  const cls='schemeval'+(it.on?' on':'')+(it.nav?' tap':'')+(it.tone==='crit'?' crit':'');
+  return '<div class="'+cls+'" data-i="'+i+'" style="left:'+it.x+'px;top:'+it.y+'px;width:'+w+'px;height:'+h+'px">'+
+    '<span>'+esc(it.text||'')+'</span></div>';
+}
+function renderScheme(v){
+  const g=el('grid');
+  g.classList.remove('panel','list','bigpage','anchorbot','snapy');
+  g.classList.add('scheme');
+  el('conn').classList.remove('vis');
+  const sw=v.sw||1300, sh=v.sh||866, items=v.items||[];
+  let html='<div class="schemetitle">'+esc(v.title||'')+'</div>'+
+    '<div class="schemeview" id="schemeView"><div class="schemestage" id="schemeStage" '+
+    'style="width:'+sw+'px;height:'+sh+'px">';
+  if(v.image) html+='<img class="schemeimg" src="'+esc(v.image)+'" alt="" draggable="false">';
+  html+=items.map(schemeValHtml).join('')+'</div><div class="schemehint">Ziehen · 2 Finger zoomen</div></div>';
+  g.innerHTML=html;
+  const viewEl=el('schemeView'), stage=el('schemeStage');
+  stage.querySelectorAll('.schemeval.tap').forEach(n=>{
+    n.onclick=()=>{ const it=items[+n.dataset.i]; if(it&&it.nav) nav(it.nav); };
+  });
+  setupSchemeZoom(viewEl, stage, sw, sh);
+  renderTabs();
+}
+function updateScheme(v){
+  const stage=el('schemeStage'); if(!stage) return false;
+  const nodes=stage.querySelectorAll('.schemeval');
+  const items=v.items||[];
+  if(nodes.length!==items.length) return false;   // Struktur anders -> voller Neuaufbau
+  items.forEach((it,i)=>{
+    const n=nodes[i], sp=n.querySelector('span');
+    if(sp && sp.textContent!==(it.text||'')) sp.textContent=it.text||'';
+    const cls='schemeval'+(it.on?' on':'')+(it.nav?' tap':'')+(it.tone==='crit'?' crit':'');
+    if(n.className!==cls){ n.className=cls;
+      n.onclick=it.nav?(()=>{ if(it.nav) nav(it.nav); }):null; }
+  });
+  return true;
+}
+function setupSchemeZoom(viewEl, stage, sw, sh){
+  let scale=1, tx=0, ty=0, minScale=0.05;
+  const apply=()=>{ stage.style.transform='translate('+tx+'px,'+ty+'px) scale('+scale+')'; };
+  const clamp=()=>{ const vw=viewEl.clientWidth, vh=viewEl.clientHeight, cw=sw*scale, ch=sh*scale;
+    if(cw<=vw) tx=(vw-cw)/2; else tx=Math.min(0,Math.max(vw-cw,tx));
+    if(ch<=vh) ty=(vh-ch)/2; else ty=Math.min(0,Math.max(vh-ch,ty)); };
+  const fit=()=>{ const vw=viewEl.clientWidth, vh=viewEl.clientHeight; if(!vw||!vh) return;
+    minScale=Math.min(vw/sw, vh/sh);              // "contain": ganzes Schema sichtbar
+    scale=minScale;                               // Start: komplett eingepasst (Hoehe & Breite)
+    tx=(vw-sw*scale)/2; ty=(vh-sh*scale)/2; clamp(); apply(); };
+  const pts=new Map(); let lastDist=0;
+  viewEl.onpointerdown=e=>{ viewEl.setPointerCapture(e.pointerId);
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY}); lastDist=0; };
+  viewEl.onpointermove=e=>{ if(!pts.has(e.pointerId)) return;
+    const prev=pts.get(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===1){ tx+=e.clientX-prev.x; ty+=e.clientY-prev.y; clamp(); apply(); }
+    else if(pts.size>=2){ const a=[...pts.values()], dist=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+      const rect=viewEl.getBoundingClientRect(), cx=(a[0].x+a[1].x)/2-rect.left, cy=(a[0].y+a[1].y)/2-rect.top;
+      if(lastDist){ const ns=Math.max(minScale,Math.min(6,scale*(dist/lastDist)));
+        tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale); scale=ns; clamp(); apply(); }
+      lastDist=dist; } };
+  const up=e=>{ pts.delete(e.pointerId); lastDist=0; };
+  viewEl.onpointerup=up; viewEl.onpointercancel=up;
+  // Doppeltipp: zwischen fit-to-width und 2.5x umschalten
+  let lastTap=0;
+  viewEl.addEventListener('click',e=>{ if(e.target.closest('.schemeval.tap')) return;
+    const now=Date.now(); if(now-lastTap<300){ const vw=viewEl.clientWidth;
+      // Doppeltipp: von "ganz sichtbar" auf fit-to-width (lesbar) zoomen, sonst zurueck
+      if(scale>minScale*1.15){ fit(); } else { const rect=viewEl.getBoundingClientRect();
+        const cx=e.clientX-rect.left, cy=e.clientY-rect.top, ns=Math.min(6,Math.max(vw/sw,minScale*2.5));
+        tx=cx-(cx-tx)*(ns/scale); ty=cy-(cy-ty)*(ns/scale); scale=ns; clamp(); apply(); } }
+    lastTap=now; });
+  schemeFit=fit;
+  // Bild kann nach dem Layout erst die richtige Groesse liefern -> nach Frame fitten
+  requestAnimationFrame(fit); const img=stage.querySelector('.schemeimg'); if(img) img.onload=fit;
+}
+window.addEventListener('resize',()=>{ if(el('grid').classList.contains('scheme')&&schemeFit) schemeFit(); });
+
 // Wisch nach rechts = zurueck (vertikales Scrollen bleibt unberuehrt)
 let sx=null, sy=null;
 const g=el('grid');
 g.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[0].clientY;},{passive:true});
 g.addEventListener('touchend',e=>{
   if(sx==null)return; const dx=e.changedTouches[0].clientX-sx, dy=e.changedTouches[0].clientY-sy; sx=null;
+  if(g.classList.contains('scheme')) return;   // im Schema pant der Finger, kein "zurueck"
   if(dx>60 && Math.abs(dy)<45) back();
 });
 
@@ -1028,6 +1131,12 @@ function connect(){
     if(msg.t==='cmdresult'){ if(msg.ok===false && pendingSecure){ const p=pendingSecure; pendingSecure=null; doSecure(p.uuid,p.cmd,'PIN falsch – nochmal'); } else pendingSecure=null; return; }
     if(msg.t!=='view') return;
     if(!booted){ booted=true; if(msg.route&&msg.route.view==='tab') stack=[msg.route]; }
+    if(msg.layout==='scheme'){
+      const sameS = view && key(view.route)===key(msg.route) && el('grid').classList.contains('scheme');
+      view=msg;
+      if(!(sameS && updateScheme(msg))) renderScheme(msg);   // gleiche Seite: nur Werte patchen (Zoom bleibt)
+      return;
+    }
     const same = view && key(view.route)===key(msg.route);
     if(msg.blocks){
       view=msg;

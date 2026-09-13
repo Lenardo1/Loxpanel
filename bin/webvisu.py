@@ -1971,7 +1971,11 @@ class App:
                       nav={"view": "control", "id": uuid},
                       sublabel=("Heizt" if dh else ("Kühlt" if dc else "Bereit")))
         elif t == "SystemScheme":
-            it.update(icon="info", sublabel="Anlagenschema")
+            # Kachel oeffnet die volle Schema-Ansicht (Hintergrundbild + Live-Werte).
+            # Als Sublabel den Hauptbaustein (details.mainControl) zeigen, sonst Hinweis.
+            main = self._resolve_control((c.get("details") or {}).get("mainControl"))
+            sub = (self._scheme_value(main).get("text") if main else "") or "Anlagenschema"
+            it.update(icon="central", sublabel=sub, nav={"view": "control", "id": uuid})
         elif t == "Hourcounter":
             it["sublabel"] = ("Wartung fällig" if self._state(c, "overdue")
                               else self._fmt_num(self._state(c, "total"), "%.0f h"))
@@ -2301,6 +2305,90 @@ class App:
                 continue
         return out
 
+    # ---- Anlagenschema (SystemScheme) -----------------------------------
+    def _resolve_control(self, uuid: str | None) -> dict | None:
+        """Baustein zu einer UUID liefern – auch wenn es ein Subcontrol ist.
+        self.controls enthaelt nur die Top-Level-Bausteine; die Referenzen im
+        Anlagenschema zeigen teils auf Subcontrols (z.B. InfoOnly eines Oelkessels)."""
+        if not uuid:
+            return None
+        c = self.controls.get(uuid)
+        if c:
+            return c
+        for pc in self.controls.values():
+            sub = (pc.get("subControls") or {}).get(uuid)
+            if sub:
+                return sub
+        return None
+
+    def _scheme_value(self, c: dict | None) -> dict:
+        """Kompakter Anzeige-Wert eines im Schema referenzierten Bausteins:
+        {text, on, tone}. Deckt die im Anlagenschema ueblichen Typen ab
+        (Slider/InfoOnlyAnalog = Zahl, InfoOnlyDigital = Ein/Aus, TextState)."""
+        if not c:
+            return {"text": "", "on": False}
+        t = c.get("type")
+        det = c.get("details") or {}
+        if t in ("Slider", "InfoOnlyAnalog", "Meter"):
+            return {"text": self._fmt_num(self._state(c, "value") if t != "Meter"
+                                          else self._state(c, "actual"),
+                                          det.get("format", "%.1f")), "on": False}
+        if t == "InfoOnlyDigital":
+            on = bool(self._state(c, "active"))
+            txt = det.get("text") or {}
+            return {"text": (txt.get("on") if on else txt.get("off"))
+                    or ("Ein" if on else "Aus"), "on": on}
+        if t in ("TextState", "InfoOnlyText"):
+            return {"text": str(self._state(c, "textAndIcon")
+                               or self._state(c, "text") or ""), "on": False}
+        # Fallback: erster vorhandener State als Text.
+        for name in (c.get("states") or {}):
+            v = self._state(c, name)
+            if v not in (None, ""):
+                return {"text": str(v), "on": False}
+        return {"text": "", "on": False}
+
+    def _view_scheme(self, uuid: str, c: dict, route: dict) -> dict:
+        """Anlagenschema als Ansicht: Hintergrundbild vom Miniserver (ueber den
+        /icon-Proxy) plus die Live-Werte der referenzierten Bausteine als Overlay
+        an ihren Positionen. schemeSize ist das Original-Koordinatensystem, in dem
+        pos/size angegeben sind – der Client skaliert es auf die Panelbreite."""
+        det = c.get("details") or {}
+        sz = det.get("schemeSize") or {}
+        img = det.get("imagePath")
+        # /icon liefert .png vom Miniserver (mit JWT); &v busted den Browser-Cache
+        # bei geaenderter imageVersion. Hinweis: der Server-seitige icon_cache wird
+        # per Pfad gehalten – aendert sich das Bild im Config, ggf. Server neu laden.
+        src = None
+        if img:
+            src = "/icon?p=" + quote(img, safe="")
+            if det.get("imageVersion"):
+                src += "&v=" + str(det["imageVersion"])
+        items = []
+        for ref in (det.get("controlReferences") or []):
+            rc = self._resolve_control(ref.get("uuidAction"))
+            if not rc:
+                continue
+            val = self._scheme_value(rc)
+            pos = ref.get("pos") or {}
+            size = ref.get("size") or {}
+            entry = {
+                "x": pos.get("x", 0), "y": pos.get("y", 0),
+                "w": size.get("width"), "h": size.get("height"),
+                "text": (ref.get("text") or "") + val["text"],
+                "on": val["on"],
+            }
+            # Bedienbare Referenzen (actionsVisible) sind antippbar -> Detailansicht
+            # des Bausteins. Nur fuer Top-Level-Bausteine, die eine eigene View haben.
+            ru = ref.get("uuidAction")
+            if ref.get("actionsVisible") and ru in self.controls:
+                entry["nav"] = {"view": "control", "id": ru}
+            items.append(entry)
+        return {"t": "view", "title": _clean(c.get("name")), "route": route,
+                "layout": "scheme", "image": src,
+                "sw": sz.get("width") or 1300, "sh": sz.get("height") or 866,
+                "items": items}
+
     def _view_control(self, uuid: str) -> dict:
         v = self._view_control_inner(uuid)
         if self.controls.get(uuid, {}).get("isSecured"):
@@ -2311,6 +2399,8 @@ class App:
         c = self.controls.get(uuid, {})
         t = c.get("type")
         route = {"view": "control", "id": uuid}
+        if t == "SystemScheme":
+            return self._view_scheme(uuid, c, route)
         if t == "LightControllerV2":
             cu = self._with_uuid(uuid)
             active = LIGHT.active_moods(cu, self.states)
