@@ -83,15 +83,32 @@ def _load_cfg() -> dict:
 
 
 def _atomic_write(path: Path, text: str) -> None:
-    """Schreibt text atomar: erst nach <datei>.tmp, fsync, dann os.replace.
-    Ein Crash/Stromausfall mitten im Schreiben laesst so die alte, vollstaendige
-    Datei stehen statt einer halben, kaputten (F5)."""
+    """Schreibt text atomar: erst nach <datei>.tmp, fsync, dann os.replace, zum
+    Schluss fsync auf das Verzeichnis (macht auch das Umbenennen dauerhaft). Ein
+    Crash/Stromausfall mitten im Schreiben laesst so die alte, vollstaendige
+    Datei stehen statt einer halben, kaputten (F5). Die .tmp wird bei einem
+    Fehler wieder entfernt, damit keine Bruchstuecke liegen bleiben."""
     tmp = path.with_name(path.name + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(text)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp, path)
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            fh.write(text)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, path)
+    except OSError:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    try:                       # Verzeichnis-fsync: macht os.replace dauerhaft
+        dfd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dfd)
+        finally:
+            os.close(dfd)
+    except OSError:
+        pass                   # nicht auf jeder Plattform/FS moeglich, best effort
 
 
 def _write_cfg(cfg: dict) -> None:
@@ -1405,6 +1422,15 @@ class App:
                "panels": panels}
         if devices:
             doc["devices"] = devices
+        # Eine Generation Sicherung: die aktuelle (funktionierende) panels.json
+        # vor dem Ueberschreiben nach panels.json.bak kopieren (best effort; ein
+        # fehlgeschlagenes Backup darf das Speichern nicht blockieren).
+        try:
+            if PANELS_FILE.is_file():
+                _atomic_write(PANELS_FILE.with_name(PANELS_FILE.name + ".bak"),
+                              PANELS_FILE.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as err:   # ValueError = UnicodeDecodeError bei kaputtem UTF-8
+            log.warning("panels.json.bak nicht geschrieben: %s", err)
         _atomic_write(PANELS_FILE,
                       json.dumps(doc, indent=2, ensure_ascii=False) + "\n")
 
@@ -3723,7 +3749,10 @@ async def api_settings_ms(request: web.Request) -> web.Response:
     if not ms.get("pass"):
         return web.json_response({"ok": False, "error": "Passwort fehlt"}, status=400)
     cfg["miniserver"] = ms
-    _write_cfg(cfg)
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
     try:
         n = await app.reconnect()
         log.info("Miniserver-Settings gespeichert, verbunden (%d Controls)", n)
@@ -3744,7 +3773,10 @@ async def api_settings_audiometa(request: web.Request) -> web.Response:
     am = dict(cfg.get("audiometa", {}) if isinstance(cfg.get("audiometa"), dict) else {})
     am["enabled"] = bool(data.get("enabled"))
     cfg["audiometa"] = am
-    _write_cfg(cfg)
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
     app.audiometa_cfg = _audiometa_config()
     # Bei Deaktivierung laufende Clients sofort schliessen; beim Aktivieren
     # startet der audio_events_task sie beim naechsten Durchlauf automatisch.
@@ -3780,7 +3812,10 @@ async def api_settings_intercom(request: web.Request) -> web.Response:
         else:
             ic.pop(uuid, None)
     cfg["intercom"] = ic
-    _write_cfg(cfg)
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
     app.intercom_cfg = _intercom_config()
     log.info("Intercom-Settings gespeichert (%d Einträge)", len(ic))
     return web.json_response({"ok": True})
@@ -3822,7 +3857,10 @@ async def api_settings_calendar(request: web.Request) -> web.Response:
     cal["days"] = _int(data.get("days"), 14, 1, 60)
     cal["fore_days"] = _int(data.get("fore_days"), 4, 1, 7)
     cfg["calendar"] = cal
-    _write_cfg(cfg)
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
     app.calendar_cfg = _calendar_config()
     app._front_refresh.set()   # sofort neu laden und an die Panels schicken
     log.info("Kalender/Wetter gespeichert (iCal %s, Wetter %s)",
