@@ -151,7 +151,7 @@ LoxPanel erkennt die Bausteine automatisch aus der Miniserver-Struktur (kein man
 <tr><td><code>InfoOnlyDigital</code></td><td>Statusanzeige (digital)</td><td align="center">✅</td><td>Ein/Aus-Text</td></tr>
 <tr><td><code>InfoOnlyText</code></td><td>Textanzeige</td><td align="center">✅</td><td></td></tr>
 <tr><td><code>Meter</code></td><td>Verbrauchszaehler</td><td align="center">✅</td><td></td></tr>
-<tr><td><code>SystemScheme</code></td><td>Anlagenschema</td><td align="center">✅</td><td>nur Hinweis-Kachel</td></tr>
+<tr><td><code>SystemScheme</code></td><td>Anlagenschema</td><td align="center">✅</td><td>Schemabild + Live-Werte als Overlay, Zoom/Pan</td></tr>
 <tr><td><code>TextState</code></td><td>Zustandstext</td><td align="center">✅</td><td></td></tr>
 <tr><td><code>Tracker</code></td><td>Ereignis-Logger</td><td align="center">✅</td><td>Verlaufszeilen</td></tr>
 <tr><th colspan="4" align="left">Sicherheit</th></tr>
