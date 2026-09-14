@@ -184,12 +184,17 @@
   .ovctrl .frow{display:flex;align-items:center;gap:10px;}
   .ovctrl .frow input[type=range]{flex:1;accent-color:var(--accent);}
   .ovctrl .cval{min-width:44px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;}
-  .ovprev{flex:none;display:grid;place-items:center;}
+  .ovprev{flex:none;display:grid;place-items:center;gap:10px;}
   .ovtile{--on-rgb:224,162,77;width:132px;height:88px;border-radius:6px;display:grid;place-items:center;
     color:var(--fg);font-size:13px;font-weight:500;
     background:rgba(var(--on-rgb),var(--ov-fill,.16));
     border:var(--ov-bw,1px) solid rgba(var(--on-rgb),var(--ov-bord,.55));}
   .ovtile.g{--on-rgb:82,184,129;} .ovtile.c{--on-rgb:226,107,95;}
+  /* Vorschau der inaktiven Kachel (nur Rahmen, konfigurierbar) */
+  .ovtile.off{background:transparent;color:var(--muted);
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));}
+  .ovgrp{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.03em;margin-top:6px;}
+  .ovgrp .ovgrp-h{font-weight:400;opacity:.75;}
   /* Einstellungen-spezifisch */
   .soon{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:44px 20px;color:var(--muted);}
   .soon .ssico{font-size:40px;opacity:.8;}
@@ -713,13 +718,15 @@ function showSub(k){
 }
 
 // ---- Aktiv-Overlay (Rahmen/Füllung/Deckkraft) ----
-const OV_DEF={mode:'both',fill:16,bord:55,bw:1};
+const OV_DEF={mode:'both',fill:16,bord:55,bw:1,ibord:8,ibw:1};
 function ovVal(ov,k){ return (ov&&ov[k]!=null)?ov[k]:OV_DEF[k]; }
 function pruneOverlay(host){ if(host&&host.overlay&&!Object.keys(host.overlay).length) delete host.overlay; }
 function overlayFields(ov,pfx){
-  const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw');
+  const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw'),
+        ib=ovVal(ov,'ibord'),ibw=ovVal(ov,'ibw');
   const opt=(v,t)=>'<option value="'+v+'"'+(m===v?' selected':'')+'>'+t+'</option>';
-  return '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
+  return '<div class="ovgrp">Aktive Kacheln</div>'+
+    '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
       opt('both','Rahmen + Füllung')+opt('border','Nur Rahmen')+opt('fill','Nur Füllung')+'</select></div>'+
     '<div class="frow"><label class="lbl">Füllung</label>'+
       '<input type="range" id="'+pfx+'fill" min="0" max="100" step="5" value="'+fi+'">'+
@@ -728,24 +735,40 @@ function overlayFields(ov,pfx){
       '<input type="range" id="'+pfx+'bord" min="0" max="100" step="5" value="'+bo+'">'+
       '<span class="cval" id="'+pfx+'bordv">'+bo+' %</span></div>'+
     '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'bw">'+
-      [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>'+
+    '<div class="ovgrp">Inaktive Kacheln <span class="ovgrp-h">(Rahmen, z. B. für helle Displays)</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmen</label>'+
+      '<input type="range" id="'+pfx+'ibord" min="0" max="100" step="5" value="'+ib+'">'+
+      '<span class="cval" id="'+pfx+'ibordv">'+ib+' %</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'ibw">'+
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(ibw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
 }
 function bindOverlay(pfx,getOv,onChange){
   const m=$('#'+pfx+'mode'),fi=$('#'+pfx+'fill'),bo=$('#'+pfx+'bord'),bw=$('#'+pfx+'bw'),
-        fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv');
+        fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv'),
+        ib=$('#'+pfx+'ibord'),ibw=$('#'+pfx+'ibw'),ibv=$('#'+pfx+'ibordv');
   const set=(k,v)=>{ getOv()[k]=v; onChange(); };
   if(m) m.onchange=()=>set('mode',m.value);
   if(fi) fi.oninput=()=>{ fiv.textContent=fi.value+' %'; set('fill',Number(fi.value)); };
   if(bo) bo.oninput=()=>{ bov.textContent=bo.value+' %'; set('bord',Number(bo.value)); };
   if(bw) bw.onchange=()=>set('bw',Number(bw.value));
+  if(ib) ib.oninput=()=>{ ibv.textContent=ib.value+' %'; set('ibord',Number(ib.value)); };
+  if(ibw) ibw.onchange=()=>set('ibw',Number(ibw.value));
 }
 function ovPreview(elId,ov){
-  const el=$('#'+elId); if(!el) return;
-  const m=ovVal(ov,'mode'); let fill=ovVal(ov,'fill')/100, bord=ovVal(ov,'bord')/100;
-  if(m==='border') fill=0; if(m==='fill') bord=0;
-  el.style.setProperty('--ov-fill',fill);
-  el.style.setProperty('--ov-bord',bord);
-  el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
+  const el=$('#'+elId);
+  if(el){
+    const m=ovVal(ov,'mode'); let fill=ovVal(ov,'fill')/100, bord=ovVal(ov,'bord')/100;
+    if(m==='border') fill=0; if(m==='fill') bord=0;
+    el.style.setProperty('--ov-fill',fill);
+    el.style.setProperty('--ov-bord',bord);
+    el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
+  }
+  const off=$('#'+elId+'Off');   // Vorschau der inaktiven Kachel
+  if(off){
+    off.style.setProperty('--tile-bord','rgba(255,255,255,'+(ovVal(ov,'ibord')/100)+')');
+    off.style.setProperty('--tile-bw',ovVal(ov,'ibw')+'px');
+  }
 }
 
 function bindAppearance(p){
@@ -918,13 +941,14 @@ function renderEditor(){
          '<div class="hint" style="padding-top:4px">Bei „Aus" zeigt das Panel nur die linke Visu im Kachel-Layout – keine Pane 2, keine Verdopplung. Für 4″-Wandpanels.</div></div>'+
        '<div class="field" style="max-width:none" id="paneField"><label class="lbl">Split-Pane je Tab</label>'+
          '<div class="cclist" id="panePerTab"></div>'+
-         '<div class="hint" style="padding-top:4px">Je Tab rechts eine Zusatzfläche: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Wetter</b> oder <b>Kalender</b>. <b>Screen füllen</b> = kein Zusatz, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
+         '<div class="hint" style="padding-top:4px">Je Tab rechts eine Zusatzfläche: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Kamera</b> (Intercom-Live-Bild – Kamera daneben wählbar, Zugang unter Einstellungen → Intercom), <b>Wetter</b>, <b>Kalender</b> oder <b>Energiefluss</b>. <b>Screen füllen</b> = kein Zusatz, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
      '</div></div></section>'+
 
    '<section class="spane" data-sub="overlay"><div class="card"><h3>Aktiv-Overlay</h3>'+
-     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
+     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Darunter der Rahmen der <b>inaktiven</b> Kacheln – Deckkraft und Breite hochdrehen, falls er auf hellen Displays (z. B. Shelly) kaum sichtbar ist. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
      '<div class="ovwrap">'+
-       '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div></div>'+
+       '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div>'+
+         '<div class="ovtile off" id="ovPrevOff">Aus</div></div>'+
        '<div class="ovctrl">'+overlayFields((p.ui||{}).overlay,'ov_')+
          '<div class="frow"><button class="minibtn" id="ovReset">Auf Standard zurücksetzen</button></div>'+
        '</div></div></div></section>';
@@ -1181,7 +1205,8 @@ function renderTileEditor(){
         '<span class="tgl'+(ov.overlay?' on':'')+'" id="tOvOn" title="Für diese Kachel abweichend">◐</span>'+
         '<span style="color:var(--muted);font-size:12.5px">abweichend vom Panel</span></div>'+
       '<div class="ovwrap" id="tOvBox"'+(ov.overlay?'':' style="display:none"')+'>'+
-        '<div class="ovprev"><div class="ovtile on" id="tovPrev">An</div></div>'+
+        '<div class="ovprev"><div class="ovtile on" id="tovPrev">An</div>'+
+          '<div class="ovtile off" id="tovPrevOff">Aus</div></div>'+
         '<div class="ovctrl">'+overlayFields(ov.overlay,'tov_')+'</div></div>'+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';

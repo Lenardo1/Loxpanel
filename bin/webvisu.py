@@ -225,6 +225,24 @@ def _overlay_alphas(ov: dict) -> tuple[float, float, int]:
     return fill, bord, bw
 
 
+def _inactive_border(ov: dict) -> tuple[float, int]:
+    """Overlay-Config -> (Rahmen-Alpha, Rahmenbreite px) fuer NICHT aktive Kacheln.
+
+    Defaults entsprechen dem bisherigen fest verdrahteten --line (weiss 8%) und
+    1px, damit sich ohne Konfiguration nichts aendert. `ibord`/`ibw` machen den
+    sonst kaum sichtbaren Kachelrahmen (z.B. auf hellen Shelly-Displays) staerker.
+    """
+    ov = ov if isinstance(ov, dict) else {}
+    def _num(key, default):
+        try:
+            return float(ov.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+    alpha = max(0.0, min(1.0, _num("ibord", 8) / 100.0))
+    bw = max(1, min(4, int(_num("ibw", 1))))
+    return alpha, bw
+
+
 def _sanitize_overlay(ov) -> dict:
     """Overlay-Config aus der Config-Seite auf erlaubte Werte eindampfen."""
     if not isinstance(ov, dict):
@@ -232,11 +250,12 @@ def _sanitize_overlay(ov) -> dict:
     out: dict = {}
     if ov.get("mode") in ("both", "border", "fill"):
         out["mode"] = ov["mode"]
-    for k in ("fill", "bord"):
+    for k in ("fill", "bord", "ibord"):
         if isinstance(ov.get(k), (int, float)):
             out[k] = max(0, min(100, int(ov[k])))
-    if isinstance(ov.get("bw"), (int, float)):
-        out["bw"] = max(1, min(4, int(ov["bw"])))
+    for k in ("bw", "ibw"):
+        if isinstance(ov.get(k), (int, float)):
+            out[k] = max(1, min(4, int(ov[k])))
     return out
 
 
@@ -1013,6 +1032,10 @@ class App:
             v["--ov-fill"] = f"{fill:.3g}"
             v["--ov-bord"] = f"{bord:.3g}"
             v["--ov-bw"] = f"{bw}px"
+            # Rahmen der NICHT aktiven Kacheln (sonst kaum sichtbar auf hellen Displays).
+            ialpha, ibw = _inactive_border(ui["overlay"])
+            v["--tile-bord"] = f"rgba(255,255,255,{ialpha:.3g})"
+            v["--tile-bw"] = f"{ibw}px"
         if ui.get("font"):
             v["--font"] = ui["font"]
         if ui.get("textColor"):
@@ -2283,6 +2306,9 @@ class App:
             style["ovFill"] = f"{fill:.3g}"     # ueberschreibt --ov-* nur fuer diese Kachel
             style["ovBord"] = f"{bord:.3g}"
             style["ovBw"] = bw
+            ialpha, ibw = _inactive_border(ov["overlay"])
+            style["tileBord"] = f"rgba(255,255,255,{ialpha:.3g})"   # inaktiver Rahmen nur fuer diese Kachel
+            style["tileBw"] = ibw
         if style:
             it["style"] = style
         ic = ov.get("icon")
