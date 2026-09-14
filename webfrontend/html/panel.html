@@ -115,7 +115,7 @@
   #playerpane .pptrans{display:flex;gap:14px;justify-content:center;align-items:center;}
   #playerpane .ppvol{display:flex;align-items:center;gap:8px;}
   #playerpane .ppvol .sico{color:var(--muted);} #playerpane .ppvol .sico svg{width:20px;height:20px;}
-  #playerpane .ppvol input[type=range]{flex:1;accent-color:var(--accent);}
+  #playerpane .ppvol .sld{flex:1;}
   #playerpane .ppvol .sval{min-width:34px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;}
   /* Scrollbarer Kachelbereich: var(--cols) Spalten x var(--rows) Reihen sichtbar */
   .grid{--gap:10px;grid-area:1/1;
@@ -263,9 +263,14 @@
   .menuitem:active{background:rgba(255,255,255,.13);}
   .menuitem.on{color:var(--glow);background:rgba(224,162,77,.15);}
   /* Musik-Player */
-  .cover{position:relative;display:grid;place-items:center;padding:4px 0 2px;}
-  .cover .coverph,.cover img{width:60%;max-width:210px;aspect-ratio:1/1;border-radius:12px;}
-  .cover .coverph{position:absolute;background:var(--tile);display:grid;place-items:center;color:var(--muted);}
+  /* Cover = zentriertes Quadrat, das in Breite UND Hoehe der Flaeche passt.
+     Ohne Hoehen-Cap ueberdeckt/verdraengt es auf flachen bzw. quadratischen
+     Displays (4-Zoll 480x480, Shelly X2) Titel/Interpret. */
+  .cover{position:relative;display:grid;place-items:center;padding:4px 0 2px;min-height:0;}
+  .cover .coverph,.cover img{width:auto;height:auto;
+    max-width:min(60%,210px);max-height:min(44vh,210px);aspect-ratio:1/1;border-radius:12px;}
+  .cover .coverph{position:absolute;width:120px;height:120px;
+    background:var(--tile);display:grid;place-items:center;color:var(--muted);}
   .cover .coverph svg{width:44px;height:44px;}
   .cover img{position:relative;object-fit:cover;opacity:0;transition:opacity .2s;
     box-shadow:0 8px 24px rgba(0,0,0,.45);}
@@ -293,11 +298,18 @@
     place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none;}
   .sbtn:active{background:var(--glow);color:#04121f;}
   #playerpane .ppvol .sbtn{width:30px;height:30px;font-size:18px;}
-  .sld{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
-    background:rgba(255,255,255,.15);outline:none;}
-  .sld::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
-    background:var(--glow);cursor:pointer;}
-  .sld::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;
+  /* Einheitliche Lautstaerke-/Wert-Leiste fuer BEIDE Player (Vollseite + Pane).
+     Fuellung ueber --p (Prozent, per JS gesetzt) statt natives accent-color,
+     damit sie auf jedem WebView gleich aussieht und der Track nie verschwindet. */
+  .sld{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:4px;cursor:pointer;
+    outline:none;background:linear-gradient(to right,
+      var(--glow) var(--p,0%),rgba(255,255,255,.22) var(--p,0%));}
+  .sld::-webkit-slider-runnable-track{-webkit-appearance:none;height:6px;border-radius:4px;background:transparent;}
+  .sld::-webkit-slider-thumb{-webkit-appearance:none;margin-top:-6px;width:18px;height:18px;border-radius:50%;
+    background:var(--glow);border:2px solid var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:pointer;}
+  .sld::-moz-range-track{height:6px;border-radius:4px;background:rgba(255,255,255,.22);}
+  .sld::-moz-range-progress{height:6px;border-radius:4px;background:var(--glow);}
+  .sld::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--bg);border-radius:50%;
     background:var(--glow);cursor:pointer;}
   /* Schwebender Zurück-Pfeil (nur beim Reinnavigieren) */
   .tabback{flex:0 0 auto;align-self:center;width:50px;height:50px;margin:0 14px;
@@ -704,11 +716,17 @@ function doSecure(uuid,cmd,msg){
 }
 function sendCmd(uuid,cmd,secured){ if(secured) doSecure(uuid,cmd,''); else send({t:'cmd',uuid,cmd}); }
 const SLD_STEP=5;   // Schrittweite der -/+ Tasten am Schieberegler (Lautstaerke etc.)
+// Fuellstand der Leiste als CSS-Var --p (Prozent) setzen -> gefuellte Anzeige
+// unabhaengig vom nativen accent-color-Rendering des jeweiligen WebViews.
+function sldFill(sld){ if(!sld)return;
+  const min=+sld.min||0, max=(sld.max!==''?+sld.max:100);
+  const p=max>min?((+sld.value-min)/(max-min))*100:0;
+  sld.style.setProperty('--p', Math.max(0,Math.min(100,p))+'%'); }
 function nudgeSld(sld,delta,valEl){ if(!sld)return;
   const min=+sld.min||0, max=(sld.max!==''?+sld.max:100);
   let v=Math.round((+sld.value||0)+delta); v=Math.max(min,Math.min(max,v));
   if(v===(+sld.value)) return;
-  sld.value=v; if(valEl) valEl.textContent=v;
+  sld.value=v; sldFill(sld); if(valEl) valEl.textContent=v;
   if(sld._uuid&&sld._tmpl) send({t:'cmd',uuid:sld._uuid,cmd:sld._tmpl.replace('{v}',v)}); }
 
 let holdRelease=null;
@@ -809,8 +827,8 @@ function renderPanel(blocks){
   const vid=blocks.find(b=>b.k==='video'); const vimg=g.querySelector('.video img');
   if(vid&&vimg){ vimg.src=vid.src; }   // MJPEG-Stream: einmal laden, läuft live
   const sb=blocks.find(b=>b.k==='slider'); const sld=g.querySelector('.sld');
-  if(sb&&sld){ sld._uuid=sb.cmd.uuid; sld._tmpl=sb.cmd.tmpl;
-    sld.addEventListener('input',()=>{ sldDragging=true; const sv=g.querySelector('.sval'); if(sv)sv.textContent=sld.value; });
+  if(sb&&sld){ sld._uuid=sb.cmd.uuid; sld._tmpl=sb.cmd.tmpl; sldFill(sld);
+    sld.addEventListener('input',()=>{ sldDragging=true; sldFill(sld); const sv=g.querySelector('.sval'); if(sv)sv.textContent=sld.value; });
     sld.addEventListener('change',()=>{ sldDragging=false; send({t:'cmd',uuid:sld._uuid,cmd:sld._tmpl.replace('{v}',sld.value)}); });
     const sdn=g.querySelector('.srow .sbtn[data-sd="dn"]'), sup=g.querySelector('.srow .sbtn[data-sd="up"]');
     const step=(sb.step&&+sb.step>0)?+sb.step:SLD_STEP;
@@ -849,7 +867,7 @@ function updatePanel(blocks){
   const ti=blocks.find(b=>b.k==='title'); if(ti){const e=g.querySelector('.ptitle'); if(e){ e.childNodes[0].nodeValue=ti.text||''; const su=e.querySelector('.psub'); if(su)su.textContent=ti.sub||''; }}
   const ast=blocks.find(b=>b.k==='astat'); if(ast){const e=g.querySelector('.astat'); if(e){ e.childNodes[0].nodeValue=ast.text||''; e.className='astat'+(ast.tone==='crit'?' crit':''); const su=e.querySelector('.astatsub'); if(su)su.textContent=ast.sub||''; }}
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img&&img.getAttribute('src')!==cov.src){img.style.opacity='0'; img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
-  const sb=blocks.find(b=>b.k==='slider'); if(sb){const sld=g.querySelector('.sld'); if(sld&&!sldDragging){ sld.value=sb.value; const sv=g.querySelector('.sval'); if(sv)sv.textContent=sb.value; }}
+  const sb=blocks.find(b=>b.k==='slider'); if(sb){const sld=g.querySelector('.sld'); if(sld&&!sldDragging){ sld.value=sb.value; sldFill(sld); const sv=g.querySelector('.sval'); if(sv)sv.textContent=sb.value; }}
   const efb=blocks.find(b=>b.k==='eflow'); if(efb){ const d=g.querySelector('[data-eflow]'); if(d) paintEnergy(d, efb.e); }   // Radial live aktualisieren (in-place)
   rowBlocks.forEach((b,ri)=>{ const rowEl=rows[ri]; if(!rowEl)return;
     b.cells.forEach((c,ci)=>{ const btn=rowEl.querySelector('[data-c="'+ci+'"]'); if(!btn)return;
@@ -1493,12 +1511,12 @@ function renderPlayer(blocks){
       '<div class="pptrans" id="pptrans"></div>'+
       '<div class="ppvol"><span class="sico">'+svg(ICONS.vol)+'</span>'+
         '<button type="button" class="sbtn" data-sd="dn">−</button>'+
-        '<input type="range" id="ppsld" min="0" max="100" value="0">'+
+        '<input type="range" class="sld" id="ppsld" min="0" max="100" value="0">'+
         '<button type="button" class="sbtn" data-sd="up">+</button><span class="sval" id="ppsldv">0</span></div>';
     const s=el('ppsld');
     pane.querySelector('.ppvol .sbtn[data-sd="dn"]').addEventListener('pointerdown',ev=>{ ev.preventDefault(); nudgeSld(s,-SLD_STEP,el('ppsldv')); });
     pane.querySelector('.ppvol .sbtn[data-sd="up"]').addEventListener('pointerdown',ev=>{ ev.preventDefault(); nudgeSld(s,SLD_STEP,el('ppsldv')); });
-    s.addEventListener('input',()=>{ _playerVolDrag=true; el('ppsldv').textContent=s.value; });
+    s.addEventListener('input',()=>{ _playerVolDrag=true; sldFill(s); el('ppsldv').textContent=s.value; });
     s.addEventListener('change',()=>{ _playerVolDrag=false;
       if(s._uuid&&s._tmpl) send({t:'cmd',uuid:s._uuid,cmd:s._tmpl.replace('{v}',s.value)}); });
     _playerBuilt=true;
@@ -1524,7 +1542,7 @@ function renderPlayer(blocks){
       n.className='btn'+(c.icon?' icon':'')+(c.big?' big':''); });
   }
   if(sl){ const s=el('ppsld'); if(s&&sl.cmd){ s._uuid=sl.cmd.uuid; s._tmpl=sl.cmd.tmpl; }
-    if(s&&!_playerVolDrag){ s.value=sl.value; el('ppsldv').textContent=sl.value; } }
+    if(s&&!_playerVolDrag){ s.value=sl.value; sldFill(s); el('ppsldv').textContent=sl.value; } }
 }
 function resetIdle(){ clearTimeout(idleTimer);
   idleTimer=setTimeout(()=>{ goTab(tabsCfg[0]||'favoriten'); showSaver(); }, SAVER_IDLE_MS);
