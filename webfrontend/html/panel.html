@@ -57,6 +57,13 @@
   /* Split-Pane Wetter/Kalender: rechte Spalte, eigener Scroll (Agenda). */
   .screen.split #frontpane{display:flex;flex-direction:column;grid-column:2;grid-row:1;
     border-left:1px solid var(--line);overflow-y:auto;padding:14px;gap:10px;}
+  /* Kamera-Pane: MJPEG-Live-Bild fuellt die rechte Spalte (kein Padding/Scroll). */
+  /* Kamera-Pane: volle Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons). */
+  #frontpane.cam{justify-content:flex-start;}
+  #frontpane .cambell{margin:0;}
+  #frontpane .camwait{display:flex;flex-direction:column;align-items:center;gap:10px;
+    color:var(--muted);padding:24px 0;}
+  #frontpane .camwait svg{width:56px;height:56px;opacity:.5;}
   /* Energiefluss-Pane (Radial, Loxone-Standard). Erzeugung=Akzent, Verbrauch=Glow. */
   .epane{flex:1;display:flex;flex-direction:column;min-height:0;}
   .epane .etop{display:flex;justify-content:center;padding:2px 0 2px;}
@@ -576,10 +583,11 @@ let gridCols = 2;   // effektive Spalten der aktuellen Ansicht (Vollbreit-Pane -
 let gridRows = 2;   // effektive sichtbare Zeilen pro Seite
 let profCols = 2, profRows = 2;   // Profil-Standard (aus dem Theme); Vollbreit ueberschreibt auf 4x2
 let _playerBuilt = false, _playerVolDrag = false;   // fester Player (Split-Layout)
-// Split-Pane pro Tab: panesCfg = {tabKennung -> "weather"|"calendar"|"wide"|"player:<zone>"|"energy:<uuid>"}
+// Split-Pane pro Tab: panesCfg = {tabKennung -> "weather"|"calendar"|"wide"|"player:<zone>"|"energy:<uuid>"|"camera:<uuid>"}
 // (vom Server). themeFill = "Bildschirm fuellen" (gilt jetzt auch im Split).
 // curPlayerZone = zuletzt an den Server gemeldete Player-Zone (setplayer).
-let panesCfg = {}, themeFill = false, curPlayerZone = '', curEnergyUuid = '';
+let panesCfg = {}, themeFill = false, curPlayerZone = '', curEnergyUuid = '', curCameraUuid = '';
+let cameraData = null;   // letzter {t:'camera'}-Push (Intercom-Bloecke) fuer die Kamera-Pane
 let energyData = null;   // letzter {t:'energy'}-Push fuer die Energiefluss-Pane
 let themeSplit = true;   // Split-Screen an/aus (aus = 4"-Panel: nur die Visu, keine Pane 2)
 
@@ -882,28 +890,41 @@ function renderTabs(){
   applyPane();
 }
 // ---- Split-Pane pro Tab: entscheidet je aktuellem Tab, was rechts steht ----
-// Wert je Tab: "weather" | "calendar" | "wide" | "player:<zone-uuid>" | "energy:<uuid>".
+// Wert je Tab: "weather" | "calendar" | "wide" | "player:<zone-uuid>" | "energy:<uuid>" | "camera:<uuid>".
 function paneForTab(tk){ return tk ? (panesCfg[tk]||null) : null; }
-function paneKind(v){ return v ? (v.indexOf('player:')===0 ? 'player' : (v.indexOf('energy:')===0 ? 'energy' : v)) : null; }
+function paneKind(v){ return v ? (v.indexOf('player:')===0 ? 'player' : (v.indexOf('energy:')===0 ? 'energy' : (v.indexOf('camera:')===0 ? 'camera' : v))) : null; }
 function applyPane(){
   const sc=document.querySelector('.screen'); if(!sc) return;
   const raw=themeSplit?paneForTab(activeTab()):null;   // Split aus (4"-Panel) -> keine Pane 2
   const kind=paneKind(raw);
-  const isPane=(kind==='player'||kind==='weather'||kind==='calendar'||kind==='energy');   // Widget in Pane 2
+  const isPane=(kind==='player'||kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera');   // Widget in Pane 2
   sc.classList.toggle('split', isPane);   // Widget -> zweigeteilt, sonst "Screen fuellen"
   sc.classList.toggle('fill', themeFill);  // "Bildschirm fuellen" fuellt Split UND Screen-fuellen
   const pp=el('playerpane'), fp=el('frontpane');
   if(pp) pp.hidden=(kind!=='player');
-  if(fp) fp.hidden=!(kind==='weather'||kind==='calendar'||kind==='energy');
+  if(fp){
+    fp.hidden=!(kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera');
+    fp.classList.toggle('cam', kind==='camera');
+    // Kamera verlassen -> Video-Stream stoppen (Inhalt leeren), keine Hintergrund-Verbindung.
+    if(kind!=='camera' && fp.dataset.cam!==undefined){ fp.innerHTML=''; delete fp.dataset.cam; delete fp.dataset.camsig; }
+  }
   if(kind==='weather') renderWeatherPane(fp);
   else if(kind==='calendar') renderCalendarPane(fp);
   else if(kind==='energy') renderEnergyPane(fp);
+  else if(kind==='camera') renderCameraPane(fp);
   // Player-Zone dieses Tabs dem Server melden (nur bei Aenderung -> er pusht die Blocks).
   const zone=(kind==='player')?raw.slice(7):'';
   if(zone!==curPlayerZone){ curPlayerZone=zone; _playerBuilt=false; try{ send({t:'setplayer',zone:zone}); }catch(e){} }
   // Energiefluss-Kachel dieses Tabs dem Server melden (er pusht dann {t:'energy'}).
   const euid=(kind==='energy')?raw.slice(7):'';
   if(euid!==curEnergyUuid){ curEnergyUuid=euid; try{ send({t:'setenergy',uuid:euid}); }catch(e){} }
+  // Kamera (Intercom) dieses Tabs dem Server melden (er pusht dann {t:'camera'} mit Video+Buttons).
+  const cuid=(kind==='camera')?raw.slice(7):'';
+  if(cuid!==curCameraUuid){ curCameraUuid=cuid; cameraData=null;
+    if(fp){ delete fp.dataset.cam; delete fp.dataset.camsig; }
+    try{ send({t:'setcamera',uuid:cuid}); }catch(e){}
+    if(cuid&&kind==='camera') renderCameraPane(fp);   // sofort Platzhalter zeigen, bis der Push kommt
+  }
 }
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und
@@ -959,7 +980,7 @@ function render(){
   // Kacheln). Nur im Querformat (2-Pane-Tablet); das quadratische 4"-Panel
   // bleibt einspaltig. Unabhaengig vom Zoom ("Bildschirm fuellen").
   const _k = themeSplit ? paneKind(paneForTab(activeTab())) : null;   // Split aus -> nie Pane/Verdopplung
-  const _widget = (_k==='player'||_k==='weather'||_k==='calendar'||_k==='energy');
+  const _widget = (_k==='player'||_k==='weather'||_k==='calendar'||_k==='energy'||_k==='camera');
   if(themeSplit && !_widget && window.innerWidth > window.innerHeight){ gridCols = profCols*2; gridRows = profRows; }
   else { gridCols = profCols; gridRows = profRows; }
   document.documentElement.style.setProperty('--cols', gridCols);
@@ -1164,6 +1185,7 @@ function connect(){
     if(msg.t==='front'){ frontData=msg; renderFront(); if(FRONT_TEST) renderFrontRich(el('frontPage')); applyPane(); return; }   // Kalender/Wetter fuer die Uhr-Seite
     if(msg.t==='player'){ renderPlayer(msg.blocks); return; }   // fester Player im Split-Layout
     if(msg.t==='energy'){ energyData=msg; const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='energy') renderEnergyPane(fp); return; }   // Energiefluss-Pane
+    if(msg.t==='camera'){ cameraData=msg; const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='camera') renderCameraPane(fp); return; }   // Kamera-Pane (Intercom-Vollansicht)
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
@@ -1421,6 +1443,38 @@ function paintEnergy(elc,d){
 }
 function renderEnergyPane(elc){ if(elc) paintEnergy(elc, energyData||{}); }
 
+// Kamera-Pane: VOLLE Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons),
+// gleiche Blöcke wie der Baustein (kommen per {t:'camera'}-Push vom Server). Das Video
+// wird wie beim Baustein direkt geladen (kein onload-Gate -> zeigt auch in Browsern, die
+// ein nacktes MJPEG-<img> nicht rendern). Struktur nur bei Änderung neu bauen, sonst nur
+// Buttons/Klingel in-place aktualisieren -> der Video-Stream läuft ununterbrochen weiter.
+function renderCameraPane(elc){ if(!elc) return;
+  const blocks=(cameraData&&cameraData.blocks)||null;
+  if(blocks===null){   // Push noch nicht da -> Platzhalter
+    if(elc.dataset.cam!=='wait'){ elc.dataset.cam='wait'; delete elc.dataset.camsig;
+      elc.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div>'; }
+    return;
+  }
+  const video=blocks.find(b=>b.k==='video'), row=blocks.find(b=>b.k==='row');
+  const bell=blocks.find(b=>b.k==='astat'), nostat=blocks.find(b=>b.k==='status');
+  const sig=(video?'v':'')+'|'+(row?row.cells.length:0)+'|'+(nostat?nostat.text:'');
+  if(elc.dataset.camsig!==sig){          // Struktur -> Neuaufbau
+    elc.dataset.camsig=sig; elc.dataset.cam='1';
+    let html='<div class="cambell astat crit" hidden></div>';
+    html+= video ? '<div class="video"><img alt=""></div>'
+                 : '<div class="status">'+esc(nostat?nostat.text:'Kein Video')+'</div>';
+    if(row) html+='<div class="brow'+(row.wrap?' wraprow':'')+'">'+row.cells.map(cellHtml).join('')+'</div>';
+    elc.innerHTML=html;
+    const vimg=elc.querySelector('.video img'); if(vimg&&video) vimg.src=video.src;   // direkt, KEIN onload-Gate
+    if(row){ const btns=elc.querySelectorAll('.brow [data-c]');
+      row.cells.forEach((c,i)=>{ const btn=btns[i]; if(!btn)return;
+        btn.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(c.cmd) sendCmd(c.cmd.uuid,c.cmd.cmd,false); }); }); }
+  } else if(row){                         // gleiche Struktur -> nur Buttons aktualisieren (Video unangetastet)
+    const btns=elc.querySelectorAll('.brow [data-c]');
+    row.cells.forEach((c,i)=>{ const btn=btns[i]; if(btn){ btn.textContent=c.label||''; btn.className='btn'+(c.on?' on':''); } });
+  }
+  const be=elc.querySelector('.cambell'); if(be){ if(bell){ be.textContent=bell.text||''; be.hidden=false; } else be.hidden=true; }
+}
 function renderWeatherPane(elc){ if(!elc) return; const d=frontData||{};
   elc.innerHTML=fpWeatherHTML(d.weather)||'<div class="fp-empty">Kein Wetter konfiguriert.</div>'; }
 function fpMonthHTML(events, holidays){

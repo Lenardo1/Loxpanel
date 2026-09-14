@@ -445,6 +445,7 @@ class App:
         self._drv_session: aiohttp.ClientSession | None = None   # HTTP-Session fuer Display-Treiber (Kiosk-Apps)
         self.conn_player: dict[web.WebSocketResponse, str] = {}   # ws -> AudioZone-UUID der aktiven Player-Pane (via setplayer)
         self.conn_energy: dict[web.WebSocketResponse, str] = {}   # ws -> EFM/EnergyManager2-UUID der aktiven Energiefluss-Pane (via setenergy)
+        self.conn_camera: dict[web.WebSocketResponse, str] = {}   # ws -> Intercom-UUID der aktiven Kamera-Pane (via setcamera)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
@@ -1071,6 +1072,21 @@ class App:
             return None
         return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
 
+    def intercom_blocks(self, uuid: str):
+        """Volle Intercom-Ansicht (Video + Tuer-/Ausgang-Buttons + Klingel-Banner)
+        einer Intercom-UUID fuer die Kamera-Pane. Gleiche Bloecke wie die
+        Detailansicht -> das Bild wird wie beim Baustein direkt geladen (robust,
+        auch wo ein nacktes MJPEG-<img> nicht anzeigt). None, wenn kein Intercom."""
+        c = self.controls.get(uuid or "")
+        if not c or c.get("type") != "Intercom":
+            return None
+        try:
+            v = self._view_control_inner(uuid)
+        except Exception:
+            log.exception("intercom_blocks fehlgeschlagen (%s)", uuid)
+            return None
+        return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
+
     def energy_blocks(self, uuid: str, max_cons: int = 6):
         """Energiefluss-Daten (Radial, Loxone-Standard) einer EFM/EnergyManager2-
         Kachel fuers Panel. EFM: genau die in der Loxone-Config angelegten Knoten
@@ -1418,7 +1434,7 @@ class App:
         # Split-Pane je Tab: nur gueltige Tab-Kennung -> "weather"|"calendar".
         if isinstance(ui.get("panes"), dict):
             ui["panes"] = {str(k): v for k, v in ui["panes"].items()
-                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
             if not ui["panes"]:
                 ui.pop("panes", None)
         else:
@@ -1493,7 +1509,7 @@ class App:
                 cui["player"] = ui["player"]    # Split-Layout: AudioZone-UUID fuer den festen Player
             if isinstance(ui.get("panes"), dict):
                 pn = {str(k): v for k, v in ui["panes"].items()
-                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
                 if pn:
                     cui["panes"] = pn           # Split-Pane je Tab: Wetter/Kalender/Vollbreit
             if _color_ok(ui.get("textColor")):
@@ -3649,6 +3665,7 @@ class App:
             self.conn_dev.pop(ws, None)
             self.conn_player.pop(ws, None)
             self.conn_energy.pop(ws, None)
+            self.conn_camera.pop(ws, None)
             try:
                 await ws.close()
             except Exception:
@@ -3707,11 +3724,23 @@ class App:
                         energy_msg = {"t": "energy", **eb} if eb is not None else None
                     except Exception:
                         log.exception("energy_blocks fehlgeschlagen (%s)", _euid)
+                # Split-Layout: Kamera-Pane (Intercom-Vollansicht) des aktiven Tabs
+                # mitrendern (kommt vom Client via setcamera -> conn_camera).
+                camera_msg = None
+                _cuid = self.conn_camera.get(ws)
+                if _cuid:
+                    try:
+                        ib = self.intercom_blocks(_cuid)
+                        camera_msg = {"t": "camera", "blocks": ib} if ib is not None else None
+                    except Exception:
+                        log.exception("intercom_blocks fehlgeschlagen (%s)", _cuid)
                 if await self._send_or_drop(ws, msg):
                     if player_msg is not None:
                         await self._send_or_drop(ws, player_msg)
                     if energy_msg is not None:
                         await self._send_or_drop(ws, energy_msg)
+                    if camera_msg is not None:
+                        await self._send_or_drop(ws, camera_msg)
 
     async def broadcaster(self) -> None:
         # Diese Schleife darf NIEMALS sterben — sonst bekommen ALLE Panels keine
@@ -4326,6 +4355,7 @@ async def _push(app: "App", msg: dict, panel: str = "", device: str = "") -> int
             app.conn_info.pop(ws, None)
             app.conn_player.pop(ws, None)
             app.conn_energy.pop(ws, None)
+            app.conn_camera.pop(ws, None)
     return n
 
 
@@ -4596,6 +4626,20 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         log.exception("energy_blocks (setenergy) fehlgeschlagen (%s)", euid)
                 else:
                     app.conn_energy.pop(ws, None)
+            elif data.get("t") == "setcamera":
+                # Client meldet die Intercom-Kachel der aktiven Kamera-Pane
+                # (oder "" = keine).
+                cuid = str(data.get("uuid") or "").strip()
+                if cuid:
+                    app.conn_camera[ws] = cuid
+                    try:
+                        ib = app.intercom_blocks(cuid)
+                        if ib is not None:
+                            await ws.send_json({"t": "camera", "blocks": ib})
+                    except Exception:
+                        log.exception("intercom_blocks (setcamera) fehlgeschlagen (%s)", cuid)
+                else:
+                    app.conn_camera.pop(ws, None)
     finally:
         app.conn_route.pop(ws, None)
         app.conn_prof.pop(ws, None)
@@ -4603,6 +4647,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         app.conn_info.pop(ws, None)
         app.conn_player.pop(ws, None)
         app.conn_energy.pop(ws, None)
+        app.conn_camera.pop(ws, None)
     return ws
 
 
