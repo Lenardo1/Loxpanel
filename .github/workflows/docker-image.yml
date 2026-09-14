@@ -23,9 +23,11 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          # PAT mit Scope write:packages als Repo-Secret GHCR_TOKEN hinterlegen
-          # (umgeht die GITHUB_TOKEN/Package-Verknuepfungs-Probleme komplett).
-          password: ${{ secrets.GHCR_TOKEN }}
+          # Optional: PAT mit Scope write:packages als Repo-Secret GHCR_TOKEN
+          # hinterlegen. Fehlt es, reicht das GITHUB_TOKEN des Workflows
+          # (packages: write), solange das Package mit diesem Repo verknuepft ist
+          # (passiert beim ersten Push aus diesem Workflow automatisch).
+          password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Image-Metadaten (Tags/Labels)
         id: meta
