@@ -56,9 +56,13 @@
     min-height:0;border-left:1px solid var(--line);overflow:hidden;padding:14px;gap:10px;}
   /* Split-Pane Wetter/Kalender/Energie: rechte Spalte, auf Pane-Hoehe begrenzt
      (min-height:0 + minmax(0,1fr)-Zeile) -> Inhalt scrollt INNEN statt ueber den
-     Kachelrahmen hinauszulaufen. */
+     Kachelrahmen hinauszulaufen. Seiten-Snapping wie beim Kachel-Grid:
+     jede .fp-page fuellt genau die Pane-Hoehe, Scrollen rastet seitenweise ein. */
   .screen.split #frontpane{display:flex;flex-direction:column;grid-column:2;grid-row:1;
-    min-height:0;border-left:1px solid var(--line);overflow-y:auto;padding:14px;gap:10px;}
+    min-height:0;border-left:1px solid var(--line);overflow-y:auto;padding:14px;gap:10px;
+    scroll-snap-type:y mandatory;}
+  .screen.split #frontpane .fp-page{flex:0 0 auto;min-height:100%;
+    display:flex;flex-direction:column;gap:10px;scroll-snap-align:start;scroll-snap-stop:always;}
   /* Energiefluss-Pane (Radial, Loxone-Standard). Erzeugung=Akzent, Verbrauch=Glow. */
   .epane{flex:1;display:flex;flex-direction:column;min-height:0;}
   .epane .etop{display:flex;justify-content:center;padding:2px 0 2px;}
@@ -1286,7 +1290,8 @@ function fpCurve(hourly){
     lbl+'</svg>';
 }
 function windDir(deg){ const C=['N','NO','O','SO','S','SW','W','NW']; return (deg==null)?'':(C[Math.round(deg/45)%8]||''); }
-function fpWeatherHTML(w){
+// Seite 1 (fuellt die 2x2-Kachelhoehe): Aktuell + Kurve + Vorschau.
+function fpWeatherMainHTML(w){
   if(!w) return '';
   let html='<div class="fp-h" data-i18n>Wetter</div>';
   html+='<div class="fp-now"><span class="ico '+esc(w.icon||'cloud')+'">'+wxSvg(w.icon)+'</span>'+
@@ -1302,7 +1307,11 @@ function fpWeatherHTML(w){
     '<span class="ico '+esc(f.icon||'cloud')+'">'+wxSvg(f.icon)+'</span>'+
     '<span class="tt"><span class="mx">'+tdeg(f.hi)+'</span> <span class="mn">'+tdeg(f.lo)+'</span></span>'+
     (f.pop!=null?'<span class="pop">'+f.pop+'%</span>':'')+'</div>').join('')+'</div>';
-  // Detailkacheln fuellen den restlichen Pane-Platz (nur vorhandene Werte).
+  return html;
+}
+// Seite 2: Detailkacheln (nur vorhandene Werte).
+function fpWeatherDetailHTML(w){
+  if(!w) return '';
   const det=[];
   if(w.humidity!=null) det.push(['Luftfeuchte', w.humidity+' %']);
   if(w.wind!=null) det.push(['Wind', w.wind+' km/h'+(w.wind_dir!=null?' '+windDir(w.wind_dir):'')]);
@@ -1310,8 +1319,9 @@ function fpWeatherHTML(w){
   if(w.uv!=null) det.push(['UV-Index', String(w.uv)]);
   if(w.precip_sum!=null) det.push(['Niederschlag', String(w.precip_sum).replace('.',',')+' mm']);
   if(w.pressure!=null) det.push(['Luftdruck', w.pressure+' hPa']);
-  if(det.length) html+='<div class="fp-det">'+det.map(x=>'<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')+'</div>';
-  return html;
+  return det.length ? '<div class="fp-det">'+det.map(x=>'<div><span>'+esc(x[0])+'</span><b>'+esc(x[1])+'</b></div>').join('')+'</div>' : '';
+}
+function fpWeatherHTML(w){ if(!w) return ''; return fpWeatherMainHTML(w)+fpWeatherDetailHTML(w);
 }
 let calMonthOff=0, calSel='';   // Kalender-Pane: Monatsverschiebung + gewaehlter Tag (ISO)
 function isoDay(dt){ const p=n=>String(n).padStart(2,'0'); return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate()); }
@@ -1423,8 +1433,12 @@ function paintEnergy(elc,d){
 }
 function renderEnergyPane(elc){ if(elc) paintEnergy(elc, energyData||{}); }
 
-function renderWeatherPane(elc){ if(!elc) return; const d=frontData||{};
-  elc.innerHTML=fpWeatherHTML(d.weather)||'<div class="fp-empty">Kein Wetter konfiguriert.</div>'; }
+function renderWeatherPane(elc){ if(!elc) return; const d=frontData||{}, w=d.weather;
+  if(!w){ elc.innerHTML='<div class="fp-empty">Kein Wetter konfiguriert.</div>'; return; }
+  // Seite 1 = Aktuell/Kurve/Vorschau (fuellt die 2x2-Hoehe), Seite 2 = Detailkacheln.
+  const det=fpWeatherDetailHTML(w);
+  elc.innerHTML='<div class="fp-page">'+fpWeatherMainHTML(w)+'</div>'
+    +(det?'<div class="fp-page">'+det+'</div>':''); }
 function fpMonthHTML(events, holidays){
   const base=new Date(); base.setDate(1); base.setMonth(base.getMonth()+calMonthOff);
   const y=base.getFullYear(), m=base.getMonth();
@@ -1451,7 +1465,9 @@ function fpMonthHTML(events, holidays){
   return html+'</div></div>';
 }
 function renderCalendarPane(elc){ if(!elc) return; const d=frontData||{};
-  elc.innerHTML=fpMonthHTML(d.events, d.holidays)+fpCalHTML(d);
+  // Seite 1 = Monat (fuellt die 2x2-Hoehe), Seite 2 = Agenda/Termine.
+  elc.innerHTML='<div class="fp-page">'+fpMonthHTML(d.events, d.holidays)+'</div>'
+    +'<div class="fp-page">'+fpCalHTML(d)+'</div>';
   elc.querySelectorAll('[data-mnav]').forEach(b=>b.onclick=()=>{ calMonthOff+=parseInt(b.dataset.mnav)||0; renderCalendarPane(elc); });
   elc.querySelectorAll('[data-day]').forEach(c=>c.onclick=()=>{ calSel=(calSel===c.dataset.day?'':c.dataset.day); renderCalendarPane(elc); });
   elc.querySelectorAll('[data-calall]').forEach(b=>b.onclick=()=>{ calSel=''; renderCalendarPane(elc); });
