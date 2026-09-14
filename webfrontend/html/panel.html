@@ -348,6 +348,17 @@
   .sv-wrap.rich .sv-date{font-size:15px;}
   .sv-wrap.rich .sv-clock{margin:20px 0 6px;}   /* Uhr klar von der Wettervorschau darueber absetzen */
   .sv-wrap.rich .sv-hint{display:none;}   /* bei voller Front kein Platz; nur-Uhr behaelt ihn */
+  /* Split-Panel: doppelte Breite nutzen. Uhr oben mittig ueber beide Spalten,
+     darunter Wetter links und Kalender rechts. Festes 2-Spalten-Grid (bricht
+     nicht um). Nur mit Front-Daten (rich); die reine Uhr bleibt zentriert. */
+  .saver.split .sv-wrap.rich{width:min(94%,820px);display:grid;
+    grid-template-columns:1fr 1fr;grid-template-areas:"clock clock" "wx cal";
+    column-gap:44px;row-gap:16px;align-items:start;}
+  .saver.split .sv-wrap.rich .sv-clock{grid-area:clock;justify-self:center;margin:0 0 4px;}
+  .saver.split .sv-wrap.rich .sv-wx{grid-area:wx;}
+  .saver.split .sv-wrap.rich .sv-cal{grid-area:cal;}
+  .saver.split .sv-wrap.rich .sv-time{font-size:60px;}
+  .saver.split .sv-wrap.rich .sv-date{font-size:18px;}
   /* Wetter oben: aktuelle Lage + Vorschau-Streifen (je Tag Icon + Max/Min). */
   .saver .sv-wx{display:flex;flex-direction:column;gap:10px;align-self:stretch;}
   .sv-wx .now{display:flex;align-items:center;gap:12px;}
@@ -1458,7 +1469,9 @@ function renderCalendarPane(elc){ if(!elc) return; const d=frontData||{};
 const FRONT_TEST=new URLSearchParams(location.search).has('front');
 if(FRONT_TEST){ const fp=el('frontPage'); if(fp) fp.classList.remove('hidden'); }
 function saverOn(){ return !el('saver').classList.contains('hidden'); }
-function showSaver(){ tickClock(); el('saver').classList.remove('hidden'); }
+function showSaver(){ tickClock();
+  el('saver').classList.toggle('split', !!themeSplit);   // Split-Panel: Screensaver zweispaltig (Uhr oben, Wetter|Kalender)
+  el('saver').classList.remove('hidden'); }
 function hideSaver(){ el('saver').classList.add('hidden'); }
 // Kurze Nachricht/Banner vom Server (t:'notify') oben im Panel einblenden.
 function showNotify(text, level, secs){
