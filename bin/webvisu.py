@@ -448,6 +448,8 @@ class App:
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
+        self._struct_sig: str | None = None   # Signatur der Loxone-Struktur (erkennt Config-Aenderungen)
+        self._pending_reload = False          # -> Panels beim naechsten Tick neu laden ({t:"reload"})
         self._dirty = True
         self.jwt: str | None = None
         self.alg: str = "SHA1"
@@ -600,6 +602,43 @@ class App:
                  len(self.controls), len(self.rooms_with), len(self.cats_with),
                  len(self.bell_map), len(self.alarm_map), len(self.playerid_by_action))
 
+    @staticmethod
+    def _structure_sig(st: dict) -> str:
+        """Signatur der Loxone-Struktur (Controls/Raeume/Kategorien). Aendert sich
+        nur bei Config-Aenderungen (Namen, neue/entfernte Controls …), nicht bei
+        State-Werten – die kommen separat ueber den WS-Stream."""
+        try:
+            rel = {"controls": st.get("controls", {}), "rooms": st.get("rooms", {}),
+                   "cats": st.get("cats", {})}
+            raw = json.dumps(rel, sort_keys=True, ensure_ascii=False, default=str)
+            return hashlib.md5(raw.encode("utf-8")).hexdigest()
+        except (TypeError, ValueError):
+            return ""
+
+    def _adopt_structure(self, st: dict) -> bool:
+        """Struktur anwenden und melden, ob sie sich seit der letzten Verbindung
+        geaendert hat (Grundlage fuer den Panel-Reload). Beim allerersten Anwenden
+        (`_struct_sig` noch None) gilt sie nie als 'geaendert' — frisch verbundene
+        Panels holen sich die Ansichten ohnehin neu."""
+        sig = self._structure_sig(st)
+        changed = bool(self._struct_sig and sig and sig != self._struct_sig)
+        self._apply_structure(st)
+        self._struct_sig = sig
+        return changed
+
+    async def _refresh_structure(self) -> bool:
+        """Struktur neu vom Miniserver laden und anwenden, WENN sie sich geaendert
+        hat (Loxone-Config geaendert). Gibt True bei Aenderung zurueck. Rein lesend;
+        Fehler werden vom Aufrufer isoliert, damit die Verbindungs-Schleife lebt."""
+        if self.client is None:
+            return False
+        st = await self.client.load_structure()
+        if not self._adopt_structure(st):
+            return False                      # unveraendert -> nichts tun (kein Panel-Reload)
+        self.states = {}                      # nach Struktur-Wechsel States frisch (MS sendet neu)
+        self._dirty = True
+        return True
+
     async def start(self) -> None:
         try:
             self.client = _make_client(self.host, self.user, self.password,
@@ -607,7 +646,12 @@ class App:
             await self.client.__aenter__()
             self.alg = (await self.client.getkey2()).hashAlg
             self.jwt = await self.client.authenticate()
-            self._apply_structure(await self.client.load_structure())
+            st = await self.client.load_structure()
+            # Reconnect nach Miniserver-Reboot (z.B. Loxone-Config hochgeladen):
+            # hat sich die Struktur geaendert, Panels neu laden lassen. Beim
+            # allerersten Start ist _struct_sig None -> kein Reload.
+            if self._adopt_structure(st):
+                self._pending_reload = True
             self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
             await self._connect_ws()
             log.info("Mit Miniserver verbunden (%s).", self.host)
@@ -654,7 +698,9 @@ class App:
         self.verify_tls = ms.get("verify_tls", False)
         old_client, self.client = self.client, newc
         self.alg, self.jwt = alg, jwt
-        self._apply_structure(st)
+        # Anderer/geaenderter Miniserver -> Struktur evtl. anders, dann Panels neu laden.
+        if self._adopt_structure(st):
+            self._pending_reload = True
         self.states = {}
         old_is, self.icon_session = self.icon_session, \
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
@@ -3614,7 +3660,17 @@ class App:
                 if self.client is None:
                     await self.start()          # Erstverbindung / nach hartem Reset
                 elif self.ws is None:
-                    await self._connect_ws()    # nur WS neu (z.B. nach Settings-Reconnect)
+                    # Reiner WS-Neuaufbau (z.B. nach Miniserver-Reboot durch eine
+                    # Loxone-Config-Aenderung): Struktur mitziehen, damit neue/
+                    # umbenannte Controls ohne LoxPanel-Neustart erscheinen. Fehler
+                    # isoliert -> Reconnect scheitert nie an der Struktur.
+                    try:
+                        if await self._refresh_structure():
+                            self._pending_reload = True   # Panels neu laden lassen
+                            log.info("Loxone-Struktur geaendert -> uebernommen, Panels werden neu geladen")
+                    except Exception:
+                        log.exception("Struktur-Refresh beim Reconnect uebersprungen")
+                    await self._connect_ws()    # WS neu (Settings-Reconnect / nach Abriss)
                 await self.ws.stream(self._on_value)
                 raise ConnectionError("WS-Stream regulär beendet")
             except asyncio.CancelledError:
@@ -3676,6 +3732,12 @@ class App:
             if self._front is not None:
                 for ws in list(self.conn_route):
                     await self._send_or_drop(ws, self._front)
+        if self._pending_reload:
+            # Loxone-Struktur hat sich geaendert (Config) -> Panels neu laden, damit
+            # neue/umbenannte Controls erscheinen. Nur bei echter Aenderung gesetzt.
+            self._pending_reload = False
+            for ws in list(self.conn_route):
+                await self._send_or_drop(ws, {"t": "reload"})
         if self._dirty and self.conn_route:
             self._dirty = False
             for ws, route in list(self.conn_route.items()):
