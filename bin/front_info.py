@@ -99,11 +99,20 @@ def _day_label(d: date, today: date) -> str:
     return f"{WD[d.weekday()]} {d.day}.{d.month}."
 
 
+def _local_naive(dt: datetime) -> datetime:
+    """Zeitzone in ORTSZEIT umrechnen und danach entfernen; naive Zeiten bleiben.
+
+    Nicht einfach `tzinfo` abschneiden: Google-Feeds liefern Einzeltermine als UTC
+    (`...T120000Z`), die sonst um den UTC-Abstand falsch am Panel stehen.
+    """
+    return dt.astimezone().replace(tzinfo=None) if dt.tzinfo is not None else dt
+
+
 def _occurrences(component, range_start: date, range_end: date):
     """Auftreten eines VEVENT im Zeitraum (loest RRULE-Serien auf).
 
     Liefert Tupel (Zeitpunkt, all_day): bei Ganztagsterminen ein `date`, sonst ein
-    naives `datetime` (TZ wird entfernt — Wanduhrzeit, wie es das Panel anzeigt).
+    naives `datetime` in ORTSZEIT (die Wanduhrzeit, die das Panel anzeigt).
     """
     dtstart_prop = component.get("dtstart")
     if not dtstart_prop:
@@ -114,18 +123,25 @@ def _occurrences(component, range_start: date, range_end: date):
     if all_day:
         base = datetime.combine(dtstart, time.min)
     else:
-        base = dtstart.replace(tzinfo=None) if dtstart.tzinfo else dtstart
+        # Aware bleibt aware: dateutil loest die Serie dann in der Original-
+        # Zeitzone auf, also ueber Sommer-/Winterzeit hinweg korrekt.
+        base = dtstart
 
     range_start_dt = datetime.combine(range_start, time.min)
     range_end_dt = datetime.combine(range_end, time.max)
+    if base.tzinfo is not None:
+        # Grenzen sind naive Ortszeit -> in dieselbe (aware) Welt heben, sonst
+        # vergleicht dateutil aware mit naiv und wirft TypeError.
+        range_start_dt = range_start_dt.astimezone()
+        range_end_dt = range_end_dt.astimezone()
     rrule = component.get("rrule")
 
     if rrule and HAVE_RRULE:
         try:
             rule = rrulestr(rrule.to_ical().decode(), dtstart=base)
             for occ in rule.between(range_start_dt, range_end_dt, inc=True):
-                occ_naive = occ.replace(tzinfo=None) if occ.tzinfo else occ
-                yield (occ_naive.date() if all_day else occ_naive, all_day)
+                occ_local = _local_naive(occ)
+                yield (occ_local.date() if all_day else occ_local, all_day)
         except Exception as e:                       # kaputte RRULE nicht fatal
             log.warning("RRULE nicht lesbar: %s", e)
     elif not rrule:
@@ -135,7 +151,7 @@ def _occurrences(component, range_start: date, range_end: date):
                 yield (d, True)
         else:
             if range_start_dt <= base <= range_end_dt:
-                yield (base, False)
+                yield (_local_naive(base), False)
 
 
 def _parse_events(ics_bytes: bytes, days: int) -> list:

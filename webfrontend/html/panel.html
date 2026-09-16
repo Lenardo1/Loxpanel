@@ -749,6 +749,19 @@ function openMenu(btn, items){
   });
   ov.addEventListener('pointerdown',()=>closeMenu());
 }
+// Struktur-Signatur der Bloecke: Art und Reihenfolge, dazu die Zaehlungen, die
+// die Anzeige formen. Weicht sie vom zuletzt Gerenderten ab, muss komplett neu
+// aufgebaut werden — in-place patchen wuerde neu dazugekommene Zeilen nie
+// erzeugen (z.B. "Wasser nachfuellen" in der Sauna) und weggefallene stehen
+// lassen.
+function blockSig(blocks){
+  return blocks.filter(b=>b.k!=='more').map(b=>
+    b.k==='row' ? 'row'+b.cells.length+(b.hidden?'h':'')
+    : b.k==='favs' ? 'favs'+(b.items?b.items.length:0)
+    : b.k==='alarmlist' ? 'alarm'+((b.entries&&b.entries.length)?1:0)
+    : b.k==='astat' ? 'astat'+(b.sub?1:0)
+    : b.k).join('|');
+}
 function renderPanel(blocks){
   stopVideo();
   closeMenu();
@@ -784,7 +797,7 @@ function renderPanel(blocks){
     if(b.k==='head') return '<div class="phead">'+esc(b.text||'')+'</div>';
     if(b.k==='favs') return '<div class="favs'+(b.wrap?' wrap':'')+'">'+b.items.map((f,i)=>'<div class="fav" data-f="'+i+'"><div class="favc">'+(f.cover?'<img loading="lazy" src="'+esc(f.cover)+'" alt="">':svg(ICONS.music))+'</div><div class="favn">'+esc(f.label)+'</div></div>').join('')+'</div>';
     if(b.k==='alarmlist'){
-      if(!b.entries||!b.entries.length) return '<div class="status">Keine Weckzeiten angelegt</div>';
+      if(!b.entries||!b.entries.length) return '<div class="status alist-empty">Keine Weckzeiten angelegt</div>';
       return '<div class="alist">'+b.entries.map(e=>
         '<div class="arow'+(e.active?'':' off')+'">'+
           '<span class="adot"></span>'+
@@ -831,23 +844,27 @@ function renderPanel(blocks){
   const fb=blocks.find(b=>b.k==='favs'); const fe=g.querySelector('.favs');
   if(fb&&fe){ fe.querySelectorAll('.fav').forEach(n=>{ const f=fb.items[+n.dataset.f]; if(!f)return;
     n.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(f.cmd){ send({t:'cmd',uuid:f.cmd.uuid,cmd:f.cmd.cmd}); back(); } }); }); }
+  g.dataset.bsig=blockSig(blocks);   // Grundlage fuer den In-place-Abgleich in updatePanel
   renderTabs();
 }
 function updatePanel(blocks){
   const g=el('grid');
+  // Struktur anders als zuletzt gerendert (Zeile/Status/Favorit dazu oder weg,
+  // Favoriten per roomfav/get nachgeliefert)? Dann komplett neu aufbauen.
+  if(g.dataset.bsig!==blockSig(blocks)){ renderPanel(blocks); return; }
   const rowBlocks=blocks.filter(b=>b.k==='row');
   const rows=[...g.querySelectorAll('.brow')];
-  if(rows.length!==rowBlocks.length){ renderPanel(blocks); return; }
-  // Favoriten kommen asynchron nach (roomfav/get) -> wenn sich die Anzahl
-  // gegenueber der Anzeige aendert (Platzhalter -> Liste), komplett neu rendern,
-  // sonst blieben sie unsichtbar/nicht klickbar.
-  const fb=blocks.find(b=>b.k==='favs');
-  if((fb?fb.items.length:0)!==g.querySelectorAll('.fav').length){ renderPanel(blocks); return; }
-  const s=blocks.find(b=>b.k==='status'); if(s){const e=g.querySelector('.status'); if(e)e.textContent=s.text||'';}
-  const v=blocks.find(b=>b.k==='value'); if(v){const e=g.querySelector('.pbar'); if(e)e.textContent=v.text||'';}
-  const bg=blocks.find(b=>b.k==='big'); if(bg){const e=g.querySelector('.pbig'); if(e){e.textContent=bg.text||''; e.className='pbig'+(bg.tone==='good'?' good':(bg.tone==='crit'?' crit':''));}}
-  const ti=blocks.find(b=>b.k==='title'); if(ti){const e=g.querySelector('.ptitle'); if(e){ e.childNodes[0].nodeValue=ti.text||''; const su=e.querySelector('.psub'); if(su)su.textContent=ti.sub||''; }}
-  const ast=blocks.find(b=>b.k==='astat'); if(ast){const e=g.querySelector('.astat'); if(e){ e.childNodes[0].nodeValue=ast.text||''; e.className='astat'+(ast.tone==='crit'?' crit':''); const su=e.querySelector('.astatsub'); if(su)su.textContent=ast.sub||''; }}
+  // Ab hier ist die Struktur nachweislich identisch -> jeden Block an SEINER
+  // Position patchen, nicht nur den ersten seiner Art: Detailseiten wie die
+  // Sauna haben mehrere Status-Zeilen (Tuer, Wasser, Stoerung ...), die sonst
+  // auf dem Stand des ersten Renderns einfrieren.
+  const nth=(k,sel,fn)=>{ const es=[...g.querySelectorAll(sel)];
+    blocks.filter(b=>b.k===k).forEach((b,i)=>{ if(es[i]) fn(es[i],b); }); };
+  nth('status','.status:not(.alist-empty)',(e,b)=>{ e.textContent=b.text||''; });
+  nth('value','.pbar',(e,b)=>{ e.textContent=b.text||''; });
+  nth('big','.pbig',(e,b)=>{ e.textContent=b.text||''; e.className='pbig'+(b.tone==='good'?' good':(b.tone==='crit'?' crit':'')); });
+  nth('title','.ptitle',(e,b)=>{ e.childNodes[0].nodeValue=b.text||''; const su=e.querySelector('.psub'); if(su)su.textContent=b.sub||''; });
+  nth('astat','.astat',(e,b)=>{ e.childNodes[0].nodeValue=b.text||''; e.className='astat'+(b.tone==='crit'?' crit':''); const su=e.querySelector('.astatsub'); if(su)su.textContent=b.sub||''; });
   const cov=blocks.find(b=>b.k==='cover'); if(cov){const img=g.querySelector('#coverimg'); if(img&&img.getAttribute('src')!==cov.src){img.style.opacity='0'; img.onload=()=>img.style.opacity='1'; img.onerror=()=>img.style.opacity='0'; img.src=cov.src;}}
   const sb=blocks.find(b=>b.k==='slider'); if(sb){const sld=g.querySelector('.sld'); if(sld&&!sldDragging){ sld.value=sb.value; const sv=g.querySelector('.sval'); if(sv)sv.textContent=sb.value; }}
   const efb=blocks.find(b=>b.k==='eflow'); if(efb){ const d=g.querySelector('[data-eflow]'); if(d) paintEnergy(d, efb.e); }   // Radial live aktualisieren (in-place)
