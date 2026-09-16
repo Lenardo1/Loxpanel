@@ -53,7 +53,7 @@
   #frontpane{display:none;}
   .screen.split #grid{grid-column:1;grid-row:1;}
   .screen.split #playerpane{display:flex;flex-direction:column;grid-column:2;grid-row:1;
-    min-height:0;border-left:1px solid var(--line);overflow:hidden;padding:14px;gap:10px;}
+    min-height:0;border-left:1px solid var(--line);overflow:hidden;padding:10px;gap:10px;}
   /* Split-Pane Wetter/Kalender/Energie: rechte Spalte, auf Pane-Hoehe begrenzt
      (min-height:0 + minmax(0,1fr)-Zeile) -> Inhalt scrollt INNEN statt ueber den
      Kachelrahmen hinauszulaufen. Seiten-Snapping wie beim Kachel-Grid:
@@ -64,17 +64,19 @@
   /* Jede Seite = ein gerahmter 480x480-Block wie der 2x2-Kachelblock links:
      min-height:100% fuellt die Pane-Hoehe, gleiche Rahmung/Innenabstand wie eine
      Kachel -> Inhalt startet auf gleicher Hoehe (nicht mehr "zu hoch"). */
-  .screen.split #frontpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
+  .screen.split #frontpane .fp-page,
+  .screen.split #playerpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
     display:flex;flex-direction:column;gap:10px;padding:16px;
     background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
     border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:16px;
     scroll-snap-align:start;scroll-snap-stop:always;}
-  /* Energie-Seite: genau EINE Pane hoch (480x480), nicht content-getrieben. Das
-     quadratische Radial-SVG (viewBox 480x480, width:100%) wuerde sonst seine Breite
-     als Hoehe erzwingen -> Pane ~550 statt 480. max-height:100% deckelt die Seite
-     auf die Pane-Hoehe, das SVG skaliert per preserveAspectRatio passend hinein.
-     Nur fuer .epage (Wetter/Kalender duerfen weiter scrollen). */
-  .screen.split #frontpane .fp-page.epage{max-height:100%;overflow:hidden;}
+  /* Einzel-Seite (Energie/Kamera/Audio): genau EINE Pane hoch (480x480), fuellt sie
+     exakt statt content-getrieben zu wachsen. Der Inhalt (quadratisches Radial-SVG,
+     4:3-Video, Cover) skaliert per object-fit/preserveAspectRatio hinein - sonst
+     erzwingt z.B. das 480x480-SVG seine Breite als Hoehe -> Pane ~550 statt 480.
+     Wetter/Kalender bleiben mehrseitig (Snap) und duerfen scrollen. */
+  .screen.split #frontpane .fp-page.solo,
+  .screen.split #playerpane .fp-page.solo{flex:1 1 0;min-height:0;max-height:100%;overflow:hidden;}
   /* Kamera-Pane: MJPEG-Live-Bild fuellt die rechte Spalte (kein Padding/Scroll). */
   /* Kamera-Pane: volle Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons). */
   #frontpane.cam{justify-content:flex-start;}
@@ -1516,7 +1518,7 @@ function paintEnergy(elc,d){
 function renderEnergyPane(elc){ if(!elc) return;
   // Energiefluss in denselben gerahmten .fp-page-Block wie Wetter/Kalender (eine Seite).
   let page=elc.querySelector('.fp-page.epage');
-  if(!page){ elc.innerHTML='<div class="fp-page epage"></div>'; page=elc.querySelector('.fp-page.epage'); }
+  if(!page){ elc.innerHTML='<div class="fp-page epage solo"></div>'; page=elc.querySelector('.fp-page.epage'); }
   paintEnergy(page, energyData||{}); }
 
 // Kamera-Pane: VOLLE Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons),
@@ -1528,7 +1530,7 @@ function renderCameraPane(elc){ if(!elc) return;
   const blocks=(cameraData&&cameraData.blocks)||null;
   if(blocks===null){   // Push noch nicht da -> Platzhalter
     if(elc.dataset.cam!=='wait'){ elc.dataset.cam='wait'; delete elc.dataset.camsig;
-      elc.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div>'; }
+      elc.innerHTML='<div class="fp-page solo campage"><div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div></div>'; }
     return;
   }
   const video=blocks.find(b=>b.k==='video'), row=blocks.find(b=>b.k==='row');
@@ -1540,7 +1542,7 @@ function renderCameraPane(elc){ if(!elc) return;
     html+= video ? '<div class="video"><img alt=""></div>'
                  : '<div class="status">'+esc(nostat?nostat.text:'Kein Video')+'</div>';
     if(row) html+='<div class="brow'+(row.wrap?' wraprow':'')+'">'+row.cells.map(cellHtml).join('')+'</div>';
-    elc.innerHTML=html;
+    elc.innerHTML='<div class="fp-page solo campage">'+html+'</div>';
     const vimg=elc.querySelector('.video img'); if(vimg&&video) vimg.src=video.src;   // direkt, KEIN onload-Gate
     if(row){ const btns=elc.querySelectorAll('.brow [data-c]');
       row.cells.forEach((c,i)=>{ const btn=btns[i]; if(!btn)return;
@@ -1625,6 +1627,7 @@ function renderPlayer(blocks){
   const sl=blocks.find(b=>b.k==='slider');
   if(!_playerBuilt){
     pane.innerHTML=
+      '<div class="fp-page solo pppage">'+
       '<div class="ppcover"><div class="coverph">'+svg(ICONS.music)+'</div><img id="ppimg" alt=""></div>'+
       '<div class="pptitle" id="pptitle"></div>'+
       '<div class="ppsub" id="ppsub"></div>'+
@@ -1632,7 +1635,8 @@ function renderPlayer(blocks){
       '<div class="ppvol"><span class="sico">'+svg(ICONS.vol)+'</span>'+
         '<button type="button" class="sbtn" data-sd="dn">−</button>'+
         '<input type="range" class="sld" id="ppsld" min="0" max="100" value="0">'+
-        '<button type="button" class="sbtn" data-sd="up">+</button><span class="sval" id="ppsldv">0</span></div>';
+        '<button type="button" class="sbtn" data-sd="up">+</button><span class="sval" id="ppsldv">0</span></div>'+
+      '</div>';
     const s=el('ppsld');
     pane.querySelector('.ppvol .sbtn[data-sd="dn"]').addEventListener('pointerdown',ev=>{ ev.preventDefault(); nudgeSld(s,-SLD_STEP,el('ppsldv')); });
     pane.querySelector('.ppvol .sbtn[data-sd="up"]').addEventListener('pointerdown',ev=>{ ev.preventDefault(); nudgeSld(s,SLD_STEP,el('ppsldv')); });
