@@ -736,7 +736,7 @@ function overlayFields(ov,pfx){
       '<span class="cval" id="'+pfx+'bordv">'+bo+' %</span></div>'+
     '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'bw">'+
       [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>'+
-    '<div class="ovgrp">Inaktive Kacheln <span class="ovgrp-h">(Rahmen, z. B. für helle Displays)</span></div>'+
+    '<div class="ovgrp">Inaktive Kacheln &amp; rechte Panes <span class="ovgrp-h">(Rahmen, z. B. für helle Displays)</span></div>'+
     '<div class="frow"><label class="lbl">Rahmen</label>'+
       '<input type="range" id="'+pfx+'ibord" min="0" max="100" step="5" value="'+ib+'">'+
       '<span class="cval" id="'+pfx+'ibordv">'+ib+' %</span></div>'+
@@ -945,7 +945,7 @@ function renderEditor(){
      '</div></div></section>'+
 
    '<section class="spane" data-sub="overlay"><div class="card"><h3>Aktiv-Overlay</h3>'+
-     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Darunter der Rahmen der <b>inaktiven</b> Kacheln – Deckkraft und Breite hochdrehen, falls er auf hellen Displays (z. B. Shelly) kaum sichtbar ist. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
+     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Darunter der Rahmen der <b>inaktiven</b> Kacheln <b>und der rechten Panes</b> (Pane 2, z. B. Energieflussmonitor, Wetter, Kalender) – Deckkraft und Breite hochdrehen, falls er auf hellen Displays (z. B. Shelly) kaum sichtbar ist. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
      '<div class="ovwrap">'+
        '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div>'+
          '<div class="ovtile off" id="ovPrevOff">Aus</div></div>'+

@@ -67,7 +67,7 @@
   .screen.split #frontpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
     display:flex;flex-direction:column;gap:10px;padding:16px;
     background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
-    border:1px solid var(--line);border-radius:16px;
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:16px;
     scroll-snap-align:start;scroll-snap-stop:always;}
   /* Kamera-Pane: MJPEG-Live-Bild fuellt die rechte Spalte (kein Padding/Scroll). */
   /* Kamera-Pane: volle Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons). */
