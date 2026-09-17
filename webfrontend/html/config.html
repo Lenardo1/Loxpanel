@@ -184,12 +184,17 @@
   .ovctrl .frow{display:flex;align-items:center;gap:10px;}
   .ovctrl .frow input[type=range]{flex:1;accent-color:var(--accent);}
   .ovctrl .cval{min-width:44px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;}
-  .ovprev{flex:none;display:grid;place-items:center;}
+  .ovprev{flex:none;display:grid;place-items:center;gap:10px;}
   .ovtile{--on-rgb:224,162,77;width:132px;height:88px;border-radius:6px;display:grid;place-items:center;
     color:var(--fg);font-size:13px;font-weight:500;
     background:rgba(var(--on-rgb),var(--ov-fill,.16));
     border:var(--ov-bw,1px) solid rgba(var(--on-rgb),var(--ov-bord,.55));}
   .ovtile.g{--on-rgb:82,184,129;} .ovtile.c{--on-rgb:226,107,95;}
+  /* Vorschau der inaktiven Kachel (nur Rahmen, konfigurierbar) */
+  .ovtile.off{background:transparent;color:var(--muted);
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));}
+  .ovgrp{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.03em;margin-top:6px;}
+  .ovgrp .ovgrp-h{font-weight:400;opacity:.75;}
   /* Einstellungen-spezifisch */
   .soon{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:44px 20px;color:var(--muted);}
   .soon .ssico{font-size:40px;opacity:.8;}
@@ -489,6 +494,15 @@
             <p class="note" data-i18n>Display-Steuerung je Gerät: Bei Fully Kiosk die Remote-Admin-Schnittstelle einschalten (Port 2323, Passwort), bei WallPanel den HTTP-Server (Port 2971). Der Server schaltet das Display dann auch bei Klingel, Wecker, Notify und Goto ein und nach der Abschaltzeit aus, unabhängig von der Seite.</p>
             <div class="actions"><button class="btn" id="dev_save" data-i18n>Speichern</button><span class="toast" id="dev_toast"></span></div>
           </div>
+          <div class="card">
+            <h3 data-i18n>Nachtmodus</h3>
+            <p class="note" data-i18n>Wann die Panels abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.</p>
+            <div class="row2">
+              <div class="field" style="max-width:460px"><label class="lbl" data-i18n>Auslöser (optional)</label><select id="nt_control"></select></div>
+            </div>
+            <p class="note" data-i18n>Wie stark abgedunkelt wird und ob eine Berührung kurz aufhellt, stellst du je Panel unter Panel Configuration → Darstellung ein.</p>
+            <div class="actions"><button class="btn" id="nt_save" data-i18n>Speichern</button><span class="toast" id="nt_toast"></span></div>
+          </div>
         </section>
 
         <!-- Audio -->
@@ -713,13 +727,15 @@ function showSub(k){
 }
 
 // ---- Aktiv-Overlay (Rahmen/Füllung/Deckkraft) ----
-const OV_DEF={mode:'both',fill:16,bord:55,bw:1};
+const OV_DEF={mode:'both',fill:16,bord:55,bw:1,ibord:8,ibw:1};
 function ovVal(ov,k){ return (ov&&ov[k]!=null)?ov[k]:OV_DEF[k]; }
 function pruneOverlay(host){ if(host&&host.overlay&&!Object.keys(host.overlay).length) delete host.overlay; }
 function overlayFields(ov,pfx){
-  const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw');
+  const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw'),
+        ib=ovVal(ov,'ibord'),ibw=ovVal(ov,'ibw');
   const opt=(v,t)=>'<option value="'+v+'"'+(m===v?' selected':'')+'>'+t+'</option>';
-  return '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
+  return '<div class="ovgrp">Aktive Kacheln</div>'+
+    '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
       opt('both','Rahmen + Füllung')+opt('border','Nur Rahmen')+opt('fill','Nur Füllung')+'</select></div>'+
     '<div class="frow"><label class="lbl">Füllung</label>'+
       '<input type="range" id="'+pfx+'fill" min="0" max="100" step="5" value="'+fi+'">'+
@@ -728,24 +744,40 @@ function overlayFields(ov,pfx){
       '<input type="range" id="'+pfx+'bord" min="0" max="100" step="5" value="'+bo+'">'+
       '<span class="cval" id="'+pfx+'bordv">'+bo+' %</span></div>'+
     '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'bw">'+
-      [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(bw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>'+
+    '<div class="ovgrp">Inaktive Kacheln &amp; rechte Panes <span class="ovgrp-h">(Rahmen, z. B. für helle Displays)</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmen</label>'+
+      '<input type="range" id="'+pfx+'ibord" min="0" max="100" step="5" value="'+ib+'">'+
+      '<span class="cval" id="'+pfx+'ibordv">'+ib+' %</span></div>'+
+    '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'ibw">'+
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(ibw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
 }
 function bindOverlay(pfx,getOv,onChange){
   const m=$('#'+pfx+'mode'),fi=$('#'+pfx+'fill'),bo=$('#'+pfx+'bord'),bw=$('#'+pfx+'bw'),
-        fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv');
+        fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv'),
+        ib=$('#'+pfx+'ibord'),ibw=$('#'+pfx+'ibw'),ibv=$('#'+pfx+'ibordv');
   const set=(k,v)=>{ getOv()[k]=v; onChange(); };
   if(m) m.onchange=()=>set('mode',m.value);
   if(fi) fi.oninput=()=>{ fiv.textContent=fi.value+' %'; set('fill',Number(fi.value)); };
   if(bo) bo.oninput=()=>{ bov.textContent=bo.value+' %'; set('bord',Number(bo.value)); };
   if(bw) bw.onchange=()=>set('bw',Number(bw.value));
+  if(ib) ib.oninput=()=>{ ibv.textContent=ib.value+' %'; set('ibord',Number(ib.value)); };
+  if(ibw) ibw.onchange=()=>set('ibw',Number(ibw.value));
 }
 function ovPreview(elId,ov){
-  const el=$('#'+elId); if(!el) return;
-  const m=ovVal(ov,'mode'); let fill=ovVal(ov,'fill')/100, bord=ovVal(ov,'bord')/100;
-  if(m==='border') fill=0; if(m==='fill') bord=0;
-  el.style.setProperty('--ov-fill',fill);
-  el.style.setProperty('--ov-bord',bord);
-  el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
+  const el=$('#'+elId);
+  if(el){
+    const m=ovVal(ov,'mode'); let fill=ovVal(ov,'fill')/100, bord=ovVal(ov,'bord')/100;
+    if(m==='border') fill=0; if(m==='fill') bord=0;
+    el.style.setProperty('--ov-fill',fill);
+    el.style.setProperty('--ov-bord',bord);
+    el.style.setProperty('--ov-bw',ovVal(ov,'bw')+'px');
+  }
+  const off=$('#'+elId+'Off');   // Vorschau der inaktiven Kachel
+  if(off){
+    off.style.setProperty('--tile-bord','rgba(255,255,255,'+(ovVal(ov,'ibord')/100)+')');
+    off.style.setProperty('--tile-bw',ovVal(ov,'ibw')+'px');
+  }
 }
 
 function bindAppearance(p){
@@ -936,6 +968,12 @@ function renderEditor(){
        '<div class="field" style="max-width:180px"><label class="lbl">Auto-Neustart alle (Std.)</label>'+
          '<input type="number" min="0" max="168" step="1" data-ui="reloadHours" value="'+
          (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="0 = aus"></div>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Nachts abdunkeln (%)</label>'+
+         '<input type="number" min="0" max="90" step="5" data-ui="nightDim" value="'+
+         (((p.ui||{}).nightDim==null)?'':(p.ui||{}).nightDim)+'" placeholder="0 = aus"></div>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Aufhellen bei Berührung (Sek.)</label>'+
+         '<input type="number" min="0" max="300" step="5" data-ui="nightWake" value="'+
+         (((p.ui||{}).nightWake==null)?'':(p.ui||{}).nightWake)+'" placeholder="20"></div>'+
        '<div class="field" style="max-width:200px"><label class="lbl">Kachel-Layout</label>'+
          '<select id="fLayout">'+
            '<option value="2x2"'+(((p.ui||{}).cols!=3&&(p.ui||{}).rows!=3)?' selected':'')+'>2 × 2 (4″-Panel)</option>'+
@@ -956,13 +994,14 @@ function renderEditor(){
          '<div class="hint" style="padding-top:4px">Bei „Aus" zeigt das Panel nur die linke Visu im Kachel-Layout – keine Pane 2, keine Verdopplung. Für 4″-Wandpanels.</div></div>'+
        '<div class="field" style="max-width:none" id="paneField"><label class="lbl">Split-Pane je Tab</label>'+
          '<div class="cclist" id="panePerTab"></div>'+
-         '<div class="hint" style="padding-top:4px">Je Tab rechts eine Zusatzfläche: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Wetter</b> oder <b>Kalender</b>. <b>Screen füllen</b> = kein Zusatz, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
+         '<div class="hint" style="padding-top:4px">Je Tab rechts eine Zusatzfläche: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Kamera</b> (Intercom-Live-Bild – Kamera daneben wählbar, Zugang unter Einstellungen → Intercom), <b>Wetter</b>, <b>Kalender</b> oder <b>Energiefluss</b>. <b>Screen füllen</b> = kein Zusatz, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
      '</div></div></section>'+
 
    '<section class="spane" data-sub="overlay"><div class="card"><h3>Aktiv-Overlay</h3>'+
-     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
+     '<p class="note">'+T('Wie eine Kachel im <b>aktiven Zustand</b> hervorgehoben wird (an = Akzent, ok = grün, kritisch = rot): Rahmen, Füllung und Deckkraft. Die <b>Farbe</b> kommt je Zustand aus dem Theme, hier stellst du das <b>Aussehen</b> ein. Darunter der Rahmen der <b>inaktiven</b> Kacheln <b>und der rechten Panes</b> (Pane 2, z. B. Energieflussmonitor, Wetter, Kalender) – Deckkraft und Breite hochdrehen, falls er auf hellen Displays (z. B. Shelly) kaum sichtbar ist. Gilt für dieses Panel — einzelne Kacheln können unten abweichen.')+'</p>'+
      '<div class="ovwrap">'+
-       '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div></div>'+
+       '<div class="ovprev"><div class="ovtile on" id="ovPrev">An</div>'+
+         '<div class="ovtile off" id="ovPrevOff">Aus</div></div>'+
        '<div class="ovctrl">'+overlayFields((p.ui||{}).overlay,'ov_')+
          '<div class="frow"><button class="minibtn" id="ovReset">Auf Standard zurücksetzen</button></div>'+
        '</div></div></div></section>';
@@ -1036,6 +1075,16 @@ function firstEnergyControl(){
   const z=cs.find(c=>c.type==='EFM')||cs.find(c=>c.type==='EnergyManager2');
   return z?z.uuid:'';
 }
+// Kameras = Intercom-Bausteine (Tuerstation/Kamera). Das Live-Bild kommt ueber
+// /mjpeg?id=<uuid>; die Zugangsdaten stehen in Einstellungen -> Intercom.
+function cameraOptions(sel){
+  return (META.controls||[]).filter(c=>c.type==='Intercom')
+    .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
+}
+function firstCamera(){
+  const z=(META.controls||[]).find(c=>c.type==='Intercom');
+  return z?z.uuid:'';
+}
 
 function renderPanes(p){
   const pf=$('#paneField'); if(pf) pf.style.display=((p.ui||{}).split===false)?'none':'';   // 4"-Panel: keine Pane-Auswahl
@@ -1045,18 +1094,20 @@ function renderPanes(p){
     const meta=(META.tabs||[]).find(t=>t.tab===tk);
     const label=meta?meta.label:tk;
     const v=panes[tk]||'';
-    const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0;
-    const kind=isP?'player':(isE?'energy':v), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'';
+    const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0;
+    const kind=isP?'player':(isE?'energy':(isC?'camera':v)), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'';
     let row='<div class="ccrow"><span class="ccnm">'+esc(label)+'</span>'+
       '<select data-pane="'+esc(tk)+'">'+
         '<option value=""'+(kind===''?' selected':'')+'>Screen füllen</option>'+
         '<option value="player"'+(kind==='player'?' selected':'')+'>Audio</option>'+
+        '<option value="camera"'+(kind==='camera'?' selected':'')+'>Kamera</option>'+
         '<option value="weather"'+(kind==='weather'?' selected':'')+'>Wetter</option>'+
         '<option value="calendar"'+(kind==='calendar'?' selected':'')+'>Kalender</option>'+
         '<option value="energy"'+(kind==='energy'?' selected':'')+'>Energiefluss</option>'+
       '</select>';
     if(isP) row+='<select data-panez="'+esc(tk)+'">'+audioZoneOptions(zone)+'</select>';
     if(isE) row+='<select data-panee="'+esc(tk)+'">'+energyControlOptions(euid)+'</select>';
+    if(isC) row+='<select data-panec="'+esc(tk)+'">'+cameraOptions(camu)+'</select>';
     return row+'</div>';
   }).join('') || '<div class="ccmut">Keine Tabs.</div>';
   const setPane=(tk,val)=>{ p.ui=p.ui||{}; p.ui.panes=p.ui.panes||{};
@@ -1068,14 +1119,19 @@ function renderPanes(p){
       const z=cur.indexOf('player:')===0?cur.slice(7):firstAudioZone(); setPane(tk,'player:'+z); }
     else if(k==='energy'){ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
       const u=cur.indexOf('energy:')===0?cur.slice(7):firstEnergyControl(); setPane(tk,'energy:'+u); }
+    else if(k==='camera'){ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
+      const u=cur.indexOf('camera:')===0?cur.slice(7):firstCamera(); setPane(tk,'camera:'+u); }
     else setPane(tk,k);
-    renderPanes(p);   // Zonen-/Control-Dropdown ein-/ausblenden
+    renderPanes(p);   // Zonen-/Control-/Kamera-Dropdown ein-/ausblenden
   });
   box.querySelectorAll('select[data-panez]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panez,'player:'+s.value);
   });
   box.querySelectorAll('select[data-panee]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panee,'energy:'+s.value);
+  });
+  box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{
+    setPane(s.dataset.panec,'camera:'+s.value);
   });
 }
 function renderChips(p){
@@ -1219,7 +1275,8 @@ function renderTileEditor(){
         '<span class="tgl'+(ov.overlay?' on':'')+'" id="tOvOn" title="Für diese Kachel abweichend">◐</span>'+
         '<span style="color:var(--muted);font-size:12.5px">abweichend vom Panel</span></div>'+
       '<div class="ovwrap" id="tOvBox"'+(ov.overlay?'':' style="display:none"')+'>'+
-        '<div class="ovprev"><div class="ovtile on" id="tovPrev">An</div></div>'+
+        '<div class="ovprev"><div class="ovtile on" id="tovPrev">An</div>'+
+          '<div class="ovtile off" id="tovPrevOff">Aus</div></div>'+
         '<div class="ovctrl">'+overlayFields(ov.overlay,'tov_')+'</div></div>'+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
@@ -1334,6 +1391,13 @@ async function loadSettings(){
     srv.innerHTML = list.length
       ? T('Erkannte Audioserver:')+' '+list.map(esc).join(', ')
       : T('Kein Audioserver in der Loxone-Struktur gefunden.'); }
+  // Nachtmodus-Ausloeser
+  const nt=SET.night||{}, ntSel=$('#nt_control');
+  if(ntSel){
+    ntSel.innerHTML='<option value="">'+T('— kein Auslöser (Sonnenuntergang) —')+'</option>'
+      + (nt.options||[]).map(o=>'<option value="'+esc(o.uuid)+'"'+(o.uuid===nt.control?' selected':'')+'>'
+          + esc((o.room?o.room+' · ':'')+o.name+' ('+o.type+')')+'</option>').join('');
+  }
   // Kalender & Wetter
   const cal=SET.calendar||{};
   if($('#cal_name')){
@@ -1396,6 +1460,16 @@ $('#ic_save').onclick=async()=>{
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
 
+$('#nt_save').onclick=async()=>{
+  const body={control:$('#nt_control').value||''};
+  $('#nt_save').disabled=true;
+  try{
+    const r=await fetch('/api/settings/night',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(j.ok){ flash($('#nt_toast'),T('✓ Gespeichert'),true); loadSettings(); } else flash($('#nt_toast'),j.error||T('Fehler'),false);
+  }catch(e){ flash($('#nt_toast'),'Fehler: '+e,false); }
+  $('#nt_save').disabled=false;
+};
 $('#am_save').onclick=async()=>{
   const body={enabled:$('#am_enabled').checked};
   $('#am_save').disabled=true;

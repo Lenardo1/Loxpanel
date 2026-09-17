@@ -121,6 +121,9 @@ SWITCHY = {"Switch"}   # TimedSwitch wird eigen behandelt (anderer State)
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
 # Display-Treiber fuer Kiosk-Apps (Android) mit Standard-Port ihrer HTTP-Schnittstelle
 DISPLAY_DRIVERS = {"fully": 2323, "wallpanel": 2971}
+# Nachtmodus: Rueckfall-Fenster, wenn keine Sonnenzeiten vorliegen (kein Wetter
+# konfiguriert). Sobald Sonnenauf-/-untergang bekannt sind, gelten die.
+NIGHT_FROM, NIGHT_TO = "22:00", "06:00"
 
 
 def _is_tab(t) -> bool:
@@ -226,6 +229,24 @@ def _overlay_alphas(ov: dict) -> tuple[float, float, int]:
     return fill, bord, bw
 
 
+def _inactive_border(ov: dict) -> tuple[float, int]:
+    """Overlay-Config -> (Rahmen-Alpha, Rahmenbreite px) fuer NICHT aktive Kacheln.
+
+    Defaults entsprechen dem bisherigen fest verdrahteten --line (weiss 8%) und
+    1px, damit sich ohne Konfiguration nichts aendert. `ibord`/`ibw` machen den
+    sonst kaum sichtbaren Kachelrahmen (z.B. auf hellen Shelly-Displays) staerker.
+    """
+    ov = ov if isinstance(ov, dict) else {}
+    def _num(key, default):
+        try:
+            return float(ov.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+    alpha = max(0.0, min(1.0, _num("ibord", 8) / 100.0))
+    bw = max(1, min(4, int(_num("ibw", 1))))
+    return alpha, bw
+
+
 def _sanitize_overlay(ov) -> dict:
     """Overlay-Config aus der Config-Seite auf erlaubte Werte eindampfen."""
     if not isinstance(ov, dict):
@@ -233,11 +254,12 @@ def _sanitize_overlay(ov) -> dict:
     out: dict = {}
     if ov.get("mode") in ("both", "border", "fill"):
         out["mode"] = ov["mode"]
-    for k in ("fill", "bord"):
+    for k in ("fill", "bord", "ibord"):
         if isinstance(ov.get(k), (int, float)):
             out[k] = max(0, min(100, int(ov[k])))
-    if isinstance(ov.get("bw"), (int, float)):
-        out["bw"] = max(1, min(4, int(ov["bw"])))
+    for k in ("bw", "ibw"):
+        if isinstance(ov.get(k), (int, float)):
+            out[k] = max(1, min(4, int(ov[k])))
     return out
 
 
@@ -325,6 +347,21 @@ def _intercom_config() -> dict:
         elif isinstance(v, str):
             cfg[k] = v.strip()
     return cfg
+
+
+def _night_config() -> dict:
+    """Nachtmodus-Block aus loxpanel.cfg `night`: {"control": "<uuid>"}. Der
+    `active`-State dieses Bausteins schaltet den Nachtmodus. Leer = kein
+    Ausloeser, dann entscheiden die Sonnenzeiten."""
+    base = Path(__file__).resolve().parent.parent / "config"
+    f = base / "loxpanel.cfg"
+    if not f.is_file():
+        f = base / "loxpanel.cfg.example"
+    try:
+        cfg = json.loads(f.read_text(encoding="utf-8")).get("night", {})
+    except (ValueError, OSError):
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
 
 
 def _calendar_config() -> dict:
@@ -446,10 +483,22 @@ class App:
         self._drv_session: aiohttp.ClientSession | None = None   # HTTP-Session fuer Display-Treiber (Kiosk-Apps)
         self.conn_player: dict[web.WebSocketResponse, str] = {}   # ws -> AudioZone-UUID der aktiven Player-Pane (via setplayer)
         self.conn_energy: dict[web.WebSocketResponse, str] = {}   # ws -> EFM/EnergyManager2-UUID der aktiven Energiefluss-Pane (via setenergy)
+        self.conn_camera: dict[web.WebSocketResponse, str] = {}   # ws -> Intercom-UUID der aktiven Kamera-Pane (via setcamera)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
+        self._struct_sig: str | None = None   # Signatur der Loxone-Struktur (erkennt Config-Aenderungen)
+        self._pending_reload = False          # -> Panels beim naechsten Tick neu laden ({t:"reload"})
+        self.global_states: dict = {}   # globale States der Anlage (Name -> UUID), s. _apply_structure
+        self._night_on = False          # Nachtmodus aktiv? (-> {t:"night"} an die Panels)
+        self.night_cfg = _night_config()  # {"control": uuid} -> dessen active-State = Nacht
         self._dirty = True
+        # Zuletzt an JEDE Verbindung zugestellte Nutzlast, je Art getrennt
+        # ({"view":…, "player":…, "energy":…}). Grundlage dafuer, unveraenderte
+        # Ansichten gar nicht erst zu senden. Eingetragen wird ausschliesslich
+        # NACH erfolgreichem Senden - ein abgebrochener Versuch darf nie als
+        # zugestellt gelten.
+        self._last_sent: dict = {}
         self.jwt: str | None = None
         self.alg: str = "SHA1"
         self.icon_session: aiohttp.ClientSession | None = None
@@ -572,6 +621,10 @@ class App:
         # Betriebsarten (id -> Name) fuer die Wecker-Wiederholung: die `modes`
         # eines Eintrags verweisen hierauf (z.B. Wochentage Mo-So).
         self.op_modes = {str(k): v for k, v in (st.get("operatingModes") or {}).items()}
+        # Globale States der Anlage (Name -> UUID): u.a. Sonnenauf-/-untergang und
+        # die aktiven Betriebsmodi. Die Werte kommen ueber den WS-Stream in
+        # self.states. Roh uebernehmen, die Belegung ist je Anlage verschieden.
+        self.global_states = dict(st.get("globalStates") or {})
         self.playerid_by_action = {}
         self.audiohost_by_action = {}
         for _u, _c in self.controls.items():
@@ -601,6 +654,43 @@ class App:
                  len(self.controls), len(self.rooms_with), len(self.cats_with),
                  len(self.bell_map), len(self.alarm_map), len(self.playerid_by_action))
 
+    @staticmethod
+    def _structure_sig(st: dict) -> str:
+        """Signatur der Loxone-Struktur (Controls/Raeume/Kategorien). Aendert sich
+        nur bei Config-Aenderungen (Namen, neue/entfernte Controls …), nicht bei
+        State-Werten – die kommen separat ueber den WS-Stream."""
+        try:
+            rel = {"controls": st.get("controls", {}), "rooms": st.get("rooms", {}),
+                   "cats": st.get("cats", {})}
+            raw = json.dumps(rel, sort_keys=True, ensure_ascii=False, default=str)
+            return hashlib.md5(raw.encode("utf-8")).hexdigest()
+        except (TypeError, ValueError):
+            return ""
+
+    def _adopt_structure(self, st: dict) -> bool:
+        """Struktur anwenden und melden, ob sie sich seit der letzten Verbindung
+        geaendert hat (Grundlage fuer den Panel-Reload). Beim allerersten Anwenden
+        (`_struct_sig` noch None) gilt sie nie als 'geaendert' — frisch verbundene
+        Panels holen sich die Ansichten ohnehin neu."""
+        sig = self._structure_sig(st)
+        changed = bool(self._struct_sig and sig and sig != self._struct_sig)
+        self._apply_structure(st)
+        self._struct_sig = sig
+        return changed
+
+    async def _refresh_structure(self) -> bool:
+        """Struktur neu vom Miniserver laden und anwenden, WENN sie sich geaendert
+        hat (Loxone-Config geaendert). Gibt True bei Aenderung zurueck. Rein lesend;
+        Fehler werden vom Aufrufer isoliert, damit die Verbindungs-Schleife lebt."""
+        if self.client is None:
+            return False
+        st = await self.client.load_structure()
+        if not self._adopt_structure(st):
+            return False                      # unveraendert -> nichts tun (kein Panel-Reload)
+        self.states = {}                      # nach Struktur-Wechsel States frisch (MS sendet neu)
+        self._dirty = True
+        return True
+
     async def start(self) -> None:
         try:
             self.client = _make_client(self.host, self.user, self.password,
@@ -608,7 +698,12 @@ class App:
             await self.client.__aenter__()
             self.alg = (await self.client.getkey2()).hashAlg
             self.jwt = await self.client.authenticate()
-            self._apply_structure(await self.client.load_structure())
+            st = await self.client.load_structure()
+            # Reconnect nach Miniserver-Reboot (z.B. Loxone-Config hochgeladen):
+            # hat sich die Struktur geaendert, Panels neu laden lassen. Beim
+            # allerersten Start ist _struct_sig None -> kein Reload.
+            if self._adopt_structure(st):
+                self._pending_reload = True
             self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
             await self._connect_ws()
             log.info("Mit Miniserver verbunden (%s).", self.host)
@@ -655,7 +750,9 @@ class App:
         self.verify_tls = ms.get("verify_tls", False)
         old_client, self.client = self.client, newc
         self.alg, self.jwt = alg, jwt
-        self._apply_structure(st)
+        # Anderer/geaenderter Miniserver -> Struktur evtl. anders, dann Panels neu laden.
+        if self._adopt_structure(st):
+            self._pending_reload = True
         self.states = {}
         old_is, self.icon_session = self.icon_session, \
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
@@ -1047,6 +1144,10 @@ class App:
             v["--ov-fill"] = f"{fill:.3g}"
             v["--ov-bord"] = f"{bord:.3g}"
             v["--ov-bw"] = f"{bw}px"
+            # Rahmen der NICHT aktiven Kacheln (sonst kaum sichtbar auf hellen Displays).
+            ialpha, ibw = _inactive_border(ui["overlay"])
+            v["--tile-bord"] = f"rgba(255,255,255,{ialpha:.3g})"
+            v["--tile-bw"] = f"{ibw}px"
         if ui.get("font"):
             v["--font"] = ui["font"]
         if ui.get("textColor"):
@@ -1102,6 +1203,21 @@ class App:
             v = self._view_control_inner(uuid)
         except Exception:
             log.exception("player_blocks fehlgeschlagen (%s)", uuid)
+            return None
+        return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
+
+    def intercom_blocks(self, uuid: str):
+        """Volle Intercom-Ansicht (Video + Tuer-/Ausgang-Buttons + Klingel-Banner)
+        einer Intercom-UUID fuer die Kamera-Pane. Gleiche Bloecke wie die
+        Detailansicht -> das Bild wird wie beim Baustein direkt geladen (robust,
+        auch wo ein nacktes MJPEG-<img> nicht anzeigt). None, wenn kein Intercom."""
+        c = self.controls.get(uuid or "")
+        if not c or c.get("type") != "Intercom":
+            return None
+        try:
+            v = self._view_control_inner(uuid)
+        except Exception:
+            log.exception("intercom_blocks fehlgeschlagen (%s)", uuid)
             return None
         return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
 
@@ -1233,6 +1349,82 @@ class App:
               **((self.panels.get(pid or "") or {}).get("ui") or {})}
         v = ui.get("dpmsOff")
         return max(0, min(3600, int(v))) if isinstance(v, (int, float)) else None
+
+    def panel_night(self, pid: str | None) -> dict:
+        """Nachtmodus je Panel: `dim` = Abdunklung in Prozent (0 = aus), `wake` =
+        Sekunden, die eine Beruehrung wieder voll aufhellt (0 = nicht aufhellen).
+        Wie panel_dpms(): Theme-Vorgabe, vom Panel-Profil ueberschreibbar."""
+        ui = {**self.theme.get("ui", {}),
+              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+
+        def _num(key, lo, hi, default):
+            v = ui.get(key)
+            return max(lo, min(hi, int(v))) if isinstance(v, (int, float)) else default
+
+        return {"dim": _num("nightDim", 0, 90, 0), "wake": _num("nightWake", 0, 300, 20)}
+
+    def night_control_options(self) -> list:
+        """Bausteine, die als Nacht-Ausloeser taugen: alles mit einem `active`-State
+        (Switch, InfoOnlyDigital, PresenceDetector ...). Damit laesst sich auch ein
+        Loxone-Betriebsmodus nutzen, sobald er in der Visu auf so einem Baustein
+        liegt — der Modus selbst steht nicht in der Struktur (s. ARCHITEKTUR.md)."""
+        out = []
+        for u, c in self.controls.items():
+            if not (c.get("states") or {}).get("active"):
+                continue
+            name = _clean(c.get("name"))
+            if not name:
+                continue
+            out.append({"uuid": u, "name": name, "type": c.get("type"),
+                        "room": _clean((self.rooms.get(c.get("room")) or {}).get("name"))})
+        return sorted(out, key=lambda d: (d["room"], d["name"]))
+
+    def _sun_minutes(self) -> tuple[int, int] | None:
+        """Sonnenauf-/-untergang als Minuten seit Mitternacht (Ortszeit).
+
+        Rangfolge: zuerst der MINISERVER (globalStates `sunrise`/`sunset` liefern
+        genau dieses Format), sonst der Wetterdienst aus den Front-Daten ("HH:MM").
+        None, wenn keine Quelle brauchbare Werte hat."""
+        gs = self.global_states or {}
+        ms = []
+        for key in ("sunrise", "sunset"):
+            u = gs.get(key)
+            v = self.states.get(u) if isinstance(u, str) else None
+            ms.append(int(v) if isinstance(v, (int, float)) and 0 <= v < 1440 else None)
+        if ms[0] is not None and ms[1] is not None:
+            return ms[0], ms[1]
+        w = (self._front or {}).get("weather") or {}
+        out = []
+        for key in ("sunrise", "sunset"):
+            hm = w.get(key)
+            if not (isinstance(hm, str) and ":" in hm):
+                return None
+            h, _, m = hm.partition(":")
+            try:
+                out.append(int(h) * 60 + int(m))
+            except ValueError:
+                return None
+        return out[0], out[1]
+
+    def _night_now(self) -> bool:
+        """Ist gerade Nacht?
+
+        Rangfolge: ein in den Einstellungen gewaehlter Baustein (sein `active`-State
+        = Nacht), sonst die Sonnenzeiten nach _sun_minutes() (Miniserver vor
+        Wetterdienst), zuletzt NIGHT_FROM..NIGHT_TO. Ein gewaehlter, aber nicht
+        (mehr) vorhandener Baustein faellt still auf die Sonnenzeiten zurueck."""
+        u = (self.night_cfg or {}).get("control")
+        if u:
+            c = self.controls.get(u)
+            if c:
+                return bool(self._state(c, "active"))
+        now = datetime.now()
+        sun = self._sun_minutes()
+        if sun:
+            cur = now.hour * 60 + now.minute
+            return cur >= sun[1] or cur < sun[0]
+        hm = now.strftime("%H:%M")
+        return hm >= NIGHT_FROM or hm < NIGHT_TO
 
     def panel_reload(self, pid: str | None):
         """Auto-Neustart-Intervall (Stunden) fuer ein Panel aus dem Profil
@@ -1447,12 +1639,13 @@ class App:
         tabs = [t for t in (raw.get("tabs") or VALID_TABS) if _is_tab(t)]
         ui = {k: v for k, v in (raw.get("ui") or {}).items()
               if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                       "dpmsOff", "reloadHours", "cols", "rows", "fill", "baseColor",
+                       "dpmsOff", "reloadHours", "nightDim", "nightWake",
+                       "cols", "rows", "fill", "baseColor",
                        "overlay", "textColor", "bold", "lang", "player", "panes", "split")}
         # Split-Pane je Tab: nur gueltige Tab-Kennung -> "weather"|"calendar".
         if isinstance(ui.get("panes"), dict):
             ui["panes"] = {str(k): v for k, v in ui["panes"].items()
-                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
             if not ui["panes"]:
                 ui.pop("panes", None)
         else:
@@ -1515,6 +1708,10 @@ class App:
                 cui["dpmsOff"] = max(0, min(3600, int(ui["dpmsOff"])))  # Display aus nach Sek.
             if isinstance(ui.get("reloadHours"), (int, float)):
                 cui["reloadHours"] = max(0, min(168, float(ui["reloadHours"])))  # Auto-Neustart Std.
+            if isinstance(ui.get("nightDim"), (int, float)):
+                cui["nightDim"] = max(0, min(90, int(ui["nightDim"])))    # Nachts abdunkeln in %
+            if isinstance(ui.get("nightWake"), (int, float)):
+                cui["nightWake"] = max(0, min(300, int(ui["nightWake"])))  # Aufhellen bei Beruehrung, Sek.
             if ui.get("cols") in (2, 3):
                 cui["cols"] = int(ui["cols"])   # Spalten: 2 oder 3
             if ui.get("rows") in (2, 3):
@@ -1527,7 +1724,7 @@ class App:
                 cui["player"] = ui["player"]    # Split-Layout: AudioZone-UUID fuer den festen Player
             if isinstance(ui.get("panes"), dict):
                 pn = {str(k): v for k, v in ui["panes"].items()
-                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
                 if pn:
                     cui["panes"] = pn           # Split-Pane je Tab: Wetter/Kalender/Vollbreit
             if _color_ok(ui.get("textColor")):
@@ -1951,9 +2148,20 @@ class App:
                     "nodes": det.get("nodes"),
                     "actuals": {f"actual{i}": self._state(c, f"actual{i}") for i in range(6)},
                 })
+        # Diagnose globale States (Sonnenzeiten, aktive Betriebsmodi ...): Name,
+        # UUID und aktueller Wert. Sonst nirgends sichtbar; Grundlage dafuer, die
+        # Nacht-Erkennung an den Miniserver zu haengen statt an einen Wetterdienst.
+        gstates = []
+        for _n, _ref in (self.global_states or {}).items():
+            if isinstance(_ref, str):
+                gstates.append({"name": _n, "uuid": _ref, "value": self.states.get(_ref)})
+            else:
+                gstates.append({"name": _n, "raw": _ref})
         return {"connected": self.client is not None, "controls": len(self.controls),
                 "typeCount": len(out), "typesByStatus": counts, "types": out,
                 "energyDetails": energy,
+                "globalStates": sorted(gstates, key=lambda g: g["name"]),
+                "operatingModes": self.op_modes,
                 "unsupportedControls": sorted(dead, key=lambda d: (d["room"], d["name"]))}
 
     def _control_item(self, uuid: str, prof: dict | None = None,
@@ -2327,6 +2535,9 @@ class App:
             style["ovFill"] = f"{fill:.3g}"     # ueberschreibt --ov-* nur fuer diese Kachel
             style["ovBord"] = f"{bord:.3g}"
             style["ovBw"] = bw
+            ialpha, ibw = _inactive_border(ov["overlay"])
+            style["tileBord"] = f"rgba(255,255,255,{ialpha:.3g})"   # inaktiver Rahmen nur fuer diese Kachel
+            style["tileBw"] = ibw
         if style:
             it["style"] = style
         ic = ov.get("icon")
@@ -3658,7 +3869,17 @@ class App:
                 if self.client is None:
                     await self.start()          # Erstverbindung / nach hartem Reset
                 elif self.ws is None:
-                    await self._connect_ws()    # nur WS neu (z.B. nach Settings-Reconnect)
+                    # Reiner WS-Neuaufbau (z.B. nach Miniserver-Reboot durch eine
+                    # Loxone-Config-Aenderung): Struktur mitziehen, damit neue/
+                    # umbenannte Controls ohne LoxPanel-Neustart erscheinen. Fehler
+                    # isoliert -> Reconnect scheitert nie an der Struktur.
+                    try:
+                        if await self._refresh_structure():
+                            self._pending_reload = True   # Panels neu laden lassen
+                            log.info("Loxone-Struktur geaendert -> uebernommen, Panels werden neu geladen")
+                    except Exception:
+                        log.exception("Struktur-Refresh beim Reconnect uebersprungen")
+                    await self._connect_ws()    # WS neu (Settings-Reconnect / nach Abriss)
                 await self.ws.stream(self._on_value)
                 raise ConnectionError("WS-Stream regulär beendet")
             except asyncio.CancelledError:
@@ -3693,6 +3914,7 @@ class App:
             self.conn_dev.pop(ws, None)
             self.conn_player.pop(ws, None)
             self.conn_energy.pop(ws, None)
+            self.conn_camera.pop(ws, None)
             try:
                 await ws.close()
             except Exception:
@@ -3720,6 +3942,25 @@ class App:
             if self._front is not None:
                 for ws in list(self.conn_route):
                     await self._send_or_drop(ws, self._front)
+        if self._pending_reload:
+            # Loxone-Struktur hat sich geaendert (Config) -> Panels neu laden, damit
+            # neue/umbenannte Controls erscheinen. Nur bei echter Aenderung gesetzt.
+            self._pending_reload = False
+            for ws in list(self.conn_route):
+                await self._send_or_drop(ws, {"t": "reload"})
+        if self._last_sent:
+            # Merkzettel von Verbindungen befreien, die es nicht mehr gibt.
+            # Selbstheilend, damit nicht an jeder der vier Stellen, die eine
+            # Verbindung schliessen, daran gedacht werden muss.
+            for _tot in [w for w in self._last_sent if w not in self.conn_route]:
+                del self._last_sent[_tot]
+        night = self._night_now()
+        if night != self._night_on:
+            # Nur beim Wechsel senden — die Panels halten den Zustand selbst.
+            self._night_on = night
+            log.info("Nachtmodus %s", "an" if night else "aus")
+            for ws in list(self.conn_route):
+                await self._send_or_drop(ws, {"t": "night", "on": night})
         if self._dirty and self.conn_route:
             self._dirty = False
             for ws, route in list(self.conn_route.items()):
@@ -3751,11 +3992,44 @@ class App:
                         energy_msg = {"t": "energy", **eb} if eb is not None else None
                     except Exception:
                         log.exception("energy_blocks fehlgeschlagen (%s)", _euid)
-                if await self._send_or_drop(ws, msg):
-                    if player_msg is not None:
-                        await self._send_or_drop(ws, player_msg)
-                    if energy_msg is not None:
-                        await self._send_or_drop(ws, energy_msg)
+                # Split-Layout: Kamera-Pane (Intercom-Vollansicht) des aktiven Tabs
+                # mitrendern (kommt vom Client via setcamera -> conn_camera).
+                camera_msg = None
+                _cuid = self.conn_camera.get(ws)
+                if _cuid:
+                    try:
+                        ib = self.intercom_blocks(_cuid)
+                        camera_msg = {"t": "camera", "blocks": ib} if ib is not None else None
+                    except Exception:
+                        log.exception("intercom_blocks fehlgeschlagen (%s)", _cuid)
+                # Nur senden, was sich seit der letzten Zustellung an DIESE
+                # Verbindung geaendert hat. Der Tick laeuft, sobald sich
+                # irgendein Wert im Haus bewegt — meist betrifft das die
+                # Ansicht dieses Panels gar nicht, und das Panel wuerde
+                # dieselbe Ansicht erneut bekommen und komplett neu zeichnen.
+                last = self._last_sent.setdefault(ws, {})
+                if msg != last.get("view"):
+                    if not await self._send_or_drop(ws, msg):
+                        self._last_sent.pop(ws, None)
+                        continue
+                    last["view"] = msg
+                if player_msg is not None and player_msg != last.get("player"):
+                    if await self._send_or_drop(ws, player_msg):
+                        last["player"] = player_msg
+                    else:
+                        self._last_sent.pop(ws, None)
+                        continue
+                if energy_msg is not None and energy_msg != last.get("energy"):
+                    if await self._send_or_drop(ws, energy_msg):
+                        last["energy"] = energy_msg
+                    else:
+                        self._last_sent.pop(ws, None)
+                        continue
+                if camera_msg is not None and camera_msg != last.get("camera"):
+                    if await self._send_or_drop(ws, camera_msg):
+                        last["camera"] = camera_msg
+                    else:
+                        self._last_sent.pop(ws, None)
 
     async def broadcaster(self) -> None:
         # Diese Schleife darf NIEMALS sterben — sonst bekommen ALLE Panels keine
@@ -3996,6 +4270,8 @@ async def api_settings(request: web.Request) -> web.Response:
             # Auto-Standort vom Miniserver (Fallback, wenn keine Koordinaten gesetzt)
             "ms_lat": app.ms_lat, "ms_lon": app.ms_lon, "ms_location": app.ms_location,
         },
+        "night": {"control": (app.night_cfg or {}).get("control") or "",
+                  "options": app.night_control_options()},
         "connected": app.client is not None,
         "nControls": len(app.controls),
     })
@@ -4065,6 +4341,30 @@ async def api_settings_ms(request: web.Request) -> web.Response:
         return web.json_response({"ok": True, "connected": True, "nControls": n})
     except Exception as err:
         return web.json_response({"ok": False, "error": f"Verbindung fehlgeschlagen: {err}"})
+
+
+async def api_settings_night(request: web.Request) -> web.Response:
+    """Nacht-Ausloeser: Baustein, dessen `active`-State den Nachtmodus schaltet.
+    Leer = keiner, dann entscheiden die Sonnenzeiten."""
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    u = str(data.get("control") or "").strip()
+    if u and u not in app.controls:
+        return web.json_response({"ok": False, "error": "Baustein nicht gefunden"}, status=400)
+    cfg = _load_cfg()
+    night = dict(cfg.get("night", {}) if isinstance(cfg.get("night"), dict) else {})
+    night["control"] = u
+    cfg["night"] = night
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
+    app.night_cfg = _night_config()
+    log.info("Nacht-Ausloeser gespeichert: %s", u or "(keiner -> Sonnenzeiten)")
+    return web.json_response({"ok": True})
 
 
 async def api_settings_audiometa(request: web.Request) -> web.Response:
@@ -4370,6 +4670,7 @@ async def _push(app: "App", msg: dict, panel: str = "", device: str = "") -> int
             app.conn_info.pop(ws, None)
             app.conn_player.pop(ws, None)
             app.conn_energy.pop(ws, None)
+            app.conn_camera.pop(ws, None)
     return n
 
 
@@ -4570,8 +4871,11 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         "panes": prof.get("panes") or {},
                         "dpmsOff": app.panel_dpms(prof["id"]),
                         "reloadHours": app.panel_reload(prof["id"]),
+                        "night": {**app.panel_night(prof["id"]), "on": app._night_on},
                         "agent": app._has_agent(dev)})
-    await ws.send_json(app.render(app.conn_route[ws], prof))
+    _first = app.render(app.conn_route[ws], prof)
+    await ws.send_json(_first)
+    app._last_sent.setdefault(ws, {})["view"] = _first
     # Player-Pane fordert der Client selbst an (setplayer), sobald ein Tab mit
     # Player-Pane aktiv ist — je Tab eine eigene Zone moeglich.
     # Kalender/Wetter fuer die Uhr-Startseite sofort mitschicken (falls schon geladen)
@@ -4597,6 +4901,9 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                     view_msg = {"t": "view", "title": "Fehler", "route": route,
                                 "blocks": [{"k": "status", "text": "Diese Ansicht konnte nicht geladen werden."}]}
                 await ws.send_json(view_msg)
+                # Auch die Navigation sendet am Tick vorbei — eintragen, sonst
+                # schickt der naechste Tick dieselbe Ansicht ein zweites Mal.
+                app._last_sent.setdefault(ws, {})["view"] = view_msg
                 # Beim Oeffnen einer AudioZone / Musikauswahl die Zonen-Favoriten
                 # aktiv anfordern; das frische Ergebnis wird per broadcaster
                 # nachgereicht (roomfav/get befuellt den sourceList-State).
@@ -4621,7 +4928,9 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                     try:
                         pb = app.player_blocks(zone)
                         if pb is not None:
-                            await ws.send_json({"t": "player", "blocks": pb})
+                            _pm = {"t": "player", "blocks": pb}
+                            await ws.send_json(_pm)
+                            app._last_sent.setdefault(ws, {})["player"] = _pm
                     except Exception:
                         log.exception("player_blocks (setplayer) fehlgeschlagen (%s)", zone)
                 else:
@@ -4635,11 +4944,27 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                     try:
                         eb = app.energy_blocks(euid)
                         if eb is not None:
-                            await ws.send_json({"t": "energy", **eb})
+                            _em = {"t": "energy", **eb}
+                            await ws.send_json(_em)
+                            app._last_sent.setdefault(ws, {})["energy"] = _em
                     except Exception:
                         log.exception("energy_blocks (setenergy) fehlgeschlagen (%s)", euid)
                 else:
                     app.conn_energy.pop(ws, None)
+            elif data.get("t") == "setcamera":
+                # Client meldet die Intercom-Kachel der aktiven Kamera-Pane
+                # (oder "" = keine).
+                cuid = str(data.get("uuid") or "").strip()
+                if cuid:
+                    app.conn_camera[ws] = cuid
+                    try:
+                        ib = app.intercom_blocks(cuid)
+                        if ib is not None:
+                            await ws.send_json({"t": "camera", "blocks": ib})
+                    except Exception:
+                        log.exception("intercom_blocks (setcamera) fehlgeschlagen (%s)", cuid)
+                else:
+                    app.conn_camera.pop(ws, None)
     finally:
         app.conn_route.pop(ws, None)
         app.conn_prof.pop(ws, None)
@@ -4647,6 +4972,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         app.conn_info.pop(ws, None)
         app.conn_player.pop(ws, None)
         app.conn_energy.pop(ws, None)
+        app.conn_camera.pop(ws, None)
     return ws
 
 
@@ -4690,6 +5016,7 @@ def main() -> None:
     a.router.add_get("/api/types", api_types)
     a.router.add_post("/api/settings/miniserver", api_settings_ms)
     a.router.add_post("/api/settings/intercom", api_settings_intercom)
+    a.router.add_post("/api/settings/night", api_settings_night)
     a.router.add_post("/api/settings/audiometa", api_settings_audiometa)
     a.router.add_post("/api/settings/calendar", api_settings_calendar)
     a.router.add_post("/api/agent/announce", api_agent_announce)
