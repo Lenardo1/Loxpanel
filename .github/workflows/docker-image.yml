@@ -1,7 +1,8 @@
 name: Docker Image
 
-# Baut das LoxPanel-Image bei jedem Push auf main (und bei v*-Tags) und schiebt
-# es in die GitHub Container Registry: ghcr.io/<owner>/loxpanel
+# Baut das LoxPanel-Image bei jedem Push auf main
+# und bei v*-Tags und schiebt es nach GHCR:
+# ghcr.io/<owner>/loxpanel
 
 on:
   push:
@@ -12,20 +13,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     permissions:
       contents: read
       packages: write
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          # PAT mit Scope write:packages als Repo-Secret GHCR_TOKEN hinterlegen
-          # (umgeht die GITHUB_TOKEN/Package-Verknuepfungs-Probleme komplett).
-          password: ${{ secrets.GHCR_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Image-Metadaten (Tags/Labels)
         id: meta
