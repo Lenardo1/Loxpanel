@@ -1155,6 +1155,7 @@ function connect(){
       if(msg.lang){ LANG=msg.lang; tickClock(); }   // Panel-Sprache -> Datum/Uhr sofort aktualisieren
       if(msg.title) document.title=msg.title;
       if(msg.tabMeta) tabMeta=msg.tabMeta;
+      if(msg.night){ NIGHT.dim=+msg.night.dim||0; NIGHT.wake=+msg.night.wake||0; setNight(msg.night.on); }
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs;
       applyDisplayCfg(msg);   // Display aus / Auto-Neustart ohne Agent (Kiosk-App)
       renderTabs(); return; }
@@ -1168,6 +1169,7 @@ function connect(){
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
     if(msg.t==='reload'){ location.reload(); return; }                       // Server -> Panel neu laden
+    if(msg.t==='night'){ setNight(msg.on); return; }                         // Tag/Nacht gewechselt
     if(msg.t==='goto'){ if(msg.route){ wake(); nav(msg.route); } return; }  // auf Seite springen
     if(msg.t==='notify'){ wake(); showNotify(msg.text, msg.level, msg.secs); return; }  // Nachricht einblenden
     if(msg.t==='display'){ if(msg.on) wake(); else screenOff(); return; }   // Server schaltet Display (Kiosk-App)
@@ -1529,8 +1531,36 @@ function renderPlayer(blocks){
 function resetIdle(){ clearTimeout(idleTimer);
   idleTimer=setTimeout(()=>{ goTab(tabsCfg[0]||'favoriten'); showSaver(); }, SAVER_IDLE_MS);
   armDpms(); }
-el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); hideSaver(); resetIdle(); });
-['pointerdown','keydown','wheel'].forEach(ev=>document.addEventListener(ev, ()=>{ if(!saverOn()) resetIdle(); }, {passive:true}));
+el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); nightWake(); hideSaver(); resetIdle(); });
+['pointerdown','keydown','wheel'].forEach(ev=>document.addEventListener(ev, ()=>{ nightWake(); if(!saverOn()) resetIdle(); }, {passive:true}));
+// ---- Nachtmodus: Panel abdunkeln ----
+// Tag/Nacht meldet der Server ({t:"night"}), Staerke und Aufhelldauer kommen je
+// Panel im theme. Gedimmt wird ueber eine schwarze Auflage statt per CSS-Filter:
+// ein Filter auf dem Seitenrumpf zerschiesst die Positionierung von
+// position:fixed-Elementen, und die Auflage wirkt wie heruntergeregelte
+// Hintergrundbeleuchtung (Weiss wird grau, nicht nur dunkler).
+const NIGHT = { on:false, dim:0, wake:20 };
+let nightEl=null, nightWakeTimer=null;
+function nightLayer(){
+  if(!nightEl){
+    nightEl=document.createElement('div'); nightEl.id='nightdim';
+    nightEl.style.cssText='position:fixed;inset:0;background:#000;opacity:0;'+
+      'pointer-events:none;z-index:100000;transition:opacity .8s ease';
+    document.body.appendChild(nightEl);
+  }
+  return nightEl;
+}
+function applyNight(awake){
+  nightLayer().style.opacity =
+    (NIGHT.on && NIGHT.dim>0 && !awake) ? Math.min(90,NIGHT.dim)/100 : 0;
+}
+function setNight(on){ NIGHT.on=!!on; clearTimeout(nightWakeTimer); applyNight(false); }
+function nightWake(){          // Beruehrung -> kurz voll aufhellen, dann zurueck
+  if(!NIGHT.on || NIGHT.dim<=0 || NIGHT.wake<=0) return;
+  clearTimeout(nightWakeTimer);
+  applyNight(true);
+  nightWakeTimer=setTimeout(()=>applyNight(false), NIGHT.wake*1000);
+}
 // ---- Display ohne Agent: Kiosk-App-Anbindung (Android) ----
 // Auf einem Linux-Panel schaltet der Agent das Display (Server meldet agent:true,
 // die Seite haelt sich dann raus). Ohne Agent uebernimmt die Seite: nach dpmsOff
@@ -1561,7 +1591,7 @@ function applyDisplayCfg(msg){
   if(!DISP.agent && DISP.reloadHours>0) reloadTimer=setTimeout(()=>location.reload(), DISP.reloadHours*3600*1000);
 }
 // Server-Ereignis, das Aufmerksamkeit braucht: Display an, Uhr weg, Timer neu.
-function wake(){ screenOn(); hideSaver(); resetIdle(); }
+function wake(){ screenOn(); nightWake(); hideSaver(); resetIdle(); }
 setInterval(tickClock, 1000);
 showSaver();     // Startseite = Uhr
 resetIdle();

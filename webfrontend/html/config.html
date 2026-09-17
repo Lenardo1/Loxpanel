@@ -489,6 +489,15 @@
             <p class="note" data-i18n>Display-Steuerung je Gerät: Bei Fully Kiosk die Remote-Admin-Schnittstelle einschalten (Port 2323, Passwort), bei WallPanel den HTTP-Server (Port 2971). Der Server schaltet das Display dann auch bei Klingel, Wecker, Notify und Goto ein und nach der Abschaltzeit aus, unabhängig von der Seite.</p>
             <div class="actions"><button class="btn" id="dev_save" data-i18n>Speichern</button><span class="toast" id="dev_toast"></span></div>
           </div>
+          <div class="card">
+            <h3 data-i18n>Nachtmodus</h3>
+            <p class="note" data-i18n>Wann die Panels abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.</p>
+            <div class="row2">
+              <div class="field" style="max-width:460px"><label class="lbl" data-i18n>Auslöser (optional)</label><select id="nt_control"></select></div>
+            </div>
+            <p class="note" data-i18n>Wie stark abgedunkelt wird und ob eine Berührung kurz aufhellt, stellst du je Panel unter Panel Configuration → Darstellung ein.</p>
+            <div class="actions"><button class="btn" id="nt_save" data-i18n>Speichern</button><span class="toast" id="nt_toast"></span></div>
+          </div>
         </section>
 
         <!-- Audio -->
@@ -898,6 +907,12 @@ function renderEditor(){
        '<div class="field" style="max-width:180px"><label class="lbl">Auto-Neustart alle (Std.)</label>'+
          '<input type="number" min="0" max="168" step="1" data-ui="reloadHours" value="'+
          (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="0 = aus"></div>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Nachts abdunkeln (%)</label>'+
+         '<input type="number" min="0" max="90" step="5" data-ui="nightDim" value="'+
+         (((p.ui||{}).nightDim==null)?'':(p.ui||{}).nightDim)+'" placeholder="0 = aus"></div>'+
+       '<div class="field" style="max-width:180px"><label class="lbl">Aufhellen bei Berührung (Sek.)</label>'+
+         '<input type="number" min="0" max="300" step="5" data-ui="nightWake" value="'+
+         (((p.ui||{}).nightWake==null)?'':(p.ui||{}).nightWake)+'" placeholder="20"></div>'+
        '<div class="field" style="max-width:200px"><label class="lbl">Kachel-Layout</label>'+
          '<select id="fLayout">'+
            '<option value="2x2"'+(((p.ui||{}).cols!=3&&(p.ui||{}).rows!=3)?' selected':'')+'>2 × 2 (4″-Panel)</option>'+
@@ -1296,6 +1311,13 @@ async function loadSettings(){
     srv.innerHTML = list.length
       ? T('Erkannte Audioserver:')+' '+list.map(esc).join(', ')
       : T('Kein Audioserver in der Loxone-Struktur gefunden.'); }
+  // Nachtmodus-Ausloeser
+  const nt=SET.night||{}, ntSel=$('#nt_control');
+  if(ntSel){
+    ntSel.innerHTML='<option value="">'+T('— kein Auslöser (Sonnenuntergang) —')+'</option>'
+      + (nt.options||[]).map(o=>'<option value="'+esc(o.uuid)+'"'+(o.uuid===nt.control?' selected':'')+'>'
+          + esc((o.room?o.room+' · ':'')+o.name+' ('+o.type+')')+'</option>').join('');
+  }
   // Kalender & Wetter
   const cal=SET.calendar||{};
   if($('#cal_name')){
@@ -1358,6 +1380,16 @@ $('#ic_save').onclick=async()=>{
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
 
+$('#nt_save').onclick=async()=>{
+  const body={control:$('#nt_control').value||''};
+  $('#nt_save').disabled=true;
+  try{
+    const r=await fetch('/api/settings/night',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(j.ok){ flash($('#nt_toast'),T('✓ Gespeichert'),true); loadSettings(); } else flash($('#nt_toast'),j.error||T('Fehler'),false);
+  }catch(e){ flash($('#nt_toast'),'Fehler: '+e,false); }
+  $('#nt_save').disabled=false;
+};
 $('#am_save').onclick=async()=>{
   const body={enabled:$('#am_enabled').checked};
   $('#am_save').disabled=true;
