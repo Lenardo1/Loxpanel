@@ -89,7 +89,7 @@ def normalize_ical_url(url) -> str:
     return url
 
 
-def _day_label(d: date, today: date) -> str:
+def day_label(d: date, today: date) -> str:
     """`date` -> "Heute" / "Morgen" / "Sa 12.9." (Wochentag + Tag.Monat)."""
     delta = (d - today).days
     if delta == 0:
@@ -181,7 +181,7 @@ def _parse_events(ics_bytes: bytes, days: int) -> list:
         seen.add(key)
         sort_time = "00:00" if all_day else f"{t.hour:02d}:{t.minute:02d}"
         out.append({
-            "day": _day_label(d, today),
+            "day": day_label(d, today),
             "date": d.isoformat(),          # ISO-Datum (fuer das Monatsraster im Pane)
             "time": "ganztägig" if all_day else f"{t.hour}:{t.minute:02d}",
             "title": title,
@@ -265,7 +265,7 @@ async def fetch_weather(session: aiohttp.ClientSession, lat: float, lon: float, 
         except (ValueError, TypeError):
             dd = None
         forecast.append({
-            "day": _day_label(dd, today) if dd else "",
+            "day": day_label(dd, today) if dd else "",
             "icon": wmo_icon(codes[i] if i < len(codes) else 0),
             "hi": round(tmax[i]) if i < len(tmax) and tmax[i] is not None else None,
             "lo": round(tmin[i]) if i < len(tmin) and tmin[i] is not None else None,
@@ -311,6 +311,7 @@ async def fetch_weather(session: aiohttp.ClientSession, lat: float, lon: float, 
         "lo": forecast[0]["lo"] if forecast else None,
         "feels": feels,
         "wind": _r(cur.get("wind_speed_10m")),
+        "wind_unit": "km/h",        # Open-Meteo liefert km/h; das Panel schreibt die Einheit mit
         "wind_dir": cur.get("wind_direction_10m"),
         "humidity": _r(cur.get("relative_humidity_2m")),
         "pressure": _r(cur.get("pressure_msl")),
@@ -324,9 +325,13 @@ async def fetch_weather(session: aiohttp.ClientSession, lat: float, lon: float, 
     }
 
 
-async def load_front(session: aiohttp.ClientSession, cfg: dict) -> dict:
+async def load_front(session: aiohttp.ClientSession, cfg: dict,
+                     skip_weather: bool = False) -> dict:
     """Kalender + Wetter gemaess Config laden. Ein Fehler in einem Teil laesst den
-    anderen unberuehrt. Rueckgabe: {weather, events, calName, meta}."""
+    anderen unberuehrt. Rueckgabe: {weather, events, calName, meta}.
+
+    `skip_weather` laesst Open-Meteo aus — der Aufrufer hat schon Wetter vom
+    Loxone-Wetterserver und braucht die zweite Quelle nicht."""
     cfg = cfg or {}
     name = (cfg.get("name") or "Family").strip() or "Family"
     out = {
@@ -367,7 +372,7 @@ async def load_front(session: aiohttp.ClientSession, cfg: dict) -> dict:
             log.warning("Feiertage laden fehlgeschlagen: %s", e)
 
     lat, lon = cfg.get("lat"), cfg.get("lon")
-    if lat not in (None, "") and lon not in (None, ""):
+    if not skip_weather and lat not in (None, "") and lon not in (None, ""):
         out["meta"]["wx_configured"] = True
         try:
             fore = int(cfg.get("fore_days") or 4)

@@ -20,6 +20,7 @@ import hashlib
 import hmac
 import json
 import logging
+import math
 import os
 import re
 import sys
@@ -58,6 +59,7 @@ from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 from audioserver import make_backend, AudioBackend  # noqa: E402
 from audioserver_events import AudioEventClient  # noqa: E402
 import front_info  # noqa: E402  # Kalender (iCal-Abo) + Wetter (Open-Meteo) fuer die Front
+import loxone_weather  # noqa: E402  # Wetter vom Loxone-Wetterserver (Vorrang vor Open-Meteo)
 import theme_colors  # noqa: E402  # Panel-Theme aus einer Grundfarbe herleiten
 
 log = logging.getLogger("loxpanel.webvisu")
@@ -511,6 +513,12 @@ class App:
         # Status fuer die Config-Seite. _front_refresh stoesst ein sofortiges
         # Neuladen an (nach dem Speichern).
         self.calendar_cfg = _calendar_config()
+        # Loxone-Wetterserver: Konfiguration aus der Struktur, Rohdaten je
+        # State-UUID (kommen ueber den WS als eigene Tabelle) und die zuletzt
+        # tatsaechlich verwendete Quelle fuer die Diagnose.
+        self.weather_cfg: dict = {}
+        self._lox_wx: dict[str, list] = {}
+        self._wx_source: str = "open-meteo"
         # Standort des Miniservers (aus msInfo) als Wetter-Fallback ohne Konfiguration.
         self.ms_lat: float | None = None
         self.ms_lon: float | None = None
@@ -625,6 +633,13 @@ class App:
         # die aktiven Betriebsmodi. Die Werte kommen ueber den WS-Stream in
         # self.states. Roh uebernehmen, die Belegung ist je Anlage verschieden.
         self.global_states = dict(st.get("globalStates") or {})
+        # Loxone-Wetterdienst: nur vorhanden, wenn die Anlage ihn gebucht hat.
+        # Enthaelt die State-UUIDs (actual/forecast), die Wetterlage-Texte und
+        # die Formatstrings mit den Einheiten. Der Wetterpuffer gehoert zu diesen
+        # UUIDs und wird mit der Struktur zusammen verworfen.
+        wsrv = st.get("weatherServer")
+        self.weather_cfg = wsrv if isinstance(wsrv, dict) else {}
+        self._lox_wx = {}
         self.playerid_by_action = {}
         self.audiohost_by_action = {}
         for _u, _c in self.controls.items():
@@ -2162,7 +2177,33 @@ class App:
                 "energyDetails": energy,
                 "globalStates": sorted(gstates, key=lambda g: g["name"]),
                 "operatingModes": self.op_modes,
+                "weatherServer": self._weather_diag(),
                 "unsupportedControls": sorted(dead, key=lambda d: (d["room"], d["name"]))}
+
+    def _weather_diag(self) -> dict:
+        """Diagnose zum Loxone-Wetterserver: was die Anlage meldet und was davon
+        ankommt. Sonst nirgends sichtbar — und die einzige verlaessliche Auskunft
+        darueber, unter welchen Namen und in welchen Einheiten diese Anlage ihre
+        Wetterwerte fuehrt."""
+        cfg = self.weather_cfg or {}
+        states = cfg.get("states") if isinstance(cfg.get("states"), dict) else {}
+        eintraege = {rolle: len(self._lox_wx.get(u) or [])
+                     for rolle, u in states.items() if isinstance(u, str)}
+        akt = (self._lox_wx.get(states.get("actual")) or [None])[0]
+        if isinstance(akt, dict):
+            # NaN/Inf wuerde ungueltiges JSON ergeben — die Tabelle kann beides fuehren.
+            akt = {k: (v if isinstance(v, int) or (isinstance(v, float) and math.isfinite(v)) else None)
+                   for k, v in akt.items()}
+        return {
+            "vorhanden": bool(cfg),
+            "quelle": self._wx_source,
+            "states": states,
+            "eintraege": eintraege,
+            "aktuellerEintrag": akt,      # Rohwerte: zeigt Einheiten und Groessenordnung
+            "wetterlagen": loxone_weather.weather_texts(cfg),
+            "format": cfg.get("format"),
+            "feldtypen": cfg.get("weatherFieldTypes"),
+        }
 
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False) -> dict:
@@ -3855,6 +3896,57 @@ class App:
                 self._pending_alarm.append({"id": self.alarm_map[uuid], "on": now})
             self._alarm_prev[uuid] = value
 
+    def _on_weather(self, uuid: str, entries: list) -> None:
+        """Wetter-Tabelle vom Miniserver uebernehmen (nur mit Wetterdienst).
+
+        Die Front wird sofort neu gebaut, statt bis zum naechsten 15-Minuten-Takt
+        zu warten. Nur bei echter Aenderung — sonst wuerde jeder Wiederholungs-
+        Push auch den Kalender neu laden, und wie oft der Miniserver schickt,
+        bestimmt er selbst."""
+        if self._lox_wx.get(uuid) == entries:
+            return
+        self._lox_wx[uuid] = entries
+        self._front_refresh.set()
+
+    def _ms_sun_hhmm(self) -> tuple[str | None, str | None]:
+        """Sonnenauf-/-untergang des Miniservers als "HH:MM".
+
+        Quelle sind die globalen States (Minuten seit Mitternacht) — dieselbe,
+        an der auch der Nachtmodus haengt. Ohne Werte (None, None)."""
+        gs = self.global_states or {}
+        out: list[str | None] = []
+        for key in ("sunrise", "sunset"):
+            u = gs.get(key)
+            v = self.states.get(u) if isinstance(u, str) else None
+            if isinstance(v, (int, float)) and 0 <= v < 1440:
+                out.append(f"{int(v) // 60:02d}:{int(v) % 60:02d}")
+            else:
+                out.append(None)
+        return out[0], out[1]
+
+    def _loxone_weather(self) -> dict | None:
+        """Wetter vom Loxone-Wetterserver aufbereitet — oder None, wenn die
+        Anlage keinen hat bzw. die Daten nicht tragfaehig sind. Dann bleibt
+        Open-Meteo zustaendig."""
+        states = (self.weather_cfg or {}).get("states")
+        if not isinstance(states, dict):
+            return None
+        actual = self._lox_wx.get(states.get("actual")) or []
+        if not actual:
+            return None
+        forecast = self._lox_wx.get(states.get("forecast")) or []
+        sr, ss = self._ms_sun_hhmm()
+        try:
+            fore = int((self.calendar_cfg or {}).get("fore_days") or 4)
+        except (TypeError, ValueError):
+            fore = 4
+        try:
+            return loxone_weather.build(self.weather_cfg, actual, forecast,
+                                        sunrise=sr, sunset=ss, fore_days=fore)
+        except Exception:
+            log.exception("Wetterserver: Aufbereitung fehlgeschlagen — Open-Meteo bleibt")
+            return None
+
     async def stream_task(self) -> None:
         # Dauer-Loop: Erstverbindung + Reconnect zum Miniserver. Bricht NIEMALS
         # den HTTP-Server ab — auch wenn der Miniserver (noch) nicht erreichbar
@@ -3880,7 +3972,7 @@ class App:
                     except Exception:
                         log.exception("Struktur-Refresh beim Reconnect uebersprungen")
                     await self._connect_ws()    # WS neu (Settings-Reconnect / nach Abriss)
-                await self.ws.stream(self._on_value)
+                await self.ws.stream(self._on_value, self._on_weather)
                 raise ConnectionError("WS-Stream regulär beendet")
             except asyncio.CancelledError:
                 raise
@@ -4060,11 +4152,22 @@ class App:
                 # Koordinaten automatisch vom Miniserver, wenn keine in der Config.
                 if cfg.get("lat") in (None, "") and self.ms_lat is not None:
                     cfg["lat"], cfg["lon"] = self.ms_lat, self.ms_lon
-                configured = bool((cfg.get("ical_url") or "").strip()) or (
+                # Wetter vom Miniserver hat Vorrang; Open-Meteo bleibt Rueckfall
+                # fuer Anlagen ohne Loxone-Wetterdienst. Liefert der Wetterserver
+                # Wetter, braucht es weder Koordinaten noch einen zweiten Abruf.
+                wx = self._loxone_weather()
+                configured = bool((cfg.get("ical_url") or "").strip()) or wx is not None or (
                     cfg.get("lat") not in (None, "") and cfg.get("lon") not in (None, ""))
                 if configured:
                     try:
-                        data = await front_info.load_front(self._front_session, cfg)
+                        data = await front_info.load_front(self._front_session, cfg,
+                                                           skip_weather=wx is not None)
+                        if wx is not None:
+                            data["weather"] = wx
+                            data["meta"]["wx_configured"] = True
+                            data["meta"]["wx_error"] = None
+                        data["meta"]["wx_source"] = "miniserver" if wx is not None else "open-meteo"
+                        self._wx_source = data["meta"]["wx_source"]
                         self._front_meta = data.get("meta", {})
                         payload = self._front_payload(data)
                     except Exception:
@@ -4072,6 +4175,7 @@ class App:
                         payload = None
                 else:
                     self._front_meta = {}
+                    self._wx_source = "open-meteo"
                     payload = {"t": "front", "weather": None, "events": [],
                                "calName": (cfg.get("name") or "Family")}
                 # Nur bei echter Aenderung senden (spart Broadcasts bei gleichem Stand).

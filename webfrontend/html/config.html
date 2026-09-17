@@ -355,7 +355,7 @@
           </div>
           <div class="ovcol"><h4>Grundeinstellungen</h4>
             <button class="ovbox" data-goto="settings:miniserver"><b>Miniserver</b><span>Zugang zum Loxone Miniserver (Host, Benutzer, Passwort). HTTPS/443.</span></button>
-            <button class="ovbox" data-goto="settings:calendar"><b>Kalender &amp; Wetter</b><span>iCal-Abo + Feiertags-iCal, Wetter (Open-Meteo, Standort automatisch vom Miniserver).</span></button>
+            <button class="ovbox" data-goto="settings:calendar"><b>Kalender &amp; Wetter</b><span>iCal-Abo + Feiertags-iCal, Wetter (Loxone-Wetterserver, sonst Open-Meteo mit dem Standort des Miniservers).</span></button>
             <button class="ovbox" data-goto="settings:audio"><b>Audio</b><span>Audioserver-Live-Daten (Cover/Titel/Favoriten), Direktkanal-Option.</span></button>
             <button class="ovbox" data-goto="settings:intercom"><b>Kamera / Türstation</b><span>Kamerabilder und Klingel-Popup je Intercom-Baustein.</span></button>
             <button class="ovbox" data-goto="settings:panels"><b>Panels &amp; Geräte</b><span>Alle Anzeigegeräte, Online-Status, Ansicht wechseln, Betriebsmodus-Automatik.</span></button>
@@ -539,7 +539,7 @@
           </div>
           <div class="card">
             <h3 data-i18n>Wetter</h3>
-            <p class="note" data-i18n>Wetter von Open-Meteo — kostenlos, ohne API-Schlüssel und ohne Konto. Nur die Koordinaten deines Standorts eintragen (Dezimalgrad, z.B. 47.071 / 15.439). Leer lassen schaltet das Wetter aus.</p>
+            <p class="note" data-i18n>Hat die Anlage den Loxone-Wetterdienst, kommt das Wetter von dort — die Koordinaten bleiben dann unbenutzt. Sonst von Open-Meteo: kostenlos, ohne API-Schlüssel und ohne Konto, nur die Koordinaten deines Standorts eintragen (Dezimalgrad, z.B. 47.071 / 15.439). Leer lassen schaltet das Wetter aus, solange kein Wetterserver liefert.</p>
             <div class="row2">
               <div class="field"><label class="lbl" data-i18n>Breitengrad</label><input type="text" id="cal_lat" placeholder="47.071" autocomplete="off"></div>
               <div class="field"><label class="lbl" data-i18n>Längengrad</label><input type="text" id="cal_lon" placeholder="15.439" autocomplete="off"></div>
@@ -1424,7 +1424,10 @@ async function loadSettings(){
       const auto=(!manual&&autoGeo)
         ? ' <span class="ccmut">· '+T('Automatisch vom Miniserver:')+' '+esc(cal.ms_location||'')+' ('+cal.ms_lat+' / '+cal.ms_lon+')</span>'
         : '';
-      if(st.wx_error) ws.innerHTML='<b class="bad">'+T('Fehler:')+'</b> '+esc(st.wx_error);
+      // Der Loxone-Wetterserver hat Vorrang; dann sind Koordinaten und Open-Meteo unbenutzt.
+      if(st.wx_source==='miniserver') ws.innerHTML='<b class="ok">'+T('Wetter vom Loxone-Wetterserver')+'</b>'
+        +' <span class="ccmut">· '+T('Open-Meteo wird nicht abgefragt.')+'</span>';
+      else if(st.wx_error) ws.innerHTML='<b class="bad">'+T('Fehler:')+'</b> '+esc(st.wx_error);
       else if(st.wx_configured) ws.innerHTML='<b class="ok">'+T('Wetter geladen')+'</b>'+auto;
       else if(autoGeo) ws.innerHTML='<span class="ccmut">'+T('Standort vom Miniserver wird verwendet.')+'</span>'+auto;
       else ws.innerHTML='<span class="ccmut">'+T('Kein Standort konfiguriert.')+'</span>';

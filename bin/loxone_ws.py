@@ -7,10 +7,20 @@ danach die binaeren Status-Updates (enablebinstatusupdate).
 Protokoll (Kurzfassung, siehe "Communicating with the Miniserver"):
   - Jede Nachricht wird von einem 8-Byte-Header eingeleitet (Byte0=0x03,
     Byte1=Identifier, Byte4..7=Laenge, little-endian).
-  - Identifier: 0=Text, 2=Value-States, 3=Text-States, 6=Keepalive.
+  - Identifier: 0=Text, 2=Value-States, 3=Text-States, 6=Keepalive,
+    7=Weather-States (nur wenn die Anlage den Loxone-Wetterdienst hat).
   - Value-State-Eintrag: 16-Byte-UUID + 8-Byte-double (LE).
   - Text-State-Eintrag: 16-Byte-UUID + 16-Byte-Icon-UUID + 4-Byte-Laenge +
     Text + Padding auf 4-Byte-Grenze.
+  - Weather-Eintrag ("EvDataWeather"): 16-Byte-UUID + 4-Byte lastUpdate
+    (uint32) + 4-Byte nrEntries (int32), danach nrEntries Bloecke a 68 Byte
+    ("EvDataWeatherEntry"): 5 * int32 (timestamp, weatherType, windDirection,
+    solarRadiation, relativeHumidity) + 6 * double (temperature,
+    perceivedTemperature, dewPoint, precipitation, windSpeed,
+    barometricPressure), alles little-endian.
+
+Nicht behandelte Identifier werden einmal pro Verbindung protokolliert — sonst
+bliebe unsichtbar, dass der Miniserver etwas schickt, das hier niemand liest.
 """
 from __future__ import annotations
 
@@ -27,6 +37,14 @@ import aiohttp
 log = logging.getLogger("loxpanel.ws")
 
 ValueCallback = Callable[[str, Any], None]
+# uuid -> Liste von Wetter-Eintraegen (siehe _parse_weather).
+WeatherCallback = Callable[[str, list], None]
+
+
+# Ein Wetter-Eintrag: 5 * int32, dann 6 * double, ohne Padding.
+_WX_ENTRY = struct.Struct("<5i6d")
+_WX_FIELDS = ("ts", "type", "wind_dir", "radiation", "humidity",
+              "temp", "feels", "dew", "precip", "wind", "pressure")
 
 
 def format_uuid(b: bytes) -> str:
@@ -100,10 +118,15 @@ class LoxoneWS:
         payload = await self._cmd_json(command)
         return str((payload.get("LL") or {}).get("value") or "")
 
-    async def stream(self, on_value: ValueCallback) -> None:
-        """Empfaengt Status-Tabellen und ruft on_value(uuid, wert) je Aenderung."""
+    async def stream(self, on_value: ValueCallback,
+                     on_weather: WeatherCallback | None = None) -> None:
+        """Empfaengt Status-Tabellen und ruft on_value(uuid, wert) je Aenderung.
+
+        on_weather(uuid, eintraege) wird zusaetzlich gerufen, wenn die Anlage
+        Wetterdaten schickt (nur mit Loxone-Wetterdienst)."""
         assert self._ws is not None
         pending_ident: int | None = None
+        seen_unknown: set[int] = set()
         async for msg in self._ws:
             if msg.type == aiohttp.WSMsgType.BINARY:
                 data = msg.data
@@ -115,6 +138,15 @@ class LoxoneWS:
                     self._parse_values(data, on_value)
                 elif ident == 3:
                     self._parse_texts(data, on_value)
+                elif ident == 7:
+                    if on_weather is not None:
+                        self._parse_weather(data, on_weather)
+                elif ident is not None and ident not in seen_unknown:
+                    # Einmal pro Verbindung melden: sonst bliebe unbemerkt, dass
+                    # der Miniserver eine Tabelle schickt, die hier keiner liest.
+                    seen_unknown.add(ident)
+                    log.info("WS-Tabelle mit unbekannter Kennung %s (%d Byte) ignoriert",
+                             ident, len(data))
             elif msg.type == aiohttp.WSMsgType.TEXT:
                 pending_ident = None  # Kommando-Antwort im Stream ignorieren
             elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
@@ -127,6 +159,28 @@ class LoxoneWS:
             uuid = format_uuid(data[off:off + 16])
             val = struct.unpack("<d", data[off + 16:off + 24])[0]
             on_value(uuid, val)
+
+    @staticmethod
+    def _parse_weather(data: bytes, on_weather: WeatherCallback) -> None:
+        """Wetter-Tabelle (Kennung 7) in Eintragslisten je UUID zerlegen.
+
+        Aufbau siehe Modul-Docstring. Laengen werden vor jedem Zugriff geprueft:
+        ein abgeschnittenes oder unerwartet aufgebautes Paket wird verworfen,
+        nicht halb gelesen."""
+        off = 0
+        while off + 24 <= len(data):
+            uuid = format_uuid(data[off:off + 16])
+            count = struct.unpack("<i", data[off + 20:off + 24])[0]
+            off += 24
+            if count < 0 or off + count * _WX_ENTRY.size > len(data):
+                log.warning("Wetter-Tabelle unplausibel (%s Eintraege, %d Byte Rest) — verworfen",
+                            count, len(data) - off)
+                return
+            entries = []
+            for _ in range(count):
+                entries.append(dict(zip(_WX_FIELDS, _WX_ENTRY.unpack_from(data, off))))
+                off += _WX_ENTRY.size
+            on_weather(uuid, entries)
 
     @staticmethod
     def _parse_texts(data: bytes, on_value: ValueCallback) -> None:

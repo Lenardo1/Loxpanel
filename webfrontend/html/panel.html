@@ -1387,6 +1387,9 @@ function fpCurve(hourly){
     '<circle cx="'+X(0).toFixed(1)+'" cy="'+Y(pts[0].temp).toFixed(1)+'" r="4" fill="currentColor"/>'+
     lbl+'</svg>';
 }
+// Windeinheit: der Server schickt sie mit (Open-Meteo km/h, der Loxone-
+// Wetterserver das, was die Anlage in ihren Formatstrings fuehrt).
+function wUnit(w){ return (w&&w.wind_unit)?w.wind_unit:'km/h'; }
 function windDir(deg){ const C=['N','NO','O','SO','S','SW','W','NW']; return (deg==null)?'':(C[Math.round(deg/45)%8]||''); }
 // Seite 1 (fuellt die 2x2-Kachelhoehe): Aktuell + Kurve + Vorschau.
 function fpWeatherMainHTML(w){
@@ -1395,7 +1398,7 @@ function fpWeatherMainHTML(w){
   html+='<div class="fp-now"><span class="ico '+esc(w.icon||'cloud')+'">'+wxSvg(w.icon)+'</span>'+
     '<span class="t">'+fmtTemp(w.temp)+'°</span><span class="meta">'+
     '<span class="cond">'+esc(w.cond||'')+'</span>'+
-    '<span class="sub">'+(w.feels!=null?'Gefühlt '+tdeg(w.feels):'')+(w.wind!=null?' · Wind '+w.wind+' km/h':'')+'</span>'+
+    '<span class="sub">'+(w.feels!=null?'Gefühlt '+tdeg(w.feels):'')+(w.wind!=null?' · Wind '+w.wind+' '+wUnit(w):'')+'</span>'+
     '<span class="sub">Heute '+tdeg(w.hi)+' / '+tdeg(w.lo)+'</span></span></div>';
   const hh=Array.isArray(w.hourly)?w.hourly:[];
   if(hh.length>=2) html+='<div class="fp-curve">'+fpCurve(hh)+'</div>';
@@ -1412,7 +1415,7 @@ function fpWeatherDetailHTML(w){
   if(!w) return '';
   const det=[];
   if(w.humidity!=null) det.push(['Luftfeuchte', w.humidity+' %']);
-  if(w.wind!=null) det.push(['Wind', w.wind+' km/h'+(w.wind_dir!=null?' '+windDir(w.wind_dir):'')]);
+  if(w.wind!=null) det.push(['Wind', w.wind+' '+wUnit(w)+(w.wind_dir!=null?' '+windDir(w.wind_dir):'')]);
   if(w.sunrise&&w.sunset) det.push(['Sonne', w.sunrise+' – '+w.sunset]);
   if(w.uv!=null) det.push(['UV-Index', String(w.uv)]);
   if(w.precip_sum!=null) det.push(['Niederschlag', String(w.precip_sum).replace('.',',')+' mm']);
