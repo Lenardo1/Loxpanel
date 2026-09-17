@@ -58,6 +58,7 @@ from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 from audioserver import make_backend, AudioBackend  # noqa: E402
 from audioserver_events import AudioEventClient  # noqa: E402
 import front_info  # noqa: E402  # Kalender (iCal-Abo) + Wetter (Open-Meteo) fuer die Front
+import theme_colors  # noqa: E402  # Panel-Theme aus einer Grundfarbe herleiten
 
 log = logging.getLogger("loxpanel.webvisu")
 _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
@@ -994,17 +995,50 @@ class App:
 
     @staticmethod
     def _theme_vars(states: dict, ui: dict) -> dict:
-        v = {"--glow": states.get("active"), "--good": states.get("good"),
-             "--crit": states.get("crit"), "--warn": states.get("warn"),
+        # Grundfarbe zuerst: daraus faellt der ganze Satz ab - Flaechen, Schrift,
+        # Zweitzeile, Icon- und Zustandsfarben. Ohne Grundfarbe bleibt v leer und
+        # es aendert sich nichts gegenueber frueher.
+        v = dict(theme_colors.derive(ui["baseColor"]) or {}) if ui.get("baseColor") else {}
+        # Ausdruecklich eingestellte Zustandsfarben schlagen die Herleitung.
+        # Aber: "nicht gesetzt" gibt es bei states gar nicht - load_theme()
+        # fuellt sie immer aus DEFAULT_THEME, und theme.example.json liefert
+        # dieselben Werte. Als ausdrueckliche Wahl zaehlt deshalb nur ein Wert,
+        # der von der eingebauten Vorgabe abweicht. Sonst wuerden die alten
+        # Festfarben jedes hergeleitete Theme ueberschreiben und die ganze
+        # Nachrechnung in theme_colors.py waere fuer diese Rollen wirkungslos.
+        _hergeleitet = bool(v)
+        _vorgabe = DEFAULT_THEME["states"]
+
+        def _gewaehlt(key: str):
+            wert = states.get(key)
+            if not wert:
+                return None
+            if _hergeleitet and str(wert).strip().lower() == str(_vorgabe.get(key, "")).lower():
+                return None
+            return wert
+
+        for _var, _key in (("--glow", "active"), ("--good", "good"),
+                           ("--crit", "crit"), ("--warn", "warn")):
+            _wert = _gewaehlt(_key)
+            if _wert:
+                v[_var] = _wert
+        if v.get("--accent") and _gewaehlt("good"):
+            # Innerhalb eines Themes zieht der Akzent mit der OK-Farbe mit, damit
+            # aktiver Tab, Energiefluss und Kalender nicht zurueckbleiben.
+            v["--accent"] = _gewaehlt("good")
+            _rgb = _hex_rgb(_gewaehlt("good"))
+            if _rgb:
+                v["--accent-rgb"] = _rgb
+        v.update({
              "--ico-size": f"{ui.get('iconSize', 38)}px",
              "--name-size": f"{ui.get('nameSize', 18)}px",
              "--sub-size": f"{ui.get('subSize', 15)}px",
-             "--name-weight": "700" if ui.get("bold") else "450"}
+             "--name-weight": "700" if ui.get("bold") else "450"})
         # Zustands-Farben zusaetzlich als R,G,B-Tripel, damit das Aktiv-Overlay
         # (Fuellung/Rahmen) die konfigurierte Farbe mit variabler Deckkraft nutzt.
         for skey, rvar in (("active", "--on-rgb"), ("good", "--good-rgb"),
                            ("crit", "--crit-rgb"), ("warn", "--warn-rgb")):
-            rgb = _hex_rgb(states.get(skey))
+            rgb = _hex_rgb(_gewaehlt(skey))
             if rgb:
                 v[rvar] = rgb
         # Aussehen des Aktiv-Overlays (global fuers Panel; pro Kachel ueberschreibbar).
@@ -1413,7 +1447,7 @@ class App:
         tabs = [t for t in (raw.get("tabs") or VALID_TABS) if _is_tab(t)]
         ui = {k: v for k, v in (raw.get("ui") or {}).items()
               if k in ("iconSize", "nameSize", "subSize", "font", "nudgeX",
-                       "dpmsOff", "reloadHours", "cols", "rows", "fill",
+                       "dpmsOff", "reloadHours", "cols", "rows", "fill", "baseColor",
                        "overlay", "textColor", "bold", "lang", "player", "panes", "split")}
         # Split-Pane je Tab: nur gueltige Tab-Kennung -> "weather"|"calendar".
         if isinstance(ui.get("panes"), dict):
@@ -1498,6 +1532,13 @@ class App:
                     cui["panes"] = pn           # Split-Pane je Tab: Wetter/Kalender/Vollbreit
             if _color_ok(ui.get("textColor")):
                 cui["textColor"] = ui["textColor"].strip()   # globale Schriftfarbe (Name)
+            if _color_ok(ui.get("baseColor")):
+                # Grundfarbe des Panel-Themes. Nur uebernehmen, wenn sich daraus
+                # ueberhaupt ein tragfaehiger Satz bauen laesst - sonst stuende
+                # eine Farbe in der Konfiguration, die das Panel ignoriert.
+                _base = ui["baseColor"].strip()
+                if theme_colors.derive(_base):
+                    cui["baseColor"] = _base
             if ui.get("bold"):
                 cui["bold"] = True                            # Kachel-Namen fett
             lang = _clean_lang(ui.get("lang"))
@@ -1629,6 +1670,8 @@ class App:
             out["font"] = str(ui["font"])[:120]
         if _color_ok(ui.get("textColor")):
             out["textColor"] = ui["textColor"].strip()
+        if _color_ok(ui.get("baseColor")) and theme_colors.derive(ui["baseColor"].strip()):
+            out["baseColor"] = ui["baseColor"].strip()
         if ui.get("bold"):
             out["bold"] = True
         lang = _clean_lang(ui.get("lang"))
@@ -1671,7 +1714,8 @@ class App:
         except ValueError:
             doc = {}
         cur = doc.get("ui") if isinstance(doc.get("ui"), dict) else {}
-        for k in ("iconSize", "nameSize", "subSize", "font", "textColor", "bold", "lang"):
+        for k in ("iconSize", "nameSize", "subSize", "font", "textColor", "baseColor",
+                  "bold", "lang"):
             if k in ui:
                 cur[k] = ui[k]
             else:
@@ -3849,7 +3893,7 @@ async def api_meta(request: web.Request) -> web.Response:
         "wsDevices": sorted({d for d in app.conn_dev.values() if d}),
         "theme": {"ui": {k: v for k, v in (app.theme.get("ui") or {}).items()
                          if k in ("iconSize", "nameSize", "subSize", "font",
-                                  "textColor", "bold", "lang")},
+                                  "textColor", "baseColor", "bold", "lang")},
                   "categories": {k: v for k, v in (app.theme.get("categories") or {}).items()
                                  if not str(k).startswith("_")}},
     })

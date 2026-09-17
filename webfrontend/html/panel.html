@@ -6,10 +6,14 @@
 <title>LoxPanel</title>
 <style>
   :root{
-    --bg:#0d120e; --screen:#0f1512; --line:rgba(255,255,255,.08);
+    --bg:#0d120e; --screen:#0f1512; --line:rgba(var(--wash,255,255,255),.08);
     --ink:#e7ede7; --muted:#9fb0a4; --glow:#e0a24d; --accent:#52b881;
     --good:#52b881; --crit:#e2695f;
-    --tile:rgba(255,255,255,.045);
+    --tile:rgba(var(--wash,255,255,255),.045);
+    /* Deckfarbe der Auflagen: Weiss hebt auf dunklem Grund ab, Schwarz auf
+       hellem. Ein helles Theme schickt "0,0,0" und dreht damit saemtliche
+       Auflagen auf einen Schlag um. */
+    --wash:255,255,255;
     --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
     --nudge-x:0px;    /* Feinversatz der ganzen Visu; live via ?x=-6 (negativ=links) */
   }
@@ -106,7 +110,7 @@
     aspect-ratio:1;object-fit:cover;
     border-radius:14px;opacity:0;transition:opacity .2s;}
   #playerpane .ppcover .coverph{width:96px;height:96px;display:grid;place-items:center;
-    background:rgba(255,255,255,.06);border-radius:14px;}
+    background:rgba(var(--wash,255,255,255),.06);border-radius:14px;}
   #playerpane .ppcover .coverph svg{width:56px;height:56px;}
   #playerpane .pptitle{font-size:18px;font-weight:600;text-align:center;line-height:1.2;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -122,16 +126,16 @@
     display:grid;grid-template-columns:repeat(var(--cols,2),1fr);
     grid-auto-rows:calc((100% - (var(--rows,2) - 1) * var(--gap)) / var(--rows,2));gap:var(--gap);padding:10px;
     overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-    scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.18) transparent;}
+    scrollbar-width:thin;scrollbar-color:rgba(var(--wash,255,255,255),.18) transparent;}
   .grid::-webkit-scrollbar{width:5px;}
-  .grid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px;}
+  .grid::-webkit-scrollbar-thumb{background:rgba(var(--wash,255,255,255),.18);border-radius:3px;}
   /* Seiten-Snapping: Kachelraster rastet hart in Vierer-Seiten ein (4 oben/4
      unten, nie dazwischen), lange Listen rasten nur sanft ein. Snap-Punkte
      setzt render() per .snap auf jede 4. Kachel. */
   .grid.snapy{scroll-snap-type:y mandatory;scroll-padding-top:10px;}
   .grid.list.snapy{scroll-snap-type:y proximity;}
   .tile.snap{scroll-snap-align:start;}
-  .tile{background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
+  .tile{background:linear-gradient(180deg,var(--tile),rgba(var(--wash,255,255,255),.015));
     border:1px solid var(--line);border-radius:16px;padding:16px;
     display:flex;flex-direction:column;justify-content:space-between;
     cursor:pointer;user-select:none;overflow:hidden;
@@ -160,7 +164,7 @@
   .arow.off{opacity:.5;}
   .arow.off .adot{background:var(--muted);}
   .fav{flex:0 0 auto;width:88px;cursor:pointer;text-align:center;}
-  .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(255,255,255,.06);display:grid;place-items:center;color:var(--muted);}
+  .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(var(--wash,255,255,255),.06);display:grid;place-items:center;color:var(--muted);}
   .favc img{width:100%;height:100%;object-fit:cover;}
   .favc svg{width:34px;height:34px;}
   .favn{font-size:12px;margin-top:5px;line-height:1.15;max-height:2.4em;overflow:hidden;}
@@ -178,13 +182,17 @@
   .tile.good{background:rgba(var(--good-rgb,82,184,129),var(--ov-fill,.16));
     border:var(--ov-bw,1px) solid rgba(var(--good-rgb,82,184,129),var(--ov-bord,.55));}
   .tile.good .ico,.tile.good .sub{color:var(--good);}
-  .tile.crit{background:rgba(var(--crit-rgb,226,107,95),var(--ov-fill,.16));
+  .tile.crit{background:var(--crit-fill,rgba(var(--crit-rgb,226,107,95),var(--ov-fill,.16)));
     border:var(--ov-bw,1px) solid rgba(var(--crit-rgb,226,107,95),var(--ov-bord,.55));}
-  .tile.crit .ico,.tile.crit .sub{color:var(--crit);}
+  .tile.crit .ico,.tile.crit .sub{color:var(--crit-ink,var(--crit));}
+  /* Gefuellte Stoerungskachel: dann tragen Name, Raumzeile und Pfeil die
+     Gegenfarbe. Ohne --crit-ink/--crit-muted aendert sich nichts. */
+  .tile.crit .name{color:var(--crit-ink,var(--name-color,inherit));}
+  .tile.crit .room,.tile.crit .chev{color:var(--crit-muted,var(--muted));}
   .tctrls{display:flex;gap:8px;justify-content:center;margin-top:6px;}
-  .tctrls .tb{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.10);
+  .tctrls .tb{width:34px;height:34px;border-radius:50%;background:rgba(var(--wash,255,255,255),.10);
     display:grid;place-items:center;color:var(--ink);flex:0 0 auto;}
-  .tctrls .tb:active{transform:scale(.92);background:rgba(255,255,255,.18);}
+  .tctrls .tb:active{transform:scale(.92);background:rgba(var(--wash,255,255,255),.18);}
   .tctrls .tb svg{width:17px;height:17px;}
   .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding-top:40px;font-size:15px;}
   /* Listen-Layout (volle Breite): immer exakt 4 Zeilen sichtbar (fuellt die
@@ -208,11 +216,14 @@
   .schemeimg{position:absolute;top:0;left:0;width:100%;height:100%;user-select:none;-webkit-user-drag:none;}
   .schemeval{position:absolute;display:flex;align-items:center;justify-content:center;
     font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+    /* Bewusst KEINE --wash-Auflage: das Wertschild liegt ueber dem Schemabild,
+       nicht ueber dem Panelgrund. Es bringt seinen Hintergrund selbst mit und
+       muss hell bleiben, sonst steht die dunkle Schrift auf Schwarz. */
     color:#12140f;background:rgba(255,255,255,.82);border-radius:6px;
     box-shadow:0 1px 3px rgba(0,0,0,.25);padding:0 4px;overflow:hidden;white-space:nowrap;}
   .schemeval span{overflow:hidden;text-overflow:ellipsis;}
-  .schemeval.on{background:rgba(82,184,129,.9);color:#08130c;}
-  .schemeval.crit{background:rgba(226,105,95,.92);color:#fff;}
+  .schemeval.on{background:rgba(var(--accent-rgb,82,184,129),.9);color:var(--on-accent,#08130c);}
+  .schemeval.crit{background:var(--crit-fill,rgba(226,105,95,.92));color:var(--crit-ink,#fff);}
   .schemeval.tap{cursor:pointer;box-shadow:0 0 0 2px var(--accent),0 1px 3px rgba(0,0,0,.25);}
   .schemehint{position:absolute;right:8px;bottom:6px;font-size:11px;color:var(--muted);
     background:rgba(0,0,0,.35);border-radius:6px;padding:2px 7px;pointer-events:none;}
@@ -245,9 +256,9 @@
     padding:17px 10px;text-align:center;font-weight:650;font-size:15px;cursor:pointer;
     user-select:none;-webkit-user-select:none;touch-action:none;
     transition:background .12s,transform .06s;}
-  .btn:active{transform:scale(.97);background:rgba(255,255,255,.09);}
-  .btn.on{background:linear-gradient(180deg,rgba(224,162,77,.22),rgba(224,162,77,.05));
-    border-color:rgba(224,162,77,.55);color:var(--glow);}
+  .btn:active{transform:scale(.97);background:rgba(var(--wash,255,255,255),.09);}
+  .btn.on{background:linear-gradient(180deg,rgba(var(--on-rgb,224,162,77),.22),rgba(var(--on-rgb,224,162,77),.05));
+    border-color:rgba(var(--on-rgb,224,162,77),.55);color:var(--glow);}
   /* Aufklappbare Auswahl (z.B. Klima Modus/Fan): Zeile per Toggle ein/aus */
   .brow.collapsed{display:none;}
   .brow.wraprow{flex-wrap:wrap;}
@@ -260,8 +271,8 @@
     box-shadow:0 14px 44px rgba(0,0,0,.65);display:flex;flex-direction:column;gap:1px;}
   .menuitem{padding:7px 16px;border-radius:7px;font-size:15px;line-height:1.15;white-space:nowrap;
     cursor:pointer;user-select:none;-webkit-user-select:none;color:var(--ink);}
-  .menuitem:active{background:rgba(255,255,255,.13);}
-  .menuitem.on{color:var(--glow);background:rgba(224,162,77,.15);}
+  .menuitem:active{background:rgba(var(--wash,255,255,255),.13);}
+  .menuitem.on{color:var(--glow);background:rgba(var(--on-rgb,224,162,77),.15);}
   /* Musik-Player */
   .cover{position:relative;display:grid;place-items:center;padding:4px 0 2px;}
   .cover .coverph,.cover img{width:60%;max-width:210px;aspect-ratio:1/1;border-radius:12px;}
@@ -282,7 +293,7 @@
   .btn.icon{flex:0 0 auto;width:58px;height:58px;display:grid;place-items:center;padding:0;
     border-radius:50%;color:var(--ink);}
   .btn.icon svg{width:24px;height:24px;}
-  .btn.icon.big{width:70px;height:70px;background:var(--glow);border-color:transparent;color:#181008;}
+  .btn.icon.big{width:70px;height:70px;background:var(--glow);border-color:transparent;color:var(--on-glow,#181008);}
   .btn.icon.big svg{width:30px;height:30px;}
   .srow{display:flex;align-items:center;gap:10px;padding:4px 4px;}
   .srow .sico{color:var(--muted);display:grid;place-items:center;}
@@ -291,10 +302,10 @@
   .sbtn{flex:0 0 auto;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);
     background:var(--panel2);color:var(--fg);font-size:20px;line-height:1;display:grid;
     place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none;}
-  .sbtn:active{background:var(--glow);color:#04121f;}
+  .sbtn:active{background:var(--glow);color:var(--on-glow,#04121f);}
   #playerpane .ppvol .sbtn{width:30px;height:30px;font-size:18px;}
   .sld{flex:1;-webkit-appearance:none;appearance:none;height:5px;border-radius:3px;
-    background:rgba(255,255,255,.15);outline:none;}
+    background:rgba(var(--wash,255,255,255),.15);outline:none;}
   .sld::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
     background:var(--glow);cursor:pointer;}
   .sld::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;
@@ -302,13 +313,13 @@
   /* Schwebender Zurück-Pfeil (nur beim Reinnavigieren) */
   .tabback{flex:0 0 auto;align-self:center;width:50px;height:50px;margin:0 14px;
     display:grid;place-items:center;border-radius:50%;cursor:pointer;font-size:32px;line-height:1;
-    color:var(--muted);border:2px solid var(--line);background:rgba(255,255,255,.04);
+    color:var(--muted);border:2px solid var(--line);background:rgba(var(--wash,255,255,255),.04);
     transition:color .15s,border-color .15s,background .15s;}
-  .tabback.on{color:#fff;border-color:var(--accent);background:rgba(82,184,129,.14);}
+  .tabback.on{color:var(--on-accent,#fff);border-color:var(--accent);background:rgba(var(--accent-rgb,82,184,129),.14);}
   .tabback:active{transform:scale(.94);}
   .back:active{background:rgba(0,0,0,.65);}
   /* Tabs */
-  .tabs{display:flex;border-top:1px solid var(--line);background:rgba(0,0,0,.25);}
+  .tabs{display:flex;border-top:1px solid var(--line);background:var(--tabbar,rgba(0,0,0,.25));}
   .tab{flex:1;display:grid;place-items:center;padding:13px 0;color:var(--muted);cursor:pointer;}
   .tab svg{width:28px;height:28px;}
   .tab .tico{display:inline-block;width:28px;height:28px;background-color:currentColor;
@@ -317,7 +328,7 @@
   .tab:active{transform:scale(.92);}
   /* Online-Punkt: nur auf den Haupt-Screens (Tabs), zentriert im 2x2-Raster */
   .conn{grid-row:1;grid-column:1;place-self:center;z-index:6;pointer-events:none;
-    width:8px;height:8px;border-radius:50%;background:#c14338;display:none;}
+    width:8px;height:8px;border-radius:50%;background:var(--crit-dot,#c14338);display:none;}
   .conn.ok{background:var(--accent);}
   .conn.vis{display:block;}
   .saver{position:absolute;inset:0;z-index:30;background:var(--bg);
@@ -367,7 +378,7 @@
   .sv-wx .ico{display:grid;place-items:center;color:var(--ink);}
   .sv-wx .ico svg{width:100%;height:100%;}
   .sv-wx .ico.sun{color:var(--glow);}
-  .sv-wx .ico.rain,.sv-wx .ico.drizzle,.sv-wx .ico.snow,.sv-wx .ico.storm{color:#7fb2e6;}
+  .sv-wx .ico.rain,.sv-wx .ico.drizzle,.sv-wx .ico.snow,.sv-wx .ico.storm{color:var(--cool,#7fb2e6);}
   /* Termine unten: die naechsten Eintraege aus dem iCal-Abo. */
   .saver .sv-cal{display:flex;flex-direction:column;gap:8px;align-self:stretch;}
   .sv-cal .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -380,7 +391,7 @@
   .sv-ev .when .tm{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
   .sv-ev .ttl{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .sv-ev .tag{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);
-    border:1px solid rgba(82,184,129,.4);background:rgba(82,184,129,.10);
+    border:1px solid rgba(var(--accent-rgb,82,184,129),.4);background:rgba(var(--accent-rgb,82,184,129),.10);
     border-radius:999px;padding:2px 8px;white-space:nowrap;}
   /* Groessere Panels/Tablets/Browser: die Front nutzt den Platz statt als kleine
      440px-Saeule in der Mitte zu haengen. Nur der Screensaver (.saver) skaliert
@@ -421,7 +432,7 @@
   .fp-now .ico{width:72px;height:72px;flex:none;display:grid;place-items:center;color:var(--ink);}
   .fp-now .ico svg{width:100%;height:100%;}
   .fp-now .ico.sun{color:var(--glow);}
-  .fp-now .ico.rain,.fp-now .ico.drizzle,.fp-now .ico.snow,.fp-now .ico.storm{color:#7fb2e6;}
+  .fp-now .ico.rain,.fp-now .ico.drizzle,.fp-now .ico.snow,.fp-now .ico.storm{color:var(--cool,#7fb2e6);}
   .fp-now .t{font-size:58px;font-weight:600;letter-spacing:-.02em;line-height:1;
     font-variant-numeric:tabular-nums;color:var(--ink);}
   .fp-now .meta{display:flex;flex-direction:column;gap:3px;min-width:0;}
@@ -438,10 +449,10 @@
   .fp-fc .ico{width:26px;height:26px;display:grid;place-items:center;color:var(--ink);}
   .fp-fc .ico svg{width:100%;height:100%;}
   .fp-fc .ico.sun{color:var(--glow);}
-  .fp-fc .ico.rain,.fp-fc .ico.drizzle,.fp-fc .ico.snow,.fp-fc .ico.storm{color:#7fb2e6;}
+  .fp-fc .ico.rain,.fp-fc .ico.drizzle,.fp-fc .ico.snow,.fp-fc .ico.storm{color:var(--cool,#7fb2e6);}
   .fp-fc .tt{font-size:13px;font-variant-numeric:tabular-nums;}
   .fp-fc .tt .mx{font-weight:600;} .fp-fc .tt .mn{color:var(--muted);}
-  .fp-fc .pop{font-size:11px;color:#7fb2e6;}
+  .fp-fc .pop{font-size:11px;color:var(--cool,#7fb2e6);}
   .fp-cal{display:flex;flex-direction:column;gap:6px;}
   .fp-day{font-size:13px;font-weight:600;color:var(--muted);margin-top:8px;}
   .fp-ev{display:grid;grid-template-columns:70px 1fr;align-items:baseline;gap:12px;
@@ -466,30 +477,30 @@
     letter-spacing:.01em;text-align:center;flex:1;}
   .fp-mnav{cursor:pointer;user-select:none;color:var(--muted);font-size:22px;line-height:1;
     width:34px;height:34px;display:grid;place-items:center;border-radius:9px;}
-  .fp-mnav:active{background:rgba(255,255,255,.08);}
+  .fp-mnav:active{background:rgba(var(--wash,255,255,255),.08);}
   .fp-mon-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
   .fp-mon-wd{font-size:10px;font-weight:600;color:var(--muted);text-align:center;
     text-transform:uppercase;letter-spacing:.06em;padding-bottom:5px;}
-  .fp-mon-wd.sun{color:#e2695f;}
+  .fp-mon-wd.sun{color:var(--crit,#e2695f);}
   .fp-mon-c{min-height:34px;padding:5px 0;display:grid;place-items:center;font-size:13px;
     border-radius:9px;font-variant-numeric:tabular-nums;position:relative;color:var(--ink);cursor:pointer;}
   .fp-mon-c.sat{color:var(--muted);}                 /* Samstag dezent */
-  .fp-mon-c.sun{color:#e2695f;}                       /* Sonntag + Feiertag rot */
+  .fp-mon-c.sun{color:var(--crit,#e2695f);}                       /* Sonntag + Feiertag rot */
   .fp-mon-c.holi{font-weight:700;}                    /* Feiertag zusaetzlich fett */
   .fp-mon-c.empty{visibility:hidden;}
   .fp-mon-c.ev{font-weight:600;}
   .fp-mon-c.ev::after{content:"";position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
     width:5px;height:5px;border-radius:50%;background:var(--accent);}
-  .fp-mon-c.holi.ev::after{background:#e2695f;}
+  .fp-mon-c.holi.ev::after{background:var(--crit,#e2695f);}
   .fp-mon-c.sel{outline:2px solid var(--accent);outline-offset:-2px;}
-  .fp-mon-c.today{background:var(--accent);color:#fff;font-weight:700;
+  .fp-mon-c.today{background:var(--accent);color:var(--on-accent,#fff);font-weight:700;
     box-shadow:0 2px 8px rgba(0,0,0,.28);}
-  .fp-mon-c.today.ev::after{background:#fff;}
+  .fp-mon-c.today.ev::after{background:var(--on-accent,#fff);}
   .fp-allbtn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:2px 4px;}
-  .fp-ev.holi .tm{color:#e2695f;}
+  .fp-ev.holi .tm{color:var(--crit,#e2695f);}
   .moreb{position:absolute;top:6px;right:8px;z-index:6;width:34px;height:34px;border-radius:50%;
     display:grid;place-items:center;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;
-    background:rgba(255,255,255,.06);}
+    background:rgba(var(--wash,255,255,255),.06);}
   .moreb:active{transform:scale(.92);}
   .pinov{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.6);display:grid;place-items:center;}
   .pinbox{background:var(--screen);border:1px solid var(--line);border-radius:16px;padding:20px;width:78%;max-width:300px;
@@ -501,15 +512,15 @@
   .pinmsg{color:var(--crit);font-size:13px;text-align:center;min-height:16px;}
   .pinrow{display:flex;gap:10px;}
   .pinbtn{flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;user-select:none;font-weight:600;border:1px solid var(--line);}
-  .pinbtn.ok{background:var(--glow);color:#181008;border-color:transparent;}
+  .pinbtn.ok{background:var(--glow);color:var(--on-glow,#181008);border-color:transparent;}
   .pinbtn:active{transform:scale(.97);}
   .pindisp{font-size:26px;text-align:center;letter-spacing:.35em;min-height:38px;padding:8px 6px;
     border:1px solid var(--line);border-radius:10px;background:var(--bg);}
   .pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pinkey{padding:15px 0;text-align:center;font-size:22px;border:1px solid var(--line);border-radius:12px;
     cursor:pointer;user-select:none;background:var(--tile);}
-  .pinkey:active{background:rgba(255,255,255,.14);transform:scale(.97);}
-  .pinkey.ok{background:var(--glow);color:#181008;border-color:transparent;font-weight:700;}
+  .pinkey:active{background:rgba(var(--wash,255,255,255),.14);transform:scale(.97);}
+  .pinkey.ok{background:var(--glow);color:var(--on-glow,#181008);border-color:transparent;font-weight:700;}
   .pinkey.del{font-size:20px;}
 </style>
 </head>

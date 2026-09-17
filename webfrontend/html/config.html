@@ -762,10 +762,48 @@ function bindAppearance(p){
     if(cc) cc.onclick=()=>{ if(p.ui) delete p.ui.textColor; if(cv)cv.textContent='Standard'; markDirty(); }; }
   { const b=$('#fBold'); if(b) b.onchange=e=>{ p.ui=p.ui||{}; e.target.value?p.ui.bold=true:delete p.ui.bold; markDirty(); }; }
   { const ls=$('#fLang'); if(ls) ls.onchange=()=>{ p.ui=p.ui||{}; ls.value?p.ui.lang=ls.value:delete p.ui.lang; markDirty(); }; }
+  { const setBase=v=>{ p.ui=p.ui||{};
+      if(v) p.ui.baseColor=v; else delete p.ui.baseColor;
+      const cv=$('#fBaseVal'); if(cv) cv.textContent=v||T('Standard-Farbschema');
+      document.querySelectorAll('.baseSw').forEach(b=>{
+        const an=String(b.dataset.base||'').toLowerCase()===String(v||'').toLowerCase();
+        b.setAttribute('aria-pressed', an?'true':'false');
+        b.style.boxShadow = an ? '0 0 0 2px var(--panel),0 0 0 4px var(--accent)' : '';
+      });
+      markDirty(); };
+    document.querySelectorAll('.baseSw').forEach(b=>{ b.onclick=()=>setBase(b.dataset.base); });
+    { const c=$('#fBaseClr'); if(c) c.onclick=()=>setBase(''); }
+    { const c=$('#fBaseCustom'); if(c) c.oninput=()=>setBase(c.value); } }
+}
+// Grundfarben fuer das Panel-Theme. Aus jeder faellt der ganze Satz ab; der
+// Server rechnet ihn in bin/theme_colors.py aus und prueft ihn dabei nach.
+const BASE_COLORS = [
+  {v:'#1c1c1e',n:'Anthrazit'}, {v:'#dedfe0',n:'Hellgrau'},   {v:'#f7f5ec',n:'Creme'},
+  {v:'#d9a83c',n:'Senfgelb'},  {v:'#b0344a',n:'Crimson'},    {v:'#f8e1e2',n:'Rosé'},
+  {v:'#cedcdd',n:'Eisblau'},   {v:'#3e4468',n:'Marineblau'}, {v:'#3e5240',n:'Tannengrün'},
+  {v:'#a8ad93',n:'Salbei'},    {v:'#ec9a80',n:'Lachs'},      {v:'#7a3f1e',n:'Nussbraun'}
+];
+function baseRing(an){ return an?'box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent);':''; }
+function baseField(ui){
+  const cur=String(ui.baseColor||'').toLowerCase();
+  return '<div class="field" style="max-width:none"><label class="lbl">Panel-Farbe</label>'+
+    '<p class="note" style="margin:0 0 8px">'+T('Eine Farbe wählen — Hintergrund, Kacheln, Leiste, Schrift, Icons und Zustandsfarben werden daraus berechnet. Eigene Zustandsfarben behalten Vorrang.')+'</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'+
+      BASE_COLORS.map(c=>'<button type="button" class="baseSw" data-base="'+esc(c.v)+'" '+
+        'title="'+esc(c.n)+'" aria-pressed="'+(cur===c.v?'true':'false')+'" '+
+        'style="width:46px;height:46px;border-radius:7px;padding:0;cursor:pointer;'+
+        'background:'+esc(c.v)+';border:1px solid var(--line);'+baseRing(cur===c.v)+'"></button>').join('')+
+      '<input type="color" id="fBaseCustom" title="'+esc(T('Eigene Farbe'))+'" value="'+
+        esc(cur&&cur[0]==='#'?ui.baseColor:'#3e4468')+'" '+
+        'style="width:46px;height:46px;padding:0;border:1px solid var(--line);border-radius:7px;background:var(--bg);cursor:pointer">'+
+      '<button type="button" class="minibtn" id="fBaseClr" style="height:46px">'+T('Keine')+'</button>'+
+    '</div>'+
+    '<span class="cval" id="fBaseVal" style="display:block;margin-top:6px">'+
+      esc(ui.baseColor||T('Standard-Farbschema'))+'</span></div>';
 }
 function appearanceFields(ui){
   ui=ui||{};
-  return langField(ui)+sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
+  return baseField(ui)+langField(ui)+sizeField('Icon-Größe','iconSize',ui)+sizeField('Name-Größe','nameSize',ui)+sizeField('Sub-Größe','subSize',ui)+
     '<div class="field" style="max-width:220px"><label class="lbl">Schriftart</label>'+
       '<select id="fFontSel">'+FONTS.map(f=>'<option value="'+esc(f.v)+'"'+(sameFont(ui.font,f.v)?' selected':'')+'>'+esc(f.label)+'</option>').join('')+
         '<option value="__custom"'+(customFont(ui.font)?' selected':'')+'>Eigene…</option></select>'+
