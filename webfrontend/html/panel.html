@@ -172,10 +172,23 @@
   .tile.on{background:rgba(var(--on-rgb,224,162,77),var(--ov-fill,.16));
     border:var(--ov-bw,1px) solid rgba(var(--on-rgb,224,162,77),var(--ov-bord,.55));}
   .tile .head{display:flex;justify-content:space-between;align-items:flex-start;}
-  .tile .ico{color:var(--ico,var(--muted));}
-  .tile.on .ico{color:var(--ico-fixed,var(--glow));}
+  .tile .ico,.tile .icowrap{color:var(--ico,var(--muted));}
+  .tile.on .ico,.tile.on .icowrap{color:var(--ico-fixed,var(--glow));}
   .tile .ico svg{width:var(--ico-size,38px);height:var(--ico-size,38px);}
   .tile .ico .rawico{width:var(--ico-size,38px);height:var(--ico-size,38px);object-fit:contain;display:block;}
+  /* Positionsring: Stellung von Rollladen, Tor, Fenster und Dimmer als Bogen
+     um das Icon. Der Server schickt "pos" nur fuer diese Bausteine; ohne den
+     Wert entsteht gar kein Element und die Kachel sieht aus wie immer.
+     Fester viewBox 0..100, Groesse ueber --ico-size - der Ring waechst also
+     mit, wenn die Icon-Groesse verstellt wird. Farbe ueber currentColor, damit
+     er dem Zustand UND dem Theme folgt, ohne eigene Farbregel. */
+  .tile .icowrap{position:relative;display:inline-grid;place-items:center;}
+  .tile .posring{position:absolute;left:50%;top:50%;pointer-events:none;
+    width:calc(var(--ico-size,38px) + 18px);height:calc(var(--ico-size,38px) + 18px);
+    transform:translate(-50%,-50%);}
+  .tile .posring circle{fill:none;stroke:currentColor;stroke-width:6;}
+  .tile .posring .trk{opacity:.18;}
+  .tile .posring .val{stroke-linecap:round;}
   .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
   .favs.wrap{flex-wrap:wrap;overflow-x:visible;justify-content:flex-start;gap:12px;}
   .phead{font-weight:650;font-size:15px;margin:10px 2px 2px;padding-bottom:6px;border-bottom:1px solid var(--line);text-align:left;}
@@ -208,10 +221,10 @@
   .tile.on .sub{color:var(--glow);}
   .tile.good{background:rgba(var(--good-rgb,82,184,129),var(--ov-fill,.16));
     border:var(--ov-bw,1px) solid rgba(var(--good-rgb,82,184,129),var(--ov-bord,.55));}
-  .tile.good .ico,.tile.good .sub{color:var(--good);}
+  .tile.good .ico,.tile.good .icowrap,.tile.good .sub{color:var(--good);}
   .tile.crit{background:var(--crit-fill,rgba(var(--crit-rgb,226,107,95),var(--ov-fill,.16)));
     border:var(--ov-bw,1px) solid rgba(var(--crit-rgb,226,107,95),var(--ov-bord,.55));}
-  .tile.crit .ico,.tile.crit .sub{color:var(--crit-ink,var(--crit));}
+  .tile.crit .ico,.tile.crit .icowrap,.tile.crit .sub{color:var(--crit-ink,var(--crit));}
   /* Gefuellte Stoerungskachel: dann tragen Name, Raumzeile und Pfeil die
      Gegenfarbe. Ohne --crit-ink/--crit-muted aendert sich nichts. */
   .tile.crit .name{color:var(--crit-ink,var(--name-color,inherit));}
@@ -1083,6 +1096,18 @@ function render(){
       : it.iconUrl
       ? '<span class="ico img" style="--u:url(\''+esc(it.iconUrl)+'\')"></span>'
       : '<span class="ico">'+svg(ICONS[it.icon]||ICONS.info)+'</span>';
+    // Positionsring: nur fuer Bausteine, die eine Stellung haben. Bei 0 %
+    // bleibt allein die Spur stehen - ein runder Abschluss auf der Laenge null
+    // wuerde sonst als Punkt erscheinen und wie ein Fehler aussehen.
+    const posv = (typeof it.pos === 'number' && isFinite(it.pos))
+      ? Math.max(0, Math.min(100, it.pos)) : null;
+    const icoCell = posv===null ? icoHtml
+      : '<span class="icowrap"><svg class="posring" viewBox="0 0 100 100" aria-hidden="true">'+
+          '<g transform="rotate(-90 50 50)">'+
+            '<circle class="trk" cx="50" cy="50" r="46"/>'+
+            (posv>0 ? '<circle class="val" cx="50" cy="50" r="46" stroke-dasharray="'+
+              (posv/100*289.03).toFixed(2)+' 289.03"/>' : '')+
+          '</g></svg>'+icoHtml+'</span>';
     const chev = (it.nav && !it.controls) ? '<span class="chev">'+svg('<path d="m9 6 6 6-6 6"/>')+'</span>' : '';
     const ctrls = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
     const tone = tileTone(it);
@@ -1097,7 +1122,7 @@ function render(){
     const nst = nsv.length?' style="'+esc(nsv.join(';'))+'"':'';
     const _pg = (view.layout==='list'?4:gridCols*gridRows);   // Snap-Seite: Liste 4 Zeilen, sonst cols x rows
     html += '<div class="tile'+tone+(_i%_pg===0?' snap':'')+'" data-id="'+esc(it.id)+'"'+st+'>'+
-              '<div class="head">'+icoHtml+chev+'</div>'+
+              '<div class="head">'+icoCell+chev+'</div>'+
               '<div class="body">'+
               (it.room?'<div class="room">'+esc(it.room)+'</div>':'')+
               '<div class="name"'+nst+'>'+esc(it.label)+'</div>'+

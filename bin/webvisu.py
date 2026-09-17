@@ -189,6 +189,19 @@ _NUMFMT = re.compile(r"^(%[-+ 0-9.]*[dfeg])(.*)$")
 _PREFIX = ["k", "M", "G", "T"]
 
 
+def _pos_pct(value) -> int | None:
+    """Stellung als ganze Prozent 0..100 fuer den Ring auf der Kachel.
+
+    None bedeutet "dieser Baustein hat keine Stellung" - dann zeichnet das
+    Panel gar keinen Ring. Der Wert ist immer derselbe, den auch die
+    Zweitzeile nennt, damit Ring und Text nicht auseinanderlaufen.
+    """
+    try:
+        return max(0, min(100, int(round(float(value)))))
+    except (TypeError, ValueError):
+        return None
+
+
 def _clean(name: str) -> str:
     return re.sub(r"^[^0-9A-Za-zÄÖÜäöü]+", "", name or "").strip() or (name or "")
 
@@ -2194,9 +2207,13 @@ class App:
             r = JAL.render(self._with_uuid(uuid), self.states)
             it.update(on=r["on"], sublabel=r["label"], icon="blind",
                       nav={"view": "control", "id": uuid})
+            _p = _pos_pct(r.get("pct"))
+            if _p is not None:
+                it["pos"] = _p
         elif t == "Gate":
             pct = round((self._state(c, "position") or 0) * 100)
             it.update(on=pct > 0, icon="gate", nav={"view": "control", "id": uuid},
+                      pos=_pos_pct(pct),
                       sublabel=("Offen" if pct >= 100 else
                                 ("Geschlossen" if pct <= 0 else f"{pct}% offen")))
         elif t == "IRoomControllerV2":
@@ -2247,6 +2264,7 @@ class App:
         elif t in ("Dimmer", "EIBDimmer"):
             pos = self._state(c, "position") or 0
             it.update(icon="bulb", on=pos > 0, nav={"view": "control", "id": uuid},
+                      pos=_pos_pct(pos),
                       sublabel=(f"{round(pos)} %" if pos > 0 else "Aus"))
         elif t in ("ValueSelector", "UpDownAnalog"):
             det = c.get("details") or {}
@@ -2262,6 +2280,7 @@ class App:
         elif t == "Window":
             pct = round((self._state(c, "position") or 0) * 100)
             it.update(icon="blind", on=pct > 0, nav={"view": "control", "id": uuid},
+                      pos=_pos_pct(pct),
                       sublabel=("Offen" if pct >= 100 else
                                 ("Geschlossen" if pct <= 0 else f"{pct}% offen")))
         elif t == "Ventilation":
