@@ -225,6 +225,24 @@ def _overlay_alphas(ov: dict) -> tuple[float, float, int]:
     return fill, bord, bw
 
 
+def _inactive_border(ov: dict) -> tuple[float, int]:
+    """Overlay-Config -> (Rahmen-Alpha, Rahmenbreite px) fuer NICHT aktive Kacheln.
+
+    Defaults entsprechen dem bisherigen fest verdrahteten --line (weiss 8%) und
+    1px, damit sich ohne Konfiguration nichts aendert. `ibord`/`ibw` machen den
+    sonst kaum sichtbaren Kachelrahmen (z.B. auf hellen Shelly-Displays) staerker.
+    """
+    ov = ov if isinstance(ov, dict) else {}
+    def _num(key, default):
+        try:
+            return float(ov.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+    alpha = max(0.0, min(1.0, _num("ibord", 8) / 100.0))
+    bw = max(1, min(4, int(_num("ibw", 1))))
+    return alpha, bw
+
+
 def _sanitize_overlay(ov) -> dict:
     """Overlay-Config aus der Config-Seite auf erlaubte Werte eindampfen."""
     if not isinstance(ov, dict):
@@ -232,11 +250,12 @@ def _sanitize_overlay(ov) -> dict:
     out: dict = {}
     if ov.get("mode") in ("both", "border", "fill"):
         out["mode"] = ov["mode"]
-    for k in ("fill", "bord"):
+    for k in ("fill", "bord", "ibord"):
         if isinstance(ov.get(k), (int, float)):
             out[k] = max(0, min(100, int(ov[k])))
-    if isinstance(ov.get("bw"), (int, float)):
-        out["bw"] = max(1, min(4, int(ov["bw"])))
+    for k in ("bw", "ibw"):
+        if isinstance(ov.get(k), (int, float)):
+            out[k] = max(1, min(4, int(ov[k])))
     return out
 
 
@@ -445,9 +464,12 @@ class App:
         self._drv_session: aiohttp.ClientSession | None = None   # HTTP-Session fuer Display-Treiber (Kiosk-Apps)
         self.conn_player: dict[web.WebSocketResponse, str] = {}   # ws -> AudioZone-UUID der aktiven Player-Pane (via setplayer)
         self.conn_energy: dict[web.WebSocketResponse, str] = {}   # ws -> EFM/EnergyManager2-UUID der aktiven Energiefluss-Pane (via setenergy)
+        self.conn_camera: dict[web.WebSocketResponse, str] = {}   # ws -> Intercom-UUID der aktiven Kamera-Pane (via setcamera)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
+        self._struct_sig: str | None = None   # Signatur der Loxone-Struktur (erkennt Config-Aenderungen)
+        self._pending_reload = False          # -> Panels beim naechsten Tick neu laden ({t:"reload"})
         self._dirty = True
         # Zuletzt an JEDE Verbindung zugestellte Nutzlast, je Art getrennt
         # ({"view":…, "player":…, "energy":…}). Grundlage dafuer, unveraenderte
@@ -606,6 +628,43 @@ class App:
                  len(self.controls), len(self.rooms_with), len(self.cats_with),
                  len(self.bell_map), len(self.alarm_map), len(self.playerid_by_action))
 
+    @staticmethod
+    def _structure_sig(st: dict) -> str:
+        """Signatur der Loxone-Struktur (Controls/Raeume/Kategorien). Aendert sich
+        nur bei Config-Aenderungen (Namen, neue/entfernte Controls …), nicht bei
+        State-Werten – die kommen separat ueber den WS-Stream."""
+        try:
+            rel = {"controls": st.get("controls", {}), "rooms": st.get("rooms", {}),
+                   "cats": st.get("cats", {})}
+            raw = json.dumps(rel, sort_keys=True, ensure_ascii=False, default=str)
+            return hashlib.md5(raw.encode("utf-8")).hexdigest()
+        except (TypeError, ValueError):
+            return ""
+
+    def _adopt_structure(self, st: dict) -> bool:
+        """Struktur anwenden und melden, ob sie sich seit der letzten Verbindung
+        geaendert hat (Grundlage fuer den Panel-Reload). Beim allerersten Anwenden
+        (`_struct_sig` noch None) gilt sie nie als 'geaendert' — frisch verbundene
+        Panels holen sich die Ansichten ohnehin neu."""
+        sig = self._structure_sig(st)
+        changed = bool(self._struct_sig and sig and sig != self._struct_sig)
+        self._apply_structure(st)
+        self._struct_sig = sig
+        return changed
+
+    async def _refresh_structure(self) -> bool:
+        """Struktur neu vom Miniserver laden und anwenden, WENN sie sich geaendert
+        hat (Loxone-Config geaendert). Gibt True bei Aenderung zurueck. Rein lesend;
+        Fehler werden vom Aufrufer isoliert, damit die Verbindungs-Schleife lebt."""
+        if self.client is None:
+            return False
+        st = await self.client.load_structure()
+        if not self._adopt_structure(st):
+            return False                      # unveraendert -> nichts tun (kein Panel-Reload)
+        self.states = {}                      # nach Struktur-Wechsel States frisch (MS sendet neu)
+        self._dirty = True
+        return True
+
     async def start(self) -> None:
         try:
             self.client = _make_client(self.host, self.user, self.password,
@@ -613,7 +672,12 @@ class App:
             await self.client.__aenter__()
             self.alg = (await self.client.getkey2()).hashAlg
             self.jwt = await self.client.authenticate()
-            self._apply_structure(await self.client.load_structure())
+            st = await self.client.load_structure()
+            # Reconnect nach Miniserver-Reboot (z.B. Loxone-Config hochgeladen):
+            # hat sich die Struktur geaendert, Panels neu laden lassen. Beim
+            # allerersten Start ist _struct_sig None -> kein Reload.
+            if self._adopt_structure(st):
+                self._pending_reload = True
             self.icon_session = aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
             await self._connect_ws()
             log.info("Mit Miniserver verbunden (%s).", self.host)
@@ -660,7 +724,9 @@ class App:
         self.verify_tls = ms.get("verify_tls", False)
         old_client, self.client = self.client, newc
         self.alg, self.jwt = alg, jwt
-        self._apply_structure(st)
+        # Anderer/geaenderter Miniserver -> Struktur evtl. anders, dann Panels neu laden.
+        if self._adopt_structure(st):
+            self._pending_reload = True
         self.states = {}
         old_is, self.icon_session = self.icon_session, \
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=self._ssl_ctx()))
@@ -1019,6 +1085,10 @@ class App:
             v["--ov-fill"] = f"{fill:.3g}"
             v["--ov-bord"] = f"{bord:.3g}"
             v["--ov-bw"] = f"{bw}px"
+            # Rahmen der NICHT aktiven Kacheln (sonst kaum sichtbar auf hellen Displays).
+            ialpha, ibw = _inactive_border(ui["overlay"])
+            v["--tile-bord"] = f"rgba(255,255,255,{ialpha:.3g})"
+            v["--tile-bw"] = f"{ibw}px"
         if ui.get("font"):
             v["--font"] = ui["font"]
         if ui.get("textColor"):
@@ -1074,6 +1144,21 @@ class App:
             v = self._view_control_inner(uuid)
         except Exception:
             log.exception("player_blocks fehlgeschlagen (%s)", uuid)
+            return None
+        return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
+
+    def intercom_blocks(self, uuid: str):
+        """Volle Intercom-Ansicht (Video + Tuer-/Ausgang-Buttons + Klingel-Banner)
+        einer Intercom-UUID fuer die Kamera-Pane. Gleiche Bloecke wie die
+        Detailansicht -> das Bild wird wie beim Baustein direkt geladen (robust,
+        auch wo ein nacktes MJPEG-<img> nicht anzeigt). None, wenn kein Intercom."""
+        c = self.controls.get(uuid or "")
+        if not c or c.get("type") != "Intercom":
+            return None
+        try:
+            v = self._view_control_inner(uuid)
+        except Exception:
+            log.exception("intercom_blocks fehlgeschlagen (%s)", uuid)
             return None
         return [b for b in (v.get("blocks") or []) if b.get("k") != "more"]
 
@@ -1424,7 +1509,7 @@ class App:
         # Split-Pane je Tab: nur gueltige Tab-Kennung -> "weather"|"calendar".
         if isinstance(ui.get("panes"), dict):
             ui["panes"] = {str(k): v for k, v in ui["panes"].items()
-                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                           if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
             if not ui["panes"]:
                 ui.pop("panes", None)
         else:
@@ -1499,7 +1584,7 @@ class App:
                 cui["player"] = ui["player"]    # Split-Layout: AudioZone-UUID fuer den festen Player
             if isinstance(ui.get("panes"), dict):
                 pn = {str(k): v for k, v in ui["panes"].items()
-                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:")) and len(v) > 7))}
+                      if isinstance(k, str) and _is_tab(k) and (v in ("weather", "calendar") or (isinstance(v, str) and (v.startswith("player:") or v.startswith("energy:") or v.startswith("camera:")) and len(v) > 7))}
                 if pn:
                     cui["panes"] = pn           # Split-Pane je Tab: Wetter/Kalender/Vollbreit
             if _color_ok(ui.get("textColor")):
@@ -2289,6 +2374,9 @@ class App:
             style["ovFill"] = f"{fill:.3g}"     # ueberschreibt --ov-* nur fuer diese Kachel
             style["ovBord"] = f"{bord:.3g}"
             style["ovBw"] = bw
+            ialpha, ibw = _inactive_border(ov["overlay"])
+            style["tileBord"] = f"rgba(255,255,255,{ialpha:.3g})"   # inaktiver Rahmen nur fuer diese Kachel
+            style["tileBw"] = ibw
         if style:
             it["style"] = style
         ic = ov.get("icon")
@@ -3620,7 +3708,17 @@ class App:
                 if self.client is None:
                     await self.start()          # Erstverbindung / nach hartem Reset
                 elif self.ws is None:
-                    await self._connect_ws()    # nur WS neu (z.B. nach Settings-Reconnect)
+                    # Reiner WS-Neuaufbau (z.B. nach Miniserver-Reboot durch eine
+                    # Loxone-Config-Aenderung): Struktur mitziehen, damit neue/
+                    # umbenannte Controls ohne LoxPanel-Neustart erscheinen. Fehler
+                    # isoliert -> Reconnect scheitert nie an der Struktur.
+                    try:
+                        if await self._refresh_structure():
+                            self._pending_reload = True   # Panels neu laden lassen
+                            log.info("Loxone-Struktur geaendert -> uebernommen, Panels werden neu geladen")
+                    except Exception:
+                        log.exception("Struktur-Refresh beim Reconnect uebersprungen")
+                    await self._connect_ws()    # WS neu (Settings-Reconnect / nach Abriss)
                 await self.ws.stream(self._on_value)
                 raise ConnectionError("WS-Stream regulär beendet")
             except asyncio.CancelledError:
@@ -3655,6 +3753,7 @@ class App:
             self.conn_dev.pop(ws, None)
             self.conn_player.pop(ws, None)
             self.conn_energy.pop(ws, None)
+            self.conn_camera.pop(ws, None)
             try:
                 await ws.close()
             except Exception:
@@ -3682,6 +3781,12 @@ class App:
             if self._front is not None:
                 for ws in list(self.conn_route):
                     await self._send_or_drop(ws, self._front)
+        if self._pending_reload:
+            # Loxone-Struktur hat sich geaendert (Config) -> Panels neu laden, damit
+            # neue/umbenannte Controls erscheinen. Nur bei echter Aenderung gesetzt.
+            self._pending_reload = False
+            for ws in list(self.conn_route):
+                await self._send_or_drop(ws, {"t": "reload"})
         if self._last_sent:
             # Merkzettel von Verbindungen befreien, die es nicht mehr gibt.
             # Selbstheilend, damit nicht an jeder der vier Stellen, die eine
@@ -3719,6 +3824,16 @@ class App:
                         energy_msg = {"t": "energy", **eb} if eb is not None else None
                     except Exception:
                         log.exception("energy_blocks fehlgeschlagen (%s)", _euid)
+                # Split-Layout: Kamera-Pane (Intercom-Vollansicht) des aktiven Tabs
+                # mitrendern (kommt vom Client via setcamera -> conn_camera).
+                camera_msg = None
+                _cuid = self.conn_camera.get(ws)
+                if _cuid:
+                    try:
+                        ib = self.intercom_blocks(_cuid)
+                        camera_msg = {"t": "camera", "blocks": ib} if ib is not None else None
+                    except Exception:
+                        log.exception("intercom_blocks fehlgeschlagen (%s)", _cuid)
                 # Nur senden, was sich seit der letzten Zustellung an DIESE
                 # Verbindung geaendert hat. Der Tick laeuft, sobald sich
                 # irgendein Wert im Haus bewegt — meist betrifft das die
@@ -3739,6 +3854,12 @@ class App:
                 if energy_msg is not None and energy_msg != last.get("energy"):
                     if await self._send_or_drop(ws, energy_msg):
                         last["energy"] = energy_msg
+                    else:
+                        self._last_sent.pop(ws, None)
+                        continue
+                if camera_msg is not None and camera_msg != last.get("camera"):
+                    if await self._send_or_drop(ws, camera_msg):
+                        last["camera"] = camera_msg
                     else:
                         self._last_sent.pop(ws, None)
 
@@ -4355,6 +4476,7 @@ async def _push(app: "App", msg: dict, panel: str = "", device: str = "") -> int
             app.conn_info.pop(ws, None)
             app.conn_player.pop(ws, None)
             app.conn_energy.pop(ws, None)
+            app.conn_camera.pop(ws, None)
     return n
 
 
@@ -4634,6 +4756,20 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         log.exception("energy_blocks (setenergy) fehlgeschlagen (%s)", euid)
                 else:
                     app.conn_energy.pop(ws, None)
+            elif data.get("t") == "setcamera":
+                # Client meldet die Intercom-Kachel der aktiven Kamera-Pane
+                # (oder "" = keine).
+                cuid = str(data.get("uuid") or "").strip()
+                if cuid:
+                    app.conn_camera[ws] = cuid
+                    try:
+                        ib = app.intercom_blocks(cuid)
+                        if ib is not None:
+                            await ws.send_json({"t": "camera", "blocks": ib})
+                    except Exception:
+                        log.exception("intercom_blocks (setcamera) fehlgeschlagen (%s)", cuid)
+                else:
+                    app.conn_camera.pop(ws, None)
     finally:
         app.conn_route.pop(ws, None)
         app.conn_prof.pop(ws, None)
@@ -4641,6 +4777,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         app.conn_info.pop(ws, None)
         app.conn_player.pop(ws, None)
         app.conn_energy.pop(ws, None)
+        app.conn_camera.pop(ws, None)
     return ws
 
 
