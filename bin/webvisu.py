@@ -130,8 +130,13 @@ NIGHT_FROM, NIGHT_TO = "22:00", "06:00"
 
 def _is_tab(t) -> bool:
     """Gueltiges Tab-Kennzeichen: einer der 4 Standard-Tabs ODER eine einzelne
-    Kategorie als Direkt-Tab (`cat:<uuid>`)."""
-    return t in VALID_TABS or (isinstance(t, str) and t.startswith("cat:") and len(t) > 4)
+    Kategorie bzw. ein einzelner Raum als Direkt-Tab (`cat:<uuid>`/`room:<uuid>`)."""
+    if t in VALID_TABS:
+        return True
+    if not isinstance(t, str):
+        return False
+    return ((t.startswith("cat:") and len(t) > 4)
+            or (t.startswith("room:") and len(t) > 5))
 # Reine Anzeige-Bausteine: keine Steuer-2.-Ebene -> Antippen zeigt eine
 # grosse 1/1-Wertseite (_view_control -> _big_view).
 STATUS_BIG = {"Meter", "InfoOnlyAnalog", "TextState", "InfoOnlyText",
@@ -1359,14 +1364,18 @@ class App:
                 "totals": {"prod": prod_total, "cons": cons_total, "grid": g or 0.0}}
 
     def _tab_meta(self, tab_keys) -> dict:
-        """Label + Icon fuer dynamische Tabs (Kategorie-Direkt-Tabs). Die 4
-        Standard-Tabs kennt das Frontend selbst; hier nur die `cat:`-Tabs."""
+        """Label + Icon fuer dynamische Tabs (Kategorie- und Raum-Direkt-Tabs).
+        Die 4 Standard-Tabs kennt das Frontend selbst; hier nur `cat:`/`room:`."""
         meta = {}
         for t in tab_keys or []:
             if isinstance(t, str) and t.startswith("cat:"):
                 cat = self.cats.get(t[4:], {})
                 meta[t] = {"label": _clean(cat.get("name")) or "Kategorie",
                            "iconUrl": self._icon_url(cat.get("image")) or ""}
+            elif isinstance(t, str) and t.startswith("room:"):
+                room = self.rooms.get(t[5:], {})
+                meta[t] = {"label": _clean(room.get("name")) or "Raum",
+                           "iconUrl": self._icon_url(room.get("image")) or ""}
         return meta
 
     def panel_dpms(self, pid: str | None):
@@ -2632,6 +2641,18 @@ class App:
             sr = self._spans_rooms(uuids)
             items = [self._control_item(u, prof, show_room=sr) for u in uuids]
             title = _clean(self.cats.get(cu, {}).get("name")) or "Kategorie"
+            return {"t": "view", "title": title, "tab": tab,
+                    "route": {"view": "tab", "tab": tab}, "items": items}
+        if isinstance(tab, str) and tab.startswith("room:"):
+            # Raum-Direkt-Tab: dieselben Controls wie im Raum-Drilldown. Als
+            # ERSTER Tab ist er die Startseite - dann weckt das Panel direkt in
+            # diesem Raum auf, ohne vorher Raum oder Kategorie zu waehlen.
+            # Der Raumname steht schon im Tab, deshalb nicht noch an jeder Kachel.
+            ru = tab[5:]
+            uuids = [u for u, c in self.controls.items()
+                     if c.get("room") == ru and self._cat_ok(u, prof) and self._shown(u, prof)]
+            items = [self._control_item(u, prof) for u in uuids]
+            title = _clean(self.rooms.get(ru, {}).get("name")) or "Raum"
             return {"t": "view", "title": title, "tab": tab,
                     "route": {"view": "tab", "tab": tab}, "items": items}
         if tab == "favoriten":
@@ -4284,7 +4305,10 @@ async def api_meta(request: web.Request) -> web.Response:
                  {"tab": "kategorien", "label": "Kategorien"}]
         + [{"tab": "cat:" + cu, "label": _clean(app.cats[cu].get("name", "")),
             "iconUrl": app._icon_url(app.cats[cu].get("image")), "cat": True}
-           for cu in app.cats_with],
+           for cu in app.cats_with]
+        + [{"tab": "room:" + ru, "label": _clean(app.rooms[ru].get("name", "")),
+            "iconUrl": app._icon_url(app.rooms[ru].get("image")), "room": True}
+           for ru in app.rooms_with],
         "panels": panels,
         "devices": app.devices,
         "wsDevices": sorted({d for d in app.conn_dev.values() if d}),

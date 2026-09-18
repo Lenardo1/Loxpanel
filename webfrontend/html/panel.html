@@ -976,10 +976,15 @@ function renderTabs(){
     const cls = 'tab'+(tk===at?' active':'');
     const t = TABS.find(x => x.tab===tk);
     if(t) return '<div class="'+cls+'" data-tab="'+esc(tk)+'" title="'+esc(t.label)+'">'+svg(t.icon)+'</div>';
-    const m = tabMeta[tk]; if(!m) return '';   // dynamischer Tab (Kategorie)
+    const m = tabMeta[tk]; if(!m) return '';   // dynamischer Tab (Kategorie/Raum)
+    // Ohne Bild aus Loxone: Raum bekommt das Raum-Symbol, Kategorie den Wuerfel -
+    // sonst sehen ein Raum- und ein Kategorie-Tab identisch aus.
+    const fallback = tk.indexOf('room:')===0
+      ? '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M14 4v16"/>'
+      : '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/>';
     const ico = m.iconUrl
       ? '<span class="tico" style="--u:url(\''+esc(m.iconUrl)+'\')"></span>'
-      : svg('<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/>');
+      : svg(fallback);
     return '<div class="'+cls+'" data-tab="'+esc(tk)+'" title="'+esc(m.label||'')+'">'+ico+'</div>';
   }).filter(Boolean);
   const mid = Math.floor(items.length/2);

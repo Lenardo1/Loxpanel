@@ -90,6 +90,7 @@
   .chip.on{background:rgba(224,162,77,.14);border-color:var(--accent);color:var(--fg);}
   .chip.dis{opacity:.4;cursor:not-allowed;}
   .chip.cat{border-style:dashed;}
+  .chip.room{border-style:dotted;}
   .chip .star{color:var(--accent);font-size:11px;margin-left:6px;}
   .chip .chic{width:15px;height:15px;object-fit:contain;vertical-align:-2px;margin-right:6px;}
   #tabcount{margin-left:6px;color:var(--muted);font-size:12.5px;}
@@ -346,7 +347,7 @@
         <div class="ovcols">
           <div class="ovcol"><h4>Panel-Konfiguration</h4>
             <button class="ovbox" data-goto="pconf:appearance"><b>Darstellung</b><span>Kachel-Layout (2×2 … 3×3), Split-Pane je Tab (Audio/Wetter/Kalender/Screen füllen), Bildschirm füllen.</span></button>
-            <button class="ovbox" data-goto="pconf:tabs"><b>Tabs</b><span>Untere Leiste: bis 4 Buttons – Standard-Tabs und/oder Kategorien als Abkürzung.</span></button>
+            <button class="ovbox" data-goto="pconf:tabs"><b>Tabs</b><span>Untere Leiste: bis 4 Buttons – Standard-Tabs und/oder einzelne Kategorien bzw. Räume als Abkürzung. Der erste ist die Startseite.</span></button>
             <button class="ovbox" data-goto="pconf:rooms"><b>Räume</b><span>Welche Räume dieses Panel zeigt. Nichts angehakt = alle.</span></button>
             <button class="ovbox" data-goto="pconf:cats"><b>Kategorien</b><span>Welche Kategorien im Tab „Kategorien" erscheinen.</span></button>
             <button class="ovbox" data-goto="pconf:tiles"><b>Kacheln gestalten</b><span>Einzelne Kacheln umbenennen, färben, Icon setzen oder ausblenden.</span></button>
@@ -934,7 +935,7 @@ function renderEditor(){
      '<div class="field"><input type="text" id="fTitle" value="'+esc(p.title||'')+'" placeholder="'+esc(cur)+'"></div></div></section>'+
 
    '<section class="spane" data-sub="tabs"><div class="card"><h3>Untere Leiste (Tabs)</h3>'+
-     '<p class="note">'+T('Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne Kategorien als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★). ')+
+     '<p class="note">'+T('Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne Kategorien (gestrichelt) bzw. Räume (gepunktet) als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★): das Panel wacht direkt dort auf. Ein Raum als Startseite heißt also, dass Licht und Beschattung dieses Raums sofort bedienbar sind. ')+
        '<span id="tabcount"></span></p>'+
      '<div class="chips" id="chips"></div></div></section>'+
 
@@ -1141,7 +1142,7 @@ function renderChips(p){
     const on=p.tabs.includes(t.tab);
     const first = p.tabs.length && p.tabs.indexOf(t.tab)===firstTabIndex(p);
     const c=document.createElement('div');
-    c.className='chip'+(on?' on':'')+(!on&&full?' dis':'')+(t.cat?' cat':'');
+    c.className='chip'+(on?' on':'')+(!on&&full?' dis':'')+(t.cat?' cat':'')+(t.room?' room':'');
     c.innerHTML=(t.iconUrl?'<img class="chic" src="'+esc(t.iconUrl)+'">':'')+
       esc(t.label)+(on&&first?'<span class="star">★ Start</span>':'');
     c.onclick=()=>{ toggleTab(p,t.tab); renderChips(p); renderPanes(p); markDirty(); };
@@ -1153,7 +1154,7 @@ function renderChips(p){
       if(inp.value==='') delete p.ui[k]; else p.ui[k]=Number(inp.value); markDirty(); };
   });
 }
-function defaultTabs(){ return (META.tabs||[]).filter(t=>!t.cat).slice(0,4).map(t=>t.tab); }
+function defaultTabs(){ return (META.tabs||[]).filter(t=>!t.cat&&!t.room).slice(0,4).map(t=>t.tab); }
 function firstTabIndex(p){
   const order=META.tabs.map(t=>t.tab);
   let best=99,bt=null; p.tabs.forEach(tb=>{const i=order.indexOf(tb); if(i>-1&&i<best){best=i;bt=tb;}});
