@@ -152,10 +152,19 @@
   .grid{--gap:10px;grid-area:1/1;
     display:grid;grid-template-columns:repeat(var(--cols,2),1fr);
     grid-auto-rows:calc((100% - (var(--rows,2) - 1) * var(--gap)) / var(--rows,2));gap:var(--gap);padding:10px;
-    overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+    overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+  /* Schlanke Scrollleiste im Theme fuer JEDEN scrollenden Bereich. Ohne das
+     zeichnet der Browser in der Split-Pane seine Standardleiste (16 px, grau)
+     direkt neben das 5-px-Band des Kachelrasters - und nimmt der Pane die
+     Breite weg. Die Pane scrollt seit dem Seiten-Snapping immer, weil Wetter
+     und Kalender zwei Seiten hoch sind. */
+  .grid,#frontpane,.frontpage,.menubox{
     scrollbar-width:thin;scrollbar-color:rgba(var(--wash,255,255,255),.18) transparent;}
-  .grid::-webkit-scrollbar{width:5px;}
-  .grid::-webkit-scrollbar-thumb{background:rgba(var(--wash,255,255,255),.18);border-radius:3px;}
+  .grid::-webkit-scrollbar,#frontpane::-webkit-scrollbar,
+  .frontpage::-webkit-scrollbar,.menubox::-webkit-scrollbar{width:5px;}
+  .grid::-webkit-scrollbar-thumb,#frontpane::-webkit-scrollbar-thumb,
+  .frontpage::-webkit-scrollbar-thumb,.menubox::-webkit-scrollbar-thumb{
+    background:rgba(var(--wash,255,255,255),.18);border-radius:3px;}
   /* Seiten-Snapping: Kachelraster rastet hart in Vierer-Seiten ein (4 oben/4
      unten, nie dazwischen), lange Listen rasten nur sanft ein. Snap-Punkte
      setzt render() per .snap auf jede 4. Kachel. */
