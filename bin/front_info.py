@@ -79,6 +79,23 @@ def wmo_icon(code) -> str:
     return "cloud"
 
 
+_RETRY_PAUSE = 3.0          # Sekunden zwischen den beiden Versuchen
+
+
+def _vorruebergehend(e: Exception) -> bool:
+    """Ist der Fehler ein Aussetzer, den ein zweiter Versuch beheben kann?
+
+    Ja bei Zeitueberschreitung, abgerissener Verbindung und den 5xx-Antworten
+    des Servers (iCloud liefert bei bestehenden Abos immer wieder 503).
+    Nein bei 4xx: 401/403/404 heisst falsche URL oder nicht mehr oeffentlich
+    geteilt, das wird durch Wiederholen nicht besser.
+    """
+    if isinstance(e, (asyncio.TimeoutError, aiohttp.ClientConnectionError)):
+        return True
+    status = getattr(e, "status", None)
+    return isinstance(status, int) and status >= 500
+
+
 def normalize_ical_url(url) -> str:
     """`webcal://` / `webcals://` -> `https://` (Apple/iCloud teilt webcal-Links)."""
     url = (url or "").strip()
@@ -195,15 +212,30 @@ def _parse_events(ics_bytes: bytes, days: int) -> list:
 
 
 async def fetch_events(session: aiohttp.ClientSession, url: str, days: int) -> list:
-    """iCal-Abo laden (async) und parsen (Parsen im Thread, blockiert die Loop nicht)."""
+    """iCal-Abo laden (async) und parsen (Parsen im Thread, blockiert die Loop nicht).
+
+    Ein zweiter Versuch nach kurzer Pause bei VORUEBERGEHENDEN Fehlern: iClouds
+    `pNNN-caldav`-Hosts antworten regelmaessig mit 503, obwohl das Abo in Ordnung
+    ist. Ein 404 oder 401 wiederholt sich dagegen nicht - dann ist die URL falsch
+    oder das Abo nicht mehr oeffentlich, und ein zweiter Abruf kostet nur Zeit.
+    """
     url = normalize_ical_url(url)
     if not url:
         return []
     if not HAVE_ICAL:
         raise RuntimeError("Bibliothek 'icalendar' nicht installiert")
-    async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
-        r.raise_for_status()
-        data = await r.read()
+    data = None
+    for versuch in (1, 2):
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as r:
+                r.raise_for_status()
+                data = await r.read()
+            break
+        except Exception as e:
+            if versuch == 2 or not _vorruebergehend(e):
+                raise
+            log.info("Kalender: %s - zweiter Versuch in %.0f s", e, _RETRY_PAUSE)
+            await asyncio.sleep(_RETRY_PAUSE)
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, _parse_events, data, days)
 

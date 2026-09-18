@@ -1586,7 +1586,12 @@ async function loadSettings(){
     const cs=$('#cal_status');
     if(cs){
       if(!st.cal_configured) cs.innerHTML='<span class="ccmut">'+T('Kein Kalender konfiguriert.')+'</span>';
-      else if(st.cal_error) cs.innerHTML='<b class="bad">'+T('Fehler:')+'</b> '+esc(st.cal_error);
+      // Bei einem Aussetzer zeigt das Panel weiter den letzten guten Stand —
+      // das muss hier dabeistehen, sonst sieht man einen Fehler und gleichzeitig
+      // Termine am Panel und hält eines von beidem für falsch.
+      else if(st.cal_error) cs.innerHTML='<b class="bad">'+T('Fehler:')+'</b> '+esc(st.cal_error)
+        +(st.events_stale?'<br><span class="ccmut">'+T('Das Panel zeigt weiter den Stand von')
+          +' '+esc(st.events_stale)+' '+T('Uhr.')+'</span>':'');
       else cs.innerHTML='<b class="ok">'+T('Kalender geladen')+'</b> · '+(st.cal_count||0)+' '+T('Termine');
     }
     // Auto-Standort vom Miniserver als Platzhalter zeigen (falls keine Koordinaten gesetzt)

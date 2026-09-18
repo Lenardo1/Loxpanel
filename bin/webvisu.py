@@ -589,6 +589,10 @@ class App:
         self._front: dict | None = None
         self._front_key: str | None = None
         self._front_meta: dict = {}
+        # Letzter erfolgreich geladener Stand je Teil (Termine, Feiertage,
+        # Wetter) plus dessen Uhrzeit. Ueberbrueckt Aussetzer der Quellen,
+        # siehe _front_keep().
+        self._front_good: dict = {}
         self._front_dirty = False
         self._front_refresh = asyncio.Event()
         self._front_session: aiohttp.ClientSession | None = None
@@ -4307,6 +4311,29 @@ class App:
                 "events": data.get("events") or [], "holidays": data.get("holidays") or {},
                 "calName": data.get("calName") or "Family"}
 
+    def _front_keep(self, data: dict) -> dict:
+        """Bei einem fehlgeschlagenen Abruf den letzten guten Stand behalten.
+
+        Ohne das loescht ein einzelner Aussetzer die Anzeige: `load_front()`
+        faengt den Fehler ab und liefert eine LEERE Liste zurueck, der
+        Diff-Vergleich sieht darin eine echte Aenderung und schickt sie los -
+        der Kalender ist am Panel bis zu 15 Minuten weg, nur weil iCloud einmal
+        503 gesagt hat. Der alte Stand ist in dem Fall die bessere Auskunft als
+        gar keiner; die Einstellungsseite nennt den Fehler weiterhin und sagt
+        jetzt dazu, von wann die gezeigten Daten sind.
+        """
+        meta = data.get("meta") or {}
+        for fehler, feld in (("cal_error", "events"),
+                             ("hol_error", "holidays"),
+                             ("wx_error", "weather")):
+            if meta.get(fehler) and not data.get(feld) and self._front_good.get(feld):
+                data[feld] = self._front_good[feld]
+                meta[f"{feld}_stale"] = self._front_good.get("_zeit")
+            elif not meta.get(fehler) and data.get(feld):
+                self._front_good[feld] = data[feld]
+                self._front_good["_zeit"] = time.strftime("%H:%M")
+        return data
+
     async def front_task(self) -> None:
         """Kalender + Wetter periodisch laden und an die Panels schicken. Laeuft nur
         aktiv, wenn eine iCal-URL ODER Koordinaten gesetzt sind. Ein sofortiges
@@ -4334,6 +4361,7 @@ class App:
                             data["meta"]["wx_error"] = None
                         data["meta"]["wx_source"] = "miniserver" if wx is not None else "open-meteo"
                         self._wx_source = data["meta"]["wx_source"]
+                        data = self._front_keep(data)   # Aussetzer loescht nichts
                         self._front_meta = data.get("meta", {})
                         payload = self._front_payload(data)
                     except Exception:
