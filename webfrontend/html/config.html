@@ -92,6 +92,7 @@
   .chip.cat{border-style:dashed;}
   .chip.room{border-style:dotted;}
   .chip .star{color:var(--accent);font-size:11px;margin-left:6px;}
+  .chip .pos{color:var(--muted);font-size:11px;margin-left:6px;}
   .chip .chic{width:15px;height:15px;object-fit:contain;vertical-align:-2px;margin-right:6px;}
   #tabcount{margin-left:6px;color:var(--muted);font-size:12.5px;}
   #tabcount.full{color:var(--accent);}
@@ -935,7 +936,7 @@ function renderEditor(){
      '<div class="field"><input type="text" id="fTitle" value="'+esc(p.title||'')+'" placeholder="'+esc(cur)+'"></div></div></section>'+
 
    '<section class="spane" data-sub="tabs"><div class="card"><h3>Untere Leiste (Tabs)</h3>'+
-     '<p class="note">'+T('Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne Kategorien (gestrichelt) bzw. Räume (gepunktet) als Abkürzung. Der <b>erste aktive</b> ist die Startseite (★): das Panel wacht direkt dort auf. Ein Raum als Startseite heißt also, dass Licht und Beschattung dieses Raums sofort bedienbar sind. ')+
+     '<p class="note">'+T('Bis zu <b>4 Buttons</b> — die 4 Standard-Tabs und/oder einzelne Kategorien (gestrichelt) bzw. Räume (gepunktet) als Abkürzung. <b>Die Reihenfolge des Anklickens ist die Reihenfolge in der Leiste</b> (1., 2., …), der erste ist die Startseite (★): das Panel wacht direkt dort auf. Ein Raum zuerst angeklickt heißt also, dass Licht und Beschattung dieses Raums sofort bedienbar sind. ')+
        '<span id="tabcount"></span></p>'+
      '<div class="chips" id="chips"></div></div></section>'+
 
@@ -1140,11 +1141,13 @@ function renderChips(p){
   const full = p.tabs.length>=4;
   META.tabs.forEach(t=>{
     const on=p.tabs.includes(t.tab);
-    const first = p.tabs.length && p.tabs.indexOf(t.tab)===firstTabIndex(p);
+    const pos = p.tabs.indexOf(t.tab);          // Platz in der Leiste (0 = Startseite)
+    const first = on && pos===firstTabIndex(p);
     const c=document.createElement('div');
     c.className='chip'+(on?' on':'')+(!on&&full?' dis':'')+(t.cat?' cat':'')+(t.room?' room':'');
     c.innerHTML=(t.iconUrl?'<img class="chic" src="'+esc(t.iconUrl)+'">':'')+
-      esc(t.label)+(on&&first?'<span class="star">★ Start</span>':'');
+      esc(t.label)+(first?'<span class="star">★ Start</span>'
+                   :(on?'<span class="pos">'+(pos+1)+'.</span>':''));
     c.onclick=()=>{ toggleTab(p,t.tab); renderChips(p); renderPanes(p); markDirty(); };
     box.appendChild(c);
   });
@@ -1155,19 +1158,15 @@ function renderChips(p){
   });
 }
 function defaultTabs(){ return (META.tabs||[]).filter(t=>!t.cat&&!t.room).slice(0,4).map(t=>t.tab); }
-function firstTabIndex(p){
-  const order=META.tabs.map(t=>t.tab);
-  let best=99,bt=null; p.tabs.forEach(tb=>{const i=order.indexOf(tb); if(i>-1&&i<best){best=i;bt=tb;}});
-  return p.tabs.indexOf(bt);
-}
+function firstTabIndex(p){ return 0; }   // Startseite = erster Tab der Leiste
 function toggleTab(p,tab){
+  // Die Reihenfolge ist die KLICKREIHENFOLGE - sie bestimmt die Tab-Leiste und
+  // damit die Startseite (der erste Tab). Vorher wurde hart nach der Liste
+  // sortiert; dabei rutschten Kategorie- und Raum-Tabs immer ans Ende und
+  // konnten nie Startseite sein, ausser sie waren der einzige Tab.
   const i=p.tabs.indexOf(tab);
   if(i>-1){ if(p.tabs.length>1) p.tabs.splice(i,1); }
-  else {
-    if(p.tabs.length>=4) return;
-    const order=META.tabs.map(t=>t.tab);
-    p.tabs.push(tab); p.tabs.sort((a,b)=>order.indexOf(a)-order.indexOf(b));
-  }
+  else { if(p.tabs.length>=4) return; p.tabs.push(tab); }
 }
 
 function renderChecklist(p,kind){
