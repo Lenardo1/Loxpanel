@@ -196,8 +196,12 @@
     width:calc(var(--ico-size,38px) + 18px);height:calc(var(--ico-size,38px) + 18px);
     transform:translate(-50%,-50%);}
   .tile .posring circle{fill:none;stroke:currentColor;stroke-width:var(--posring-w,6);}
-  .tile .posring .trk{opacity:.18;}
-  .tile .posring .val{stroke-linecap:round;}
+  .tile .posring .trk{opacity:var(--posring-trk,.18);}
+  /* Der Uebergang laesst den Bogen der Fahrt FOLGEN statt in 1-%-Stufen zu
+     springen - keine Dauer-Animation: im Stand steht er absolut still. */
+  .tile .posring .val{stroke-linecap:round;opacity:var(--posring-op,1);
+    transition:stroke-dasharray .4s linear;}
+  @media (prefers-reduced-motion:reduce){ .tile .posring .val{transition:none;} }
   .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
   .favs.wrap{flex-wrap:wrap;overflow-x:visible;justify-content:flex-start;gap:12px;}
   .phead{font-weight:650;font-size:15px;margin:10px 2px 2px;padding-bottom:6px;border-bottom:1px solid var(--line);text-align:left;}
@@ -1060,9 +1064,21 @@ function tileVarStyle(it){
   if(ts.ovBw!=null) sv.push('--ov-bw:'+ts.ovBw+'px');
   if(ts.tileBord!=null) sv.push('--tile-bord:'+ts.tileBord);
   if(ts.tileBw!=null) sv.push('--tile-bw:'+ts.tileBw+'px');
+  if(ts.ringOp!=null) sv.push('--posring-op:'+ts.ringOp);
+  if(ts.ringTrk!=null) sv.push('--posring-trk:'+ts.ringTrk);
+  if(ts.ringW!=null) sv.push('--posring-w:'+ts.ringW);
   return sv.join(';');
 }
 function tileTone(it){ return it.tone==='good'?' good':(it.tone==='crit'?' crit':(it.on?' on':'')); }
+// Positionsring: EINE Quelle fuer Vollrender und In-place-Patch. Vorher stand
+// der Umfang zweimal als Zahl im Render-Zweig; sobald der Patch dazukam, waere
+// er die dritte Stelle gewesen, an der sich derselbe Wert aendern muss.
+const RING_U = 289.03;                      // Umfang bei r=46 im viewBox 0..100
+function ringPos(it){
+  return (typeof it.pos === 'number' && isFinite(it.pos))
+    ? Math.max(0, Math.min(100, it.pos)) : null;
+}
+function ringDash(posv){ return (posv/100*RING_U).toFixed(2)+' '+RING_U; }
 // Live-Update der Kachel-Ansicht OHNE Neuaufbau: aktualisiert nur die
 // veraenderlichen Teile (Zustand/Farben/Sublabel/Steuer-Icons) der bestehenden
 // Kacheln. Verhindert das Flackern (Icons/Cover werden nicht neu geladen).
@@ -1071,9 +1087,8 @@ function tileTone(it){ return it.tone==='good'?' good':(it.tone==='crit'?' crit'
 // baute den Ring frueher NICHT mit -> der Bogen fror auf dem Stand vom letzten
 // vollen Render ein (Text sagte 95 %, Ring zeigte noch 20 %). Gibt false zurueck,
 // wenn sich die Ring-STRUKTUR aendert (Ring kommt/geht) -> voller render().
-function ringDash(posv){ return (posv/100*289.03).toFixed(2)+' 289.03'; }
 function updateTileRing(n,it){
-  const posv=(typeof it.pos==='number'&&isFinite(it.pos))?Math.max(0,Math.min(100,it.pos)):null;
+  const posv=ringPos(it);
   const ring=n.querySelector('.posring');
   if(posv===null) return !ring;          // Ring war da, ist aber weg -> Struktur
   if(!ring) return false;                // Ring soll da sein, ist aber nicht -> Struktur
@@ -1152,14 +1167,13 @@ function render(){
     // Positionsring: nur fuer Bausteine, die eine Stellung haben. Bei 0 %
     // bleibt allein die Spur stehen - ein runder Abschluss auf der Laenge null
     // wuerde sonst als Punkt erscheinen und wie ein Fehler aussehen.
-    const posv = (typeof it.pos === 'number' && isFinite(it.pos))
-      ? Math.max(0, Math.min(100, it.pos)) : null;
+    const posv = ringPos(it);
     const icoCell = posv===null ? icoHtml
       : '<span class="icowrap"><svg class="posring" viewBox="0 0 100 100" aria-hidden="true">'+
           '<g transform="rotate(-90 50 50)">'+
             '<circle class="trk" cx="50" cy="50" r="46"/>'+
             (posv>0 ? '<circle class="val" cx="50" cy="50" r="46" stroke-dasharray="'+
-              (posv/100*289.03).toFixed(2)+' 289.03"/>' : '')+
+              ringDash(posv)+'"/>' : '')+
           '</g></svg>'+icoHtml+'</span>';
     const chev = (it.nav && !it.controls) ? '<span class="chev">'+svg('<path d="m9 6 6 6-6 6"/>')+'</span>' : '';
     const ctrls = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
@@ -1324,11 +1338,18 @@ let LANG='de-DE';   // Panel-Sprache (aus dem Profil, Server sendet sie im theme
 // Strichstaerke des Positionsrings live am echten Display einstellen (verschiedene
 // Panels zeichnen duenne Linien unterschiedlich – Shelly braucht mehr fuer eine
 // sichtbare Linie): ?ring=4 duenner · ?ring=8 dicker · ?ring=6 Standard. Gemerkt.
+// Der gemerkte Geraetewert muss NACH den Theme-Variablen erneut gesetzt werden:
+// seit die Strichstaerke auch aus der Konfiguration kommt, schickt der Server
+// --posring-w mit, und der Theme-Push wuerde den Live-Test sonst ueberschreiben.
+// Der Wert am Geraet gewinnt - genau das ist der Zweck des Reglers.
+function posringOverride(){
+  const v=localStorage.getItem('lp_posring_w');
+  if(v!==null && v!=='') document.documentElement.style.setProperty('--posring-w', parseFloat(v)||6);
+}
 (function(){
   const p=new URLSearchParams(location.search).get('ring');
   if(p!==null) localStorage.setItem('lp_posring_w', p);
-  const v=localStorage.getItem('lp_posring_w');
-  if(v!==null && v!=='') document.documentElement.style.setProperty('--posring-w', parseFloat(v)||6);
+  posringOverride();
 })();
 function connect(){
   const q=[];
@@ -1344,6 +1365,7 @@ function connect(){
   ws.onmessage=e=>{
     const msg=JSON.parse(e.data);
     if(msg.t==='theme'){ const v=msg.vars||{}; for(const k in v){ if(v[k]) document.documentElement.style.setProperty(k,v[k]); }
+      posringOverride();      // ?ring= am Geraet schlaegt die Konfiguration
       profCols = (v['--cols']?(parseInt(v['--cols'])||2):2);
       profRows = (v['--rows']?(parseInt(v['--rows'])||2):2);
       gridCols = profCols; gridRows = profRows;

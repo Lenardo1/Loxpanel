@@ -745,12 +745,13 @@ function showSub(k){
 }
 
 // ---- Aktiv-Overlay (Rahmen/Füllung/Deckkraft) ----
-const OV_DEF={mode:'both',fill:16,bord:55,bw:1,ibord:8,ibw:1};
+const OV_DEF={mode:'both',fill:16,bord:55,bw:1,ibord:8,ibw:1,ring:100,rtrk:18,rw:6};
 function ovVal(ov,k){ return (ov&&ov[k]!=null)?ov[k]:OV_DEF[k]; }
 function pruneOverlay(host){ if(host&&host.overlay&&!Object.keys(host.overlay).length) delete host.overlay; }
 function overlayFields(ov,pfx){
   const m=ovVal(ov,'mode'),fi=ovVal(ov,'fill'),bo=ovVal(ov,'bord'),bw=ovVal(ov,'bw'),
-        ib=ovVal(ov,'ibord'),ibw=ovVal(ov,'ibw');
+        ib=ovVal(ov,'ibord'),ibw=ovVal(ov,'ibw'),
+        rg=ovVal(ov,'ring'),rt=ovVal(ov,'rtrk'),rw=ovVal(ov,'rw');
   const opt=(v,t)=>'<option value="'+v+'"'+(m===v?' selected':'')+'>'+t+'</option>';
   return '<div class="ovgrp">Aktive Kacheln</div>'+
     '<div class="frow"><label class="lbl">Darstellung</label><select id="'+pfx+'mode">'+
@@ -768,12 +769,36 @@ function overlayFields(ov,pfx){
       '<input type="range" id="'+pfx+'ibord" min="0" max="100" step="5" value="'+ib+'">'+
       '<span class="cval" id="'+pfx+'ibordv">'+ib+' %</span></div>'+
     '<div class="frow"><label class="lbl">Rahmenbreite</label><select id="'+pfx+'ibw">'+
-      [1,2,3,4].map(n=>'<option value="'+n+'"'+(ibw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>';
+      [1,2,3,4].map(n=>'<option value="'+n+'"'+(ibw===n?' selected':'')+'>'+n+' px</option>').join('')+'</select></div>'+
+    '<div class="ovgrp">Positionsring <span class="ovgrp-h">(Rollladen, Tor, Fenster, Dimmer)</span></div>'+
+    '<div class="frow"><label class="lbl">Strichstärke</label>'+
+      '<input type="range" id="'+pfx+'rw" min="1" max="12" step="1" value="'+rw+'">'+
+      '<span class="cval" id="'+pfx+'rwv"></span></div>'+
+    '<div class="frow"><label class="lbl">Bogen</label>'+
+      '<input type="range" id="'+pfx+'ring" min="0" max="100" step="5" value="'+rg+'">'+
+      '<span class="cval" id="'+pfx+'ringv">'+rg+' %</span></div>'+
+    '<div class="frow"><label class="lbl">Spur</label>'+
+      '<input type="range" id="'+pfx+'rtrk" min="0" max="100" step="2" value="'+rt+'">'+
+      '<span class="cval" id="'+pfx+'rtrkv">'+rt+' %</span></div>';
+}
+// Der Ring ist so dick wie `rw` Prozent von (Icon-Größe + 18 px), die Icon-Linie
+// dagegen 1,7/24 der Icon-Größe. Beides in Pixeln nebeneinander zu zeigen ist
+// der einzige Weg, die eigentliche Ursache sichtbar zu machen: durch den festen
+// 18-px-Sockel wird der Ring bei kleinen Icons dicker als die Linien, die er
+// umschließt.
+function ringHint(rw,ico){
+  const s=Number(ico)||38;
+  const ring=rw/100*(s+18), lin=1.7*(s/24);
+  return ring.toFixed(1)+' px gegen '+lin.toFixed(1)+' px Iconlinie ('
+    +(ring/lin).toFixed(2)+'×)';
 }
 function bindOverlay(pfx,getOv,onChange){
   const m=$('#'+pfx+'mode'),fi=$('#'+pfx+'fill'),bo=$('#'+pfx+'bord'),bw=$('#'+pfx+'bw'),
         fiv=$('#'+pfx+'fillv'),bov=$('#'+pfx+'bordv'),
-        ib=$('#'+pfx+'ibord'),ibw=$('#'+pfx+'ibw'),ibv=$('#'+pfx+'ibordv');
+        ib=$('#'+pfx+'ibord'),ibw=$('#'+pfx+'ibw'),ibv=$('#'+pfx+'ibordv'),
+        rg=$('#'+pfx+'ring'),rgv=$('#'+pfx+'ringv'),
+        rt=$('#'+pfx+'rtrk'),rtv=$('#'+pfx+'rtrkv'),
+        rw=$('#'+pfx+'rw'),rwv=$('#'+pfx+'rwv');
   const set=(k,v)=>{ getOv()[k]=v; onChange(); };
   if(m) m.onchange=()=>set('mode',m.value);
   if(fi) fi.oninput=()=>{ fiv.textContent=fi.value+' %'; set('fill',Number(fi.value)); };
@@ -781,6 +806,14 @@ function bindOverlay(pfx,getOv,onChange){
   if(bw) bw.onchange=()=>set('bw',Number(bw.value));
   if(ib) ib.oninput=()=>{ ibv.textContent=ib.value+' %'; set('ibord',Number(ib.value)); };
   if(ibw) ibw.onchange=()=>set('ibw',Number(ibw.value));
+  // Die Icon-Größe steht im selben Formular; der Hinweis rechnet mit ihr, damit
+  // das Verhältnis Ring zu Iconlinie beim Schieben direkt ablesbar ist.
+  const icoJetzt=()=>{ const i=document.querySelector('input[data-ui="iconSize"]');
+                       return (i&&i.value)?Number(i.value):38; };
+  const rwHint=()=>{ if(rwv&&rw) rwv.textContent=ringHint(Number(rw.value),icoJetzt()); };
+  if(rw){ rwHint(); rw.oninput=()=>{ rwHint(); set('rw',Number(rw.value)); }; }
+  if(rg) rg.oninput=()=>{ rgv.textContent=rg.value+' %'; set('ring',Number(rg.value)); };
+  if(rt) rt.oninput=()=>{ rtv.textContent=rt.value+' %'; set('rtrk',Number(rt.value)); };
 }
 function ovPreview(elId,ov){
   const el=$('#'+elId);

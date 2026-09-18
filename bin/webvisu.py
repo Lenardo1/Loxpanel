@@ -286,6 +286,30 @@ def _inactive_border(ov: dict) -> tuple[float, int]:
     return alpha, bw
 
 
+def _posring(ov: dict) -> tuple[float, float, int]:
+    """Overlay-Config -> (Deckkraft Bogen, Deckkraft Spur, Strichstaerke viewBox).
+
+    Defaults entsprechen dem bisher fest verdrahteten Aussehen (Bogen voll
+    deckend, Spur 18 %, Strichstaerke 6), ohne Konfiguration aendert sich also
+    nichts. Die Strichstaerke zaehlt in viewBox-Einheiten des Rings (0..100);
+    in Pixeln ergibt sie `rw/100 * (Icon-Groesse + 18)`. Das ist der Regler,
+    der zaehlt: weil der Ring 18 px Sockel hat, die Icon-Linie aber sauber mit
+    der Icon-Groesse skaliert, faellt der Ring bei kleinen Icons deutlich
+    dicker aus als die Linien, die er umschliesst (bei 24 px Icon Faktor 1,5).
+    """
+    ov = ov if isinstance(ov, dict) else {}
+
+    def _num(key, default):
+        try:
+            return float(ov.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+    ring = max(0.0, min(1.0, _num("ring", 100) / 100.0))
+    rtrk = max(0.0, min(1.0, _num("rtrk", 18) / 100.0))
+    rw = max(1, min(12, int(_num("rw", 6))))
+    return ring, rtrk, rw
+
+
 def _sanitize_overlay(ov) -> dict:
     """Overlay-Config aus der Config-Seite auf erlaubte Werte eindampfen."""
     if not isinstance(ov, dict):
@@ -293,12 +317,14 @@ def _sanitize_overlay(ov) -> dict:
     out: dict = {}
     if ov.get("mode") in ("both", "border", "fill"):
         out["mode"] = ov["mode"]
-    for k in ("fill", "bord", "ibord"):
+    for k in ("fill", "bord", "ibord", "ring", "rtrk"):
         if isinstance(ov.get(k), (int, float)):
             out[k] = max(0, min(100, int(ov[k])))
     for k in ("bw", "ibw"):
         if isinstance(ov.get(k), (int, float)):
             out[k] = max(1, min(4, int(ov[k])))
+    if isinstance(ov.get("rw"), (int, float)):
+        out["rw"] = max(1, min(12, int(ov["rw"])))
     return out
 
 
@@ -1200,6 +1226,12 @@ class App:
             ialpha, ibw = _inactive_border(ui["overlay"])
             v["--tile-bord"] = f"rgba(255,255,255,{ialpha:.3g})"
             v["--tile-bw"] = f"{ibw}px"
+            # Positionsring (Rollladen/Tor/Fenster/Dimmer) - herunterdrehbar, wo
+            # er zu kraeftig wirkt.
+            rop, rtrk, rw = _posring(ui["overlay"])
+            v["--posring-op"] = f"{rop:.3g}"
+            v["--posring-trk"] = f"{rtrk:.3g}"
+            v["--posring-w"] = f"{rw}"
         if ui.get("font"):
             v["--font"] = ui["font"]
         if ui.get("textColor"):
@@ -1754,7 +1786,11 @@ class App:
             if hide:
                 e["hide"] = hide           # einzeln ausgeblendete Kacheln (panelweit)
             ui = p.get("ui") or {}
-            cui = {k: ui[k] for k in ("iconSize", "nameSize", "subSize")
+            # Groessen genauso klemmen wie der globale Pfad (_sanitize_theme_ui)
+            # und wie die Nachbarfelder unten - sonst nimmt der Panel-Override
+            # jeden Wert an, waehrend die globale Einstellung auf 8..80 begrenzt
+            # ist.
+            cui = {k: max(8, min(80, int(ui[k]))) for k in ("iconSize", "nameSize", "subSize")
                    if isinstance(ui.get(k), (int, float))}
             if ui.get("font"):
                 cui["font"] = str(ui["font"])[:120]
@@ -2274,7 +2310,29 @@ class App:
                       nav={"view": "control", "id": uuid})
         elif t == "Jalousie":
             r = JAL.render(self._with_uuid(uuid), self.states)
-            it.update(on=r["on"], sublabel=r["label"], icon="blind",
+            # Fahrt auf der Kachel sichtbar machen: dieselben States, die die
+            # Detailansicht schon liest (_view_control_inner). Ohne das steht die
+            # Kachel waehrend einer halben Minute Fahrt reglos da.
+            s = c.get("states") or {}
+            up_move = bool(self.states.get(s.get("up")))
+            down_move = bool(self.states.get(s.get("down")))
+            sub = r["label"]
+            if up_move:
+                sub = "▲ fährt … " + sub
+            elif down_move:
+                sub = "▼ fährt … " + sub
+            # BEWUSST KEINE Auf/Ab-Tasten auf der Kachel, obwohl die controls-
+            # Mechanik des Audioplayers sie hergeben wuerde: deren Tasten loesen
+            # per pointerdown schon beim AUFSETZEN des Fingers aus und schlucken
+            # dabei die Wischgeste (panel.html, Bindung der .tctrls .tb). Das
+            # Kachelraster scrollt; ein Wischer, der auf so einer Taste beginnt,
+            # wuerde die Beschattung losfahren lassen statt zu scrollen. Beim
+            # Player kostet das einen Titel, hier eine halbe Minute Fahrt. Die
+            # Kachel selbst reagiert dagegen erst auf einen echten Klick.
+            # Bedient wird die Beschattung in der Detailansicht, die ohnehin mehr
+            # bietet als auf eine Kachel passt: Auf/Ab, Ganz Auf/Ganz Ab und
+            # Beschatten, dazu Automatikstatus und Stellung im Klartext.
+            it.update(on=r["on"], sublabel=sub, icon="blind",
                       nav={"view": "control", "id": uuid})
             _p = _pos_pct(r.get("pct"))
             if _p is not None:
@@ -2626,6 +2684,10 @@ class App:
             ialpha, ibw = _inactive_border(ov["overlay"])
             style["tileBord"] = f"rgba(255,255,255,{ialpha:.3g})"   # inaktiver Rahmen nur fuer diese Kachel
             style["tileBw"] = ibw
+            rop, rtrk, rw = _posring(ov["overlay"])
+            style["ringOp"] = f"{rop:.3g}"      # Positionsring nur fuer diese Kachel
+            style["ringTrk"] = f"{rtrk:.3g}"
+            style["ringW"] = rw
         if style:
             it["style"] = style
         ic = ov.get("icon")
