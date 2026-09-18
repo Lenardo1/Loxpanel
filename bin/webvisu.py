@@ -2326,11 +2326,17 @@ class App:
             s = c.get("states") or {}
             up_move = bool(self.states.get(s.get("up")))
             down_move = bool(self.states.get(s.get("down")))
+            # „fährt …" vor der Stellung las sich widerspruechlich: „▲ fährt …
+            # 62% zu" wirkt, als sei sie beim Auffahren trotzdem zu. Beides
+            # stimmt zwar - sie faehrt auf UND steht gerade auf 62 % geschlossen
+            # -, nur stand nichts dazwischen, das die zwei Angaben trennt. Ein
+            # Verb benennt die Richtung eindeutig (wie beim Tor, :3219), der
+            # Trenner macht die Stellung als zweite Angabe kenntlich.
             sub = r["label"]
             if up_move:
-                sub = "▲ fährt … " + sub
+                sub = "▲ öffnet · " + sub
             elif down_move:
-                sub = "▼ fährt … " + sub
+                sub = "▼ schließt · " + sub
             # BEWUSST KEINE Auf/Ab-Tasten auf der Kachel, obwohl die controls-
             # Mechanik des Audioplayers sie hergeben wuerde: deren Tasten loesen
             # per pointerdown schon beim AUFSETZEN des Fingers aus und schlucken
@@ -3106,7 +3112,9 @@ class App:
             pct = JAL.render(cu, self.states).get("pct")
             base = "–" if pct is None else ("Offen" if pct <= 0 else
                                             ("Geschlossen" if pct >= 100 else f"{pct}% geschlossen"))
-            val = ("▲ fährt … " + base) if up_move else (("▼ fährt … " + base) if down_move else base)
+            # Gleiche Formulierung wie auf der Kachel (_control_item), damit
+            # Kachel und Detailansicht dasselbe sagen.
+            val = ("▲ öffnet · " + base) if up_move else (("▼ schließt · " + base) if down_move else base)
             # Wie Original-Visu: kein Stop-Button. Tipp auf die Richtung waehrend der
             # Fahrt sendet Stop (haelt an); im Stand startet er die Fahrt.
             auf = {"label": "Auf", "on": up_move, "cmd": {"uuid": ua, "cmd": "Stop" if moving else "Up"}}
