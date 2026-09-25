@@ -2262,6 +2262,12 @@ class App:
             "picks": [u for u in (raw.get("picks") or [])
                       if isinstance(u, str) and u in self.controls],
             "pickName": raw.get("pickName") or "",
+            # Bis zu 4 freie Seiten [{name, picks, icon}]. MUSS mit exportiert
+            # werden, sonst verliert der Konfigurator beim Neuladen die Seiten
+            # 2-4: er baut aus den (leeren) Legacy-Feldern nur EINE Pick-Seite,
+            # waehrend "tabs" noch vier Kennungen fuehrt - beim naechsten
+            # Bearbeiten synct der Client "tabs" dann auf die eine Seite herunter.
+            "pickTabs": _pick_tabs(raw),
         }
 
     def _loxone_icons(self) -> list:
