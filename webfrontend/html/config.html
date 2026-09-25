@@ -216,7 +216,7 @@
   .iopt:hover{border-color:var(--accent);}
   .iopt.sel{border-color:var(--accent);background:rgba(224,162,77,.14);}
   .iopt svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
-  .iopt .loxi{width:24px;height:24px;background:var(--fg);-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .loxi{display:inline-block;width:24px;height:24px;background:var(--fg);-webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
   .iopt.clear{font-size:20px;color:var(--muted);}
   .tgl{display:inline-grid;place-items:center;width:34px;height:32px;border:1px solid var(--line);border-radius:4px;cursor:pointer;color:var(--muted);font-weight:700;user-select:none;}
   .tgl.it{font-style:italic;font-family:Georgia,serif;font-weight:600;}
@@ -342,6 +342,78 @@
   .ovw .fpx2 .miniscr{height:82%;}
   .ovw .fptab{width:198px;aspect-ratio:16/10;}
   .ovw .fptab .miniscr{height:72%;}
+  /* Pick-Tab-Leiste (bis zu 4 freie Seiten) */
+  .picktabbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .ptb{display:inline-flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer;}
+  .ptb:hover{border-color:#3a3f49;}
+  .ptb.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);background:#252230;}
+  .ptb .ptx{color:var(--muted);font-size:11px;line-height:1;padding:2px 3px;border-radius:3px;}
+  .ptb .ptx:hover{color:var(--crit);background:rgba(0,0,0,.2);}
+  .ptadd{background:transparent;border:1px dashed #3a3f49;color:var(--accent);border-radius:6px;padding:6px 12px;font:inherit;cursor:pointer;}
+  .ptadd:hover{border-color:var(--accent);}
+  .ptb .loxi{width:16px;height:16px;}
+  .picogrid{display:flex;flex-wrap:wrap;gap:6px;max-height:132px;overflow-y:auto;padding:8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;}
+  .pgi{width:34px;height:34px;border:1px solid var(--line);border-radius:6px;background:var(--panel2);cursor:pointer;display:grid;place-items:center;padding:0;}
+  .pgi:hover{border-color:#3a3f49;} .pgi.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+  .pgi.none{width:auto;padding:0 10px;color:var(--muted);font:inherit;font-size:12px;}
+  .pgi .loxi{width:20px;height:20px;}
+  .pgi-search{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:7px 10px;font:inherit;font-size:12.5px;margin-bottom:6px;}
+  .pgi-search:focus{outline:none;border-color:var(--accent);}
+  /* ---------- Panel-Assistent (Wizard) ---------- */
+  .wzov{position:fixed;inset:0;background:rgba(6,8,11,.72);display:grid;place-items:center;padding:20px;z-index:100;}
+  .wzov[hidden]{display:none;}
+  .wzbox{width:100%;max-width:640px;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.6);display:flex;flex-direction:column;max-height:92vh;}
+  .wzhd{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;}
+  .wzhd b{font-size:16px;} .wzhd .wzstep{margin-left:auto;color:var(--muted);font-size:12px;}
+  .wzbody{padding:20px;overflow-y:auto;}
+  .wzq{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:0 0 9px;}
+  .wzq.mt{margin-top:22px;}
+  .wzopts{display:flex;flex-direction:column;gap:8px;}
+  .wzo{display:flex;gap:13px;align-items:center;text-align:left;width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;color:var(--fg);font:inherit;cursor:pointer;transition:.12s;}
+  .wzo:hover{border-color:#3a3f49;} .wzo.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+  .wzo .ic{flex:none;width:38px;height:38px;border:1px solid var(--line);border-radius:8px;background:var(--bg);display:grid;place-items:center;}
+  .wzo .ic svg{width:22px;height:22px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+  .wzo .ic .loxi{width:22px;height:22px;}
+  .wzp2sel{background:var(--bg);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:7px 9px;font:inherit;font-size:13px;}
+  .wztiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:560px){ .wztiles{grid-template-columns:1fr;} }
+  .wztcol{display:flex;flex-direction:column;min-height:0;}
+  .wzchosen{display:flex;flex-direction:column;gap:5px;max-height:300px;overflow-y:auto;}
+  .wzci{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12.5px;}
+  .wzci span{flex:1;} .wzci button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;} .wzci button:hover{color:var(--crit);}
+  .wzavail{display:flex;flex-direction:column;gap:3px;max-height:320px;overflow-y:auto;}
+  .wzrg{font-size:10.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;padding:6px 2px 2px;}
+  .wzai{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;color:var(--fg);font:inherit;font-size:12.5px;cursor:pointer;text-align:left;}
+  .wzai:hover{border-color:var(--accent);} .wzai.on{border-color:#2f5a44;} .wzai .pl{color:var(--accent);} .wzai b{color:var(--good);font-size:11px;}
+  .wztiles3{display:grid;grid-template-columns:minmax(130px,190px) 1fr;gap:12px;}
+  @media(max-width:560px){ .wztiles3{grid-template-columns:1fr;} }
+  .wzrooms{display:flex;flex-direction:column;gap:3px;max-height:320px;overflow-y:auto;}
+  .wzroom{display:flex;align-items:center;justify-content:space-between;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:7px 9px;color:var(--fg);font:inherit;font-size:12.5px;cursor:pointer;text-align:left;}
+  .wzroom:hover{border-color:var(--accent);} .wzroom.on{border-color:var(--accent);background:var(--panel);}
+  .wzroom .rn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .wzroom .rc{color:var(--muted);font-size:11px;} .wzroom .rc b{color:var(--good);}
+  .wzchip{flex-direction:row;flex-wrap:wrap;max-height:120px;}
+  .wzo b{display:block;font-size:14px;} .wzo .tx span{color:var(--muted);font-size:12px;display:block;}
+  .wzgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  @media(max-width:520px){ .wzgrid{grid-template-columns:repeat(2,1fr);} }
+  .wzg{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:12px 8px;cursor:pointer;color:var(--fg);font:inherit;display:flex;flex-direction:column;align-items:center;gap:8px;transition:.12s;}
+  .wzg:hover{border-color:#3a3f49;} .wzg.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);}
+  .wzgm{display:grid;gap:3px;width:44px;height:44px;grid-template-columns:repeat(var(--c),1fr);grid-template-rows:repeat(var(--r),1fr);}
+  .wzgm i{background:#1b2430;border:1px solid #2a3a4a;border-radius:2px;}
+  .wzg b{font-size:12.5px;font-weight:600;}
+  .wzfield label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px;}
+  .wzfield.mt{margin-top:16px;}
+  .wzfield input,.wzfield select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:6px;color:var(--fg);padding:9px 11px;font:inherit;font-size:14px;}
+  .wznote{color:var(--muted);font-size:11.5px;margin-top:8px;} .wznote code{background:var(--panel2);border-radius:3px;padding:1px 5px;}
+  .wzft{padding:13px 20px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;align-items:center;}
+  .wzbtn{background:var(--panel2);border:1px solid var(--line);color:var(--fg);border-radius:6px;padding:9px 16px;font:inherit;font-size:14px;cursor:pointer;}
+  .wzbtn:hover{border-color:#3a3f49;} .wzbtn:disabled{opacity:.4;cursor:default;}
+  .wzbtn.prim{background:var(--accent);border-color:var(--accent);color:#161018;font-weight:700;}
+  .wzbtn.prim:disabled{filter:none;}
+  .wzsww{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+  .wzsw{width:40px;height:40px;border-radius:7px;padding:0;border:1px solid var(--line);cursor:pointer;background:var(--panel2);}
+  .wzsw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent);}
+  .wzsw.none{width:auto;padding:0 12px;color:var(--muted);font:inherit;font-size:12px;}
+  .wzrow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
 </style>
 </head>
 <body>
@@ -1405,15 +1477,17 @@ function renderSvPane(p){
       '<option value="weather"'+(k==='weather'?' selected':'')+'>Wetter-Details</option>'+
       '<option value="energy"'+(k==='energy'?' selected':'')+'>Energiefluss</option>'+
       '<option value="camera"'+(k==='camera'?' selected':'')+'>Kamera</option>'+
+      '<option value="chart"'+(k==='chart'?' selected':'')+'>Verlauf (Baustein)</option>'+
       '<option value="status"'+(k==='status'?' selected':'')+'>Werte (eigene Auswahl)</option>'+
       '<option value="off"'+(k==='off'?' selected':'')+'>Nichts (Uhr über volle Breite)</option>'+
     '</select>';
-  if(k==='energy'||k==='camera'){
-    const opt=(k==='energy')?energyControlOptions(arg):cameraOptions(arg);
+  if(k==='energy'||k==='camera'||k==='chart'){
+    const opt=(k==='energy')?energyControlOptions(arg):(k==='camera')?cameraOptions(arg):chartControlOptions(arg);
     h+= opt ? '<select id="fSvArg">'+opt+'</select>'
       : '<span class="ccmut">'+(k==='energy'
           ? T('Kein Energieflussmonitor in der Anlage.')
-          : T('Kein Intercom-Baustein in der Anlage.'))+'</span>';
+          : k==='camera' ? T('Kein Intercom-Baustein in der Anlage.')
+          : T('Kein Baustein mit Aufzeichnung in der Anlage.'))+'</span>';
   }
   h+='</div>';
   const uu=(k==='status'&&arg)?arg.split(','):[];
@@ -1439,9 +1513,10 @@ function renderSvPane(p){
     let ziel='';
     if(nk==='energy') ziel=(k==='energy'&&arg)?arg:firstEnergyControl();
     else if(nk==='camera') ziel=(k==='camera'&&arg)?arg:firstCamera();
+    else if(nk==='chart') ziel=(k==='chart'&&arg)?arg:firstChartControl();
     else if(nk==='status') ziel=uu.join(',');
-    svWant=(nk==='energy'||nk==='camera'||nk==='status') && !ziel ? cur+'|'+nk : '';
-    if(nk==='energy'||nk==='camera'||nk==='status') setSv(ziel?(nk+':'+ziel):'');
+    svWant=(nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') && !ziel ? cur+'|'+nk : '';
+    if(nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') setSv(ziel?(nk+':'+ziel):'');
     else setSv(nk);
   };
   const sa=$('#fSvArg');
@@ -1468,7 +1543,7 @@ function renderChips(p){
     // Der Auswahl-Tab traegt den Namen, den die Seite hier bekommen hat. Das
     // Label aus META.tabs ist nur der Rueckfall - /api/meta baut die Tabliste
     // fuer alle Panels zusammen und kennt das einzelne Profil gar nicht.
-    const label=(t.pick&&(p.pickName||'').trim())?p.pickName.trim():t.label;
+    const label=(t.pick&&pick0Name(p))?pick0Name(p):t.label;
     c.innerHTML=(t.iconUrl?'<img class="chic" src="'+esc(t.iconUrl)+'">':'')+
       esc(label)+(first?'<span class="star">★ Start</span>'
                    :(on?'<span class="pos">'+(pos+1)+'.</span>':''));
@@ -1494,7 +1569,7 @@ function renderChips(p){
 function tabMode(p){
   const t=p.tabs||[], eins=(t.length===1);
   if(eins && String(t[0]||'').indexOf('room:')===0) return 'room';
-  if(eins && t[0]===PICK_TAB) return 'pick';
+  if(t.length && t.every(isPick)) return 'pick';   // eine oder mehrere freie Seiten
   return 'classic';
 }
 // Gilt die Leiste als selbst zusammengestellt? Nur dann wird vor dem Verwerfen
@@ -1519,7 +1594,7 @@ function renderTabMode(p){
       if(mode==='classic' && tabsEigen(p) &&
          !confirm(T('Die zusammengestellte Tab-Leiste geht dabei verloren. Fortfahren?'))) return;
       if(ziel==='room') p.tabs=[rooms[0].tab];
-      else if(ziel==='pick') p.tabs=[PICK_TAB];
+      else if(ziel==='pick'){ p.tabs=[PICK_TAB]; curPickIdx=0; ensurePickTabs(p); }
       else p.tabs=defaultTabs();
       markDirty(); renderTabMode(p); renderPanes(p);
     };
@@ -1610,14 +1685,29 @@ async function save(){
                             body:JSON.stringify({ui:g.ui||{}, categories:g.catColors||{}})});
       const j2=await r2.json(); okT=j2.ok; errT=j2.error||'';
     }
-    if(j.ok&&okT){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels wurden automatisch neu geladen'; }
+    if(j.ok&&okT){ dirty=false; t.className='toast show'; t.textContent='✓ Gespeichert ('+j.count+' Profile) — Panels wurden automatisch neu geladen';
+      // Panel-Liste fuer die Geraete-Zuordnung auffrischen (sonst fehlt ein neues
+      // Panel dort bis zum Reload - PANEL_IDS wird sonst nur beim Start geladen).
+      try{ await loadPanelIds(); renderDevices(); }catch(e){} }
     else { t.className='toast show err'; t.textContent='Fehler: '+(j.error||errT||'?'); }
   }catch(e){ t.className='toast show err'; t.textContent='Fehler: '+e; }
   setTimeout(()=>{ if(t) t.classList.remove('show'); }, 4000);
 }
 
 // ---- Kachel-Editor ----
+function isPickPanel(p){ return (p.tabs||[]).some(isPick); }
+// Alle gewaehlten Bausteine ueber alle freien Seiten (dedupliziert). Legacy p.picks
+// wird nur beruecksichtigt, solange noch keine pickTabs migriert wurden.
+function allPicks(p){ const out=[];
+  const add=u=>{ if(out.indexOf(u)<0) out.push(u); };
+  if(Array.isArray(p.pickTabs)&&p.pickTabs.length) p.pickTabs.forEach(t=>(t.picks||[]).forEach(add));
+  else if(Array.isArray(p.picks)) p.picks.forEach(add);
+  return out; }
 function panelControls(p){
+  // Freie-Auswahl-Panel: „Kacheln gestalten" zeigt genau die gewaehlten Bausteine,
+  // nicht alle der Anlage (rooms/cats sind hier leer, sonst kaeme alles durch).
+  if(isPickPanel(p)){ const ps=allPicks(p);
+    return (META.controls||[]).filter(c=>ps.indexOf(c.uuid)>=0); }
   const rs=p.rooms||[], cs=p.cats||[];
   return (META.controls||[]).filter(c=>
     (rs.length ? rs.includes(c.room) : true) &&
@@ -1658,10 +1748,58 @@ function clearHide(){ const p=PANELS[cur]; if(p.hide){ delete p.hide; markDirty(
 // ist, ueber den Raum-/Kategoriefilter des Panels hinauszugreifen. Waere sie
 // gefiltert, kaeme man nie an die Bausteine, fuer die man sie anlegt.
 // Reihenfolge = Klickreihenfolge, wie bei der Tab-Leiste (toggleTab).
-// NUR LESEN - darf p.picks nicht anlegen. Sonst brächte jedes Rendern den
-// Schlüssel zurück, den togglePick/clearPicks gerade entfernt haben, und das
-// Panel gälte als geändert, obwohl nichts gewählt ist.
-function pickList(p){ return p.picks || []; }
+// Bis zu 4 freie Seiten je Panel: p.pickTabs = [{name, picks}]. Tabs heissen
+// auswahl, auswahl2..auswahl4 (siehe _pick_index in webvisu.py). Ein altes
+// picks/pickName wird beim ersten Schreiben zur ersten Seite migriert.
+let curPickIdx=0;
+function isPick(t){ if(t===PICK_TAB) return true; if(typeof t==='string' && t.indexOf(PICK_TAB)===0){ const s=t.slice(PICK_TAB.length); return /^[2-4]$/.test(s); } return false; }
+function pickKey(i){ return i===0?PICK_TAB:PICK_TAB+(i+1); }
+// LESEN: legt nichts an (siehe alter Kommentar - kein Zuruecksetzen entfernter Keys).
+function pickList(p){ const t=p.pickTabs;
+  if(Array.isArray(t)&&t[curPickIdx]) return t[curPickIdx].picks||[];
+  return curPickIdx===0 ? (p.picks||[]) : []; }
+function pickNameOf(p){ const t=p.pickTabs;
+  if(Array.isArray(t)&&t[curPickIdx]) return t[curPickIdx].name||'';
+  return curPickIdx===0 ? (p.pickName||'') : ''; }
+function pick0Name(p){ const t=p.pickTabs; return String((Array.isArray(t)&&t[0]?t[0].name:p.pickName)||'').trim(); }
+// SCHREIBEN: migriert auf die kanonische pickTabs-Form.
+function ensurePickTabs(p){
+  if(!Array.isArray(p.pickTabs)||!p.pickTabs.length){
+    p.pickTabs=[{name:(p.pickName||''), picks:(p.picks||[]).slice()}];
+    delete p.picks; delete p.pickName;
+  }
+  if(p.pickTabs.length>4) p.pickTabs=p.pickTabs.slice(0,4);
+  return p.pickTabs;
+}
+function curPT(p){ const t=ensurePickTabs(p); if(curPickIdx>=t.length) curPickIdx=t.length-1; if(curPickIdx<0) curPickIdx=0; return t[curPickIdx]; }
+function pickSyncTabsMode(p){ if(tabMode(p)==='pick') p.tabs=ensurePickTabs(p).map((_,i)=>pickKey(i)); }
+function pickAddTab(p){ const t=ensurePickTabs(p); if(t.length>=4) return; t.push({name:'',picks:[]}); curPickIdx=t.length-1; pickSyncTabsMode(p); pickWiz=0; markDirty(); renderPick(p); renderChips(p); }
+function pickDelTab(p,i){ const t=ensurePickTabs(p); if(t.length<=1) return; t.splice(i,1); if(curPickIdx>=t.length) curPickIdx=t.length-1; pickSyncTabsMode(p); markDirty(); renderPick(p); renderChips(p); }
+function icoUrl(ic){ return ic ? (ic.charAt(0)==='/' ? ic : '/icon?p='+encodeURIComponent(ic)) : ''; }
+function pickTabBar(p){
+  const t=ensurePickTabs(p);
+  return '<div class="picktabbar">'+t.map((x,i)=>{
+    const ic=x.icon?'<span class="loxi" style="--u:url(\''+esc(icoUrl(x.icon))+'\')"></span>':'';
+    return '<button class="ptb'+(i===curPickIdx?' on':'')+'" data-pti="'+i+'">'+ic+
+      esc((x.name||'').trim()||(T('Seite')+' '+(i+1)))+(t.length>1?'<span class="ptx" data-ptdel="'+i+'">✕</span>':'')+'</button>';
+  }).join('')+
+    (t.length<4?'<button class="ptadd" id="ptAdd" title="'+T('Seite hinzufügen')+'">＋</button>':'')+'</div>';
+}
+// Icon-Auswahl einer freien Seite: volle Loxone-Bibliothek (referenzierte + loxlib),
+// als fertige URL gespeichert. Suche filtert clientseitig (DOM, ohne Neurender).
+function icoBtn(url,cur,title){ return '<button class="pgi'+(cur===url?' on':'')+'" data-pic="'+esc(url)+'" data-in="'+esc((title||'').toLowerCase())+'" title="'+esc(title)+'"><span class="loxi" style="--u:url(\''+esc(url)+'\')"></span></button>'; }
+function icoGridBody(cur){
+  var g='<button class="pgi none'+(cur?'':' on')+'" data-pic="" data-in="">'+T('kein')+'</button>';
+  (((META.icons||{}).loxone)||[]).forEach(function(pth){ g+=icoBtn('/icon?p='+encodeURIComponent(pth),cur,pth); });
+  (LOXLIB||[]).forEach(function(n){ g+=icoBtn('/loxlib?n='+encodeURIComponent(n),cur,n.replace(/\.svg$/i,'')); });
+  return g;
+}
+function pickIcoFilter(v){ v=(v||'').trim().toLowerCase(); document.querySelectorAll('.picogrid .pgi[data-in]').forEach(function(b){ if(b.classList.contains('none')) return; b.hidden = !!v && (b.getAttribute('data-in')||'').indexOf(v)<0; }); }
+function pickIcoGridHtml(p){
+  const cur=curPT(p).icon||'';
+  if(LOXLIB===null) loadLoxlib(function(){ if($('#tabPick')) renderPick(p); });
+  return '<input class="pgi-search" oninput="pickIcoFilter(this.value)" placeholder="'+T('Icon suchen…')+'"><div class="picogrid">'+icoGridBody(cur)+'</div>';
+}
 
 // Zustand der Rubrik. pickWiz: 0 = noch nicht entschieden, 1..3 = Schritt des
 // Assistenten, -1 = direkter Editor. pickFor merkt sich, zu welchem Panel der
@@ -1756,7 +1894,7 @@ function pickWizHtml(p){
   if(pickWiz===1){
     h+='<p class="note">'+T('Diese Seite stellt Bausteine aus <b>beliebigen Räumen und Kategorien</b> zusammen – etwa alles, was du morgens brauchst. Die untere Leiste am Panel wird dabei zu <b>Sprungmarken auf die Räume</b> deiner Auswahl.')+'</p>'+
       '<div class="field" style="max-width:280px"><label class="lbl">'+T('Name der Seite')+'</label>'+
-        '<input type="text" id="pickName" maxlength="40" value="'+esc(p.pickName||'')+'" placeholder="'+T('Auswahl')+'"></div>'+
+        '<input type="text" id="pickName" maxlength="40" value="'+esc(pickNameOf(p))+'" placeholder="'+T('Auswahl')+'"></div>'+
       '<div class="anchors" id="pickNameEx">'+
         ['Morgens','Abends','Urlaub','Putzen'].map(x=>'<span class="chip" data-ex="'+esc(x)+'">'+esc(x)+'</span>').join('')+'</div>'+
       '<p class="hint" style="padding-top:8px">'+T('Ohne Namen heißt die Seite „Auswahl“.')+'</p>'+
@@ -1770,7 +1908,7 @@ function pickWizHtml(p){
     // Gezaehlt wird, was am Panel ANKOMMT: ausgeblendete Bausteine wirft der
     // Server vorher weg, sie duerfen die Zahl nicht aufblaehen.
     const sel=pickSichtbar(p), rs=pickRooms(p), weg=pickList(p).length-sel.length;
-    h+='<p class="wsum">'+T('Die Seite')+' <b>'+esc((p.pickName||'').trim()||T('Auswahl'))+'</b> '+
+    h+='<p class="wsum">'+T('Die Seite')+' <b>'+esc(pickNameOf(p).trim()||T('Auswahl'))+'</b> '+
       T('zeigt')+' <b>'+sel.length+'</b> '+(sel.length===1?T('Baustein'):T('Bausteine'))+' '+
       T('aus')+' <b>'+rs.length+'</b> '+(rs.length===1?T('Raum'):T('Räumen'))+'.</p>'+
       (weg?'<p class="hint">'+weg+' '+(weg===1?T('gewählter Baustein ist auf diesem Panel ausgeblendet und erscheint nicht.')
@@ -1787,7 +1925,8 @@ function pickEditHtml(p){
   return '<div class="grph">'+T('Eigene Auswahl')+
       '<button class="minibtn" id="wizAgain" style="float:right;margin-top:-4px">'+T('Schritt für Schritt')+'</button></div>'+
     '<div class="field" style="max-width:280px"><label class="lbl">'+T('Name der Seite')+'</label>'+
-      '<input type="text" id="pickName" maxlength="40" value="'+esc(p.pickName||'')+'" placeholder="'+T('Auswahl')+'"></div>'+
+      '<input type="text" id="pickName" maxlength="40" value="'+esc(pickNameOf(p))+'" placeholder="'+T('Auswahl')+'"></div>'+
+    '<div class="field"><label class="lbl">'+T('Icon der Seite')+'</label>'+pickIcoGridHtml(p)+'</div>'+
     '<div style="margin-top:10px">'+pickAnchorsHtml(p)+'</div>'+
     pickChosenHtml()+
     '<p class="note" style="margin:8px 0 0">'+T('Tippen auf <b>×</b> nimmt einen Baustein wieder heraus; die Nummern rutschen nach.')+'</p>'+
@@ -1800,23 +1939,32 @@ function pickEditHtml(p){
 // Damit liegen Zusammenstellen und Sichtbarmachen an EINER Stelle.
 function renderPick(p){
   const box=$('#tabPick'); if(!box) return;
-  if(pickFor!==cur){ pickFor=cur; pickWiz=0; pickQ=''; pickRoomF=''; }
-  if((p.tabs||[]).indexOf(PICK_TAB)<0){ box.style.display='none'; box.innerHTML=''; return; }
+  if(pickFor!==cur){ pickFor=cur; pickWiz=0; pickQ=''; pickRoomF=''; curPickIdx=0; }
+  if(!(p.tabs||[]).some(isPick)){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='';
   if(!pickWiz) pickWiz = pickList(p).length ? -1 : 1;
-  box.innerHTML = pickWiz>0 ? pickWizHtml(p) : pickEditHtml(p);
+  const bar = tabMode(p)==='pick' ? pickTabBar(p) : '';
+  box.innerHTML = bar + (pickWiz>0 ? pickWizHtml(p) : pickEditHtml(p));
   bindPick(p);
 }
 
 function bindPick(p){
   renderPicked(); renderPickList();
   const pnm=$('#pickName');
-  if(pnm) pnm.oninput=()=>{ const v=pnm.value.trim();
-    if(v) p.pickName=v; else delete p.pickName;
-    renderChips(p); markDirty(); };
+  if(pnm) pnm.oninput=()=>{ curPT(p).name=pnm.value; renderChips(p); markDirty(); };
   const ex=$('#pickNameEx');
   if(ex) ex.querySelectorAll('.chip[data-ex]').forEach(n=>n.onclick=()=>{
-    p.pickName=n.dataset.ex; markDirty(); renderPick(p); });
+    curPT(p).name=n.dataset.ex; markDirty(); renderPick(p); });
+  // Pick-Tab-Leiste (bis 4 Seiten): wechseln / hinzufügen / entfernen
+  $('#tabPick').querySelectorAll('[data-pti]').forEach(el=>el.onclick=(ev)=>{
+    if(ev.target && ev.target.hasAttribute('data-ptdel')) return;
+    curPickIdx=+el.dataset.pti; pickWiz=0; renderPick(p); });
+  $('#tabPick').querySelectorAll('[data-ptdel]').forEach(el=>el.onclick=(ev)=>{
+    ev.stopPropagation(); pickDelTab(p,+el.dataset.ptdel); });
+  { const pa=$('#ptAdd'); if(pa) pa.onclick=()=>pickAddTab(p); }
+  $('#tabPick').querySelectorAll('.picogrid [data-pic]').forEach(el=>el.onclick=()=>{
+    const v=el.dataset.pic; if(v) curPT(p).icon=v; else delete curPT(p).icon;
+    markDirty(); renderPick(p); renderChips(p); });
   const psr=$('#pickSearch');
   if(psr) psr.oninput=()=>{ pickQ=psr.value; renderPickList(); };
   const prm=$('#pickRoom');
@@ -1889,15 +2037,14 @@ function renderPickList(){
 // anlegen, sonst braechte jedes Rendern den Schluessel zurueck, den togglePick
 // und clearPicks gerade entfernt haben, und das Panel gaelte als geaendert.
 function togglePick(uuid){
-  const p=PANELS[cur], sel=pickList(p).slice(), i=sel.indexOf(uuid);
+  const p=PANELS[cur], t=curPT(p), sel=t.picks.slice(), i=sel.indexOf(uuid);
   if(i>-1) sel.splice(i,1);
   else { if(sel.length>=60) return; sel.push(uuid); }   // derselbe Deckel wie im Server
-  if(sel.length) p.picks=sel; else delete p.picks;      // eine Stelle schreibt
-  markDirty(); pickRefresh();
+  t.picks=sel; markDirty(); pickRefresh();
 }
 
-function clearPicks(){ const p=PANELS[cur];
-  if(p.picks){ delete p.picks; markDirty(); pickRefresh(); } }
+function clearPicks(){ const p=PANELS[cur], t=curPT(p);
+  if(t.picks.length){ t.picks=[]; markDirty(); pickRefresh(); } }
 
 // Nach jeder Aenderung an der Auswahl: nur die Teile neu zeichnen, die davon
 // abhaengen. NICHT die ganze Rubrik - das naehme Such- und Namensfeld den Fokus.
@@ -2075,14 +2222,300 @@ function paintLoxlib(box){
   else if(!list.length) note(T('Nichts gefunden.'));
 }
 
-$('#addBtn').onclick=()=>{
+/* ============================================================
+   Panel-Assistent (Wizard) — geführtes „Neues Panel". Setzt das Grundgeruest
+   (Panes/Raster/Modus/Name + Screensaver-Spalte) mit den realen Keys und
+   uebergibt an den normalen Editor (der Panes je Tab, Kacheln, Icons kann).
+   ============================================================ */
+function createBlankPanel(){
   let id=prompt(T('ID des neuen Panels (klein, ohne Leerzeichen), z. B. wohnzimmer:'));
   if(!id) return; id=id.trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
   if(!id){ alert(T('Ungültige ID.')); return; }
   if(PANELS[id]){ alert('Panel „'+id+'" gibt es schon.'); return; }
   PANELS[id]={title:id.charAt(0).toUpperCase()+id.slice(1), tabs:defaultTabs(), rooms:[], cats:[], ui:{}, states:{}, tiles:{}};
   cur=id; tileSel=null; renderList(); setRubric('pconf'); markDirty();
+}
+const WZIC={
+  p1:'<svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" rx="2"/></svg>',
+  p2:'<svg viewBox="0 0 24 24"><rect x="2" y="5" width="9" height="14" rx="1.5"/><rect x="13" y="5" width="9" height="14" rx="1.5"/></svg>',
+  room:'<svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><rect x="10" y="14" width="4" height="6"/></svg>',
+  grid:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  pick:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 17.5h7M17.5 14v7"/></svg>',
+  clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  cal:'<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+  wx:'<svg viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/></svg>',
+  paint:'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  brush:'<svg viewBox="0 0 24 24"><path d="M17 3 21 7 10 18l-4 1 1-4z"/><path d="M14 6l4 4"/></svg>',
+  energy:'<svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  camera:'<svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
+  status:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="8" width="3" height="8"/><rect x="17" y="13" width="3" height="3"/></svg>',
+  ext:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>',
+  photo:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5-9 9"/></svg>'
 };
+function wzg(k){ return '<span class="ic">'+(WZIC[k]||WZIC.grid)+'</span>'; }
+function wzOpt(key,val,icon,title,desc){ return '<button class="wzo'+(WZ[key]===val?' on':'')+'" data-wk="'+key+'" data-wo="'+esc(val)+'">'+wzg(icon)+'<span class="tx"><b>'+title+'</b>'+(desc?'<span>'+desc+'</span>':'')+'</span></button>'; }
+const WZ_LOOK_DEF={iconSize:38,nameSize:20,subSize:16};
+const WZ={panes:null,grid:'2x2',content:null,design:'global',look:Object.assign({},WZ_LOOK_DEF),overlay:{},roomTab:'',roomCats:[],classic:null,pickPages:null,pane2:{},title:'',id:'',_idT:false,svPane:'',icoPage:-1,step:0};
+let wzTileFor=-1, wzTileSearch='', wzTileRoom='';
+function wzFlow(){ return ['anzeige','inhalt','design','name','setup','screensaver','overlay','review']; }
+function wzReset(){ wzTileFor=-1; wzTileSearch=''; wzTileRoom=''; Object.assign(WZ,{panes:null,grid:'2x2',content:null,design:'global',look:Object.assign({},WZ_LOOK_DEF),overlay:{},roomTab:'',roomCats:[],classic:null,pickPages:null,pane2:{},title:'',id:'',_idT:false,svPane:'',icoPage:-1,step:0}); }
+function wzOpen(){
+  if(!WZ._wired){ WZ._wired=true;
+    $('#wzBack').onclick=function(){ if(WZ.step>0){ WZ.step--; wzRender(); } };
+    $('#wzNext').onclick=wzNext;
+    $('#wzBlank').onclick=function(){ wzClose(); createBlankPanel(); };
+    $('#wzOv').onclick=function(e){ if(e.target===this) wzClose(); };
+  }
+  wzReset();
+  $('#wzOv').hidden=false; wzRender();
+}
+function wzClose(){ $('#wzOv').hidden=true; }
+function wzGridCells(g){ const c={'2x2':[2,2],'3x2':[3,2],'2x3':[2,3],'3x3':[3,3]}[g]||[2,2]; let s=''; for(let i=0;i<c[0]*c[1];i++) s+='<i></i>'; return {c:c[0],r:c[1],s:s}; }
+/* ---- mode-spezifisches Setup + Pane 2 (echte META-Daten) ---- */
+function wzInitSetup(){
+  if(WZ.content==='room' && !WZ.roomTab){ var rr=(META.tabs||[]).filter(function(t){return t.room;}); if(rr[0]) WZ.roomTab=rr[0].tab; }
+  if(WZ.content==='classic' && !WZ.classic) WZ.classic=defaultTabs().map(function(k){ var m=(META.tabs||[]).find(function(t){return t.tab===k;}); return {key:k,label:(m&&m.label)||k,on:true}; });
+  if(WZ.content==='pick' && !WZ.pickPages) WZ.pickPages=[{name:'Favoriten',icon:''}];
+}
+function wzRoomCats(roomTab){ var ru=(roomTab||'').indexOf('room:')===0?roomTab.slice(5):''; return (META.cats||[]).filter(function(cat){ return (META.controls||[]).some(function(c){return c.room===ru && c.cat===cat.uuid;}); }); }
+function wzViews(){
+  if(WZ.panes!=='2') return [];
+  if(WZ.content==='room'){ if(!WZ.roomTab) return []; var r=(META.tabs||[]).find(function(t){return t.tab===WZ.roomTab;}); return [{key:WZ.roomTab,label:(r&&r.label)||'Raum'}]; }
+  if(WZ.content==='classic') return (WZ.classic||[]).filter(function(t){return t.on;}).map(function(t){return {key:t.key,label:t.label};});
+  return (WZ.pickPages||[]).map(function(pg,i){return {key:pickKey(i),label:(pg.name||'').trim()||(T('Seite')+' '+(i+1))};});
+}
+function wzP2Opts(sel){ var o=[['','Visu erweitern'],['weather','Wetter'],['calendar','Kalender'],['audio','Audio'],['energy','Energiefluss'],['camera','Kamera'],['chart','Verlauf']]; return o.map(function(x){return '<option value="'+x[0]+'"'+((sel||'')===x[0]?' selected':'')+'>'+T(x[1])+'</option>';}).join(''); }
+function wzP2Real(v){
+  if(v==='weather'||v==='calendar') return v;
+  if(v==='audio'){ var z=firstAudioZone(); return z?'player:'+z:''; }
+  if(v==='energy'){ var u=firstEnergyControl(); return u?'energy:'+u:''; }
+  if(v==='camera'){ var u=firstCamera(); return u?'camera:'+u:''; }
+  if(v==='chart'){ var u=firstChartControl(); return u?'chart:'+u:''; }
+  return '';
+}
+function wzPaneRows(){
+  var v=wzViews(); if(!v.length) return '';
+  return '<p class="wzq mt">'+T('Rechtes Pane je Ansicht')+'</p><div class="wzopts">'+v.map(function(x){
+    return '<div class="wzo" style="cursor:default"><span class="tx" style="flex:1"><b>'+esc(x.label)+'</b></span><select class="wzp2sel" data-p2k="'+esc(x.key)+'" style="max-width:170px">'+wzP2Opts(WZ.pane2[x.key])+'</select></div>';
+  }).join('')+'</div><div class="wznote">'+T('Audio/Energie/Kamera/Verlauf nehmen automatisch den ersten passenden Baustein — den genauen wählst du bei Bedarf im Editor.')+'</div>';
+}
+function wzIcoGrid(i){
+  var cur=WZ.pickPages[i].icon||'';
+  if(LOXLIB===null) loadLoxlib(function(){ var o=$('#wzOv'); if(o && !o.hidden) wzRender(); });
+  var btn=function(url,title){ return '<button class="pgi'+(cur===url?' on':'')+'" data-wpico="'+i+'" data-picv="'+esc(url)+'" data-in="'+esc((title||'').toLowerCase())+'" title="'+esc(title)+'"><span class="loxi" style="--u:url(\''+esc(url)+'\')"></span></button>'; };
+  var g='<button class="pgi none'+(cur?'':' on')+'" data-wpico="'+i+'" data-picv="" data-in="">'+T('kein')+'</button>';
+  (((META.icons||{}).loxone)||[]).forEach(function(pth){ g+=btn('/icon?p='+encodeURIComponent(pth),pth); });
+  (LOXLIB||[]).forEach(function(n){ g+=btn('/loxlib?n='+encodeURIComponent(n),n.replace(/\.svg$/i,'')); });
+  return '<input class="pgi-search" oninput="pickIcoFilter(this.value)" placeholder="'+T('Icon suchen…')+'" style="width:100%;margin-top:6px"><div class="picogrid" style="width:100%">'+g+'</div>';
+}
+function wzSetup(){
+  wzInitSetup();
+  if(WZ.content==='room'){
+    var rooms=(META.tabs||[]).filter(function(t){return t.room;});
+    var cats=wzRoomCats(WZ.roomTab), auto=!(WZ.roomCats&&WZ.roomCats.length);
+    var h='<div class="wzfield"><label>'+T('Raum')+'</label><select id="wzRoom">'+(rooms.length?rooms.map(function(r){return '<option value="'+esc(r.tab)+'"'+(WZ.roomTab===r.tab?' selected':'')+'>'+esc(r.label||r.tab)+'</option>';}).join(''):'<option value="">'+T('Keine Räume gefunden')+'</option>')+'</select></div>';
+    h+='<p class="wzq mt">'+T('Sprungtabs — Kategorien des Raums')+' <span style="text-transform:none;letter-spacing:0">('+T('max 4, leer = automatisch')+')</span></p><div class="wzopts">';
+    h+=(cats.length?cats.slice(0,10).map(function(c){ var on=!auto&&WZ.roomCats.indexOf(c.uuid)>=0; return '<button class="wzo'+(on?' on':'')+'" data-rc="'+esc(c.uuid)+'"><span class="tx" style="flex:1"><b>'+esc(c.name||'Kategorie')+'</b></span></button>'; }).join(''):'<div class="wznote">'+T('Für diesen Raum sind keine Kategorien hinterlegt.')+'</div>');
+    return h+'</div>'+wzPaneRows();
+  }
+  if(WZ.content==='classic'){
+    var h2='<p class="wzq">'+T('Standard-Tabs — an/aus')+'</p><div class="wzopts">';
+    h2+=WZ.classic.map(function(t,i){ return '<button class="wzo'+(t.on?' on':'')+'" data-std="'+i+'"><span class="tx" style="flex:1"><b>'+esc(t.label)+'</b></span></button>'; }).join('');
+    return h2+'</div>'+wzPaneRows();
+  }
+  if(wzTileFor>=0 && wzTileFor<WZ.pickPages.length) return wzTileEditor(wzTileFor);
+  var h3='<p class="wzq">'+T('Freie Seiten — bis 4, je Name, Icon & Kacheln')+'</p><div class="wzopts">';
+  h3+=WZ.pickPages.map(function(pg,i){
+    var ic=pg.icon?'<span class="loxi" style="--u:url(\''+esc(icoUrl(pg.icon))+'\')"></span>':WZIC.pick;
+    var del=WZ.pickPages.length>1?'<button class="wzbtn" data-pgdel="'+i+'" style="padding:5px 9px">✕</button>':'';
+    var n=(pg.picks||[]).length;
+    var row='<div class="wzo" style="cursor:default;flex-wrap:wrap;gap:8px"><button class="ic" data-pgico="'+i+'" style="cursor:pointer;padding:0">'+ic+'</button>'+
+      '<input class="wzp2sel" data-pgn="'+i+'" value="'+esc(pg.name)+'" placeholder="'+T('Seitenname')+'" style="flex:1;min-width:120px">'+
+      '<button class="wzbtn'+(n?' prim':'')+'" data-pgtiles="'+i+'" style="padding:6px 11px">▦ '+T('Kacheln')+' ('+n+')</button>'+del+'</div>';
+    if(WZ.icoPage===i) row+=wzIcoGrid(i);
+    return row;
+  }).join('');
+  h3+='</div>';
+  if(WZ.pickPages.length<4) h3+='<button class="wzbtn" id="wzPgAdd" style="margin-top:8px">＋ '+T('Seite hinzufügen')+'</button>';
+  h3+=wzPaneRows();
+  return h3;
+}
+function wzTileEditor(i){
+  var pg=WZ.pickPages[i]; if(!pg.picks) pg.picks=[];
+  var picks=pg.picks, q=(wzTileSearch||'').trim().toLowerCase(), ctrls=(META.controls||[]);
+  function compBtn(c){ var on=picks.indexOf(c.uuid)>=0; return '<button class="wzai'+(on?' on':'')+'" data-wtadd="'+esc(c.uuid)+'"><span>'+esc(c.name)+'</span>'+(on?'<b>✓</b>':'<span class="pl">＋</span>')+'</button>'; }
+  var chosen='<p class="wzq" style="margin:0 0 6px">'+T('Gewählt')+' ('+picks.length+')</p><div class="wzchosen wzchip">'+
+    (picks.length?picks.map(function(u){ var c=ctrls.find(function(x){return x.uuid===u;}); return '<div class="wzci"><span>'+esc(c?((c.room?roomName(c.room)+' · ':'')+c.name):u)+'</span><button data-wtdel="'+esc(u)+'">✕</button></div>'; }).join(''):'<div class="wznote" style="margin:0">'+T('Noch keine Kacheln — links Raum wählen, dann rechts Bausteine.')+'</div>')+'</div>';
+  // Bausteine nach Raum gruppieren
+  var byRoom={}, order=[];
+  ctrls.forEach(function(c){ var r=c.room||''; if(!byRoom[r]){ byRoom[r]=[]; order.push(r); } byRoom[r].push(c); });
+  var cur=wzTileRoom; if(order.indexOf(cur)<0) cur=order.length?order[0]:''; wzTileRoom=cur;
+  // Links: Raumliste
+  var roomList=order.map(function(r){
+    var cin=byRoom[r].filter(function(c){return picks.indexOf(c.uuid)>=0;}).length;
+    return '<button class="wzroom'+(r===cur?' on':'')+'" data-wtroom="'+esc(r)+'"><span class="rn">'+esc(roomName(r)||T('Ohne Raum'))+'</span><span class="rc">'+byRoom[r].length+(cin?' <b>'+cin+'✓</b>':'')+'</span></button>';
+  }).join('');
+  if(!roomList) roomList='<div class="wznote" style="margin:0">'+T('Keine Bausteine gefunden.')+'</div>';
+  // Rechts: Bausteine des gewählten Raums, oder bei Suche raumübergreifend
+  var comps;
+  if(q){
+    var g2={}, o2=[]; ctrls.forEach(function(c){ if(((c.name||'').toLowerCase().indexOf(q)<0)&&((roomName(c.room)||'').toLowerCase().indexOf(q)<0)) return; var r=c.room||''; if(!g2[r]){ g2[r]=[]; o2.push(r); } g2[r].push(c); });
+    comps=o2.map(function(r){ return '<div class="wzrg">'+esc(roomName(r)||T('Ohne Raum'))+'</div>'+g2[r].map(compBtn).join(''); }).join('');
+  } else {
+    comps=(byRoom[cur]||[]).map(compBtn).join('');
+  }
+  if(!comps) comps='<div class="wznote" style="margin:0">'+T('Nichts gefunden.')+'</div>';
+  var N=WZ.pickPages.length, last=(i>=N-1);
+  var prog='<button class="wzbtn prim" id="wzTileNext" style="width:100%;margin-top:12px;padding:11px">'+(last?(T('Weiter')+' →'):(T('Nächsten Tab befüllen')+' →'))+'</button>';
+  return '<div class="wzq" style="display:flex;align-items:center;gap:10px"><button class="wzbtn" id="wzTileBack" style="padding:4px 10px">← '+T('Übersicht')+'</button><b style="text-transform:none;letter-spacing:0;color:var(--fg)">'+esc(pg.name||T('Seite'))+' <span style="color:var(--muted);font-weight:400">('+(i+1)+'/'+N+')</span></b></div>'+
+    chosen+
+    '<div class="wztiles3"><div class="wztcol"><div class="wzq" style="margin:0 0 6px;font-size:11px">'+T('Raum')+'</div><div class="wzrooms">'+roomList+'</div></div>'+
+    '<div class="wztcol"><input id="wzTileSearch" class="wzp2sel" style="width:100%;margin-bottom:8px" placeholder="'+T('Baustein suchen (alle Räume)…')+'" value="'+esc(wzTileSearch)+'"><div class="wzavail">'+comps+'</div></div></div>'+prog;
+}
+// Aussehen-Steuerung im Assistenten (Farbschema, Größen, Schrift) -> WZ.look,
+// beim Anlegen 1:1 in panel.ui übernommen. Nutzt dieselben Werte/Presets wie
+// der Editor-Reiter „Aussehen", damit die Reiter danach genau das zeigen.
+function wzLookHtml(){
+  var L=WZ.look||{}, curc=String(L.baseColor||'').toLowerCase();
+  var sw=BASE_COLORS.map(function(c){ return '<button type="button" class="wzsw'+(curc===c.v.toLowerCase()?' on':'')+'" data-wbase="'+esc(c.v)+'" title="'+esc(c.n)+'" style="background:'+esc(c.v)+'"></button>'; }).join('');
+  var custom='<input type="color" id="wzBaseCustom" title="'+T('Eigene Farbe')+'" value="'+esc(curc&&curc[0]==='#'?L.baseColor:'#3e4468')+'" class="wzsw" style="padding:0">';
+  var none='<button type="button" class="wzsw none'+(L.baseColor?'':' on')+'" data-wbase="" title="'+T('Standard-Farbschema')+'">'+T('Keine')+'</button>';
+  var sizes=[['iconSize',T('Icon-Größe')],['nameSize',T('Name-Größe')],['subSize',T('Sub-Größe')]].map(function(s){
+    return '<div class="wzfield" style="max-width:120px"><label>'+s[1]+'</label><input type="number" min="8" max="80" data-wsize="'+s[0]+'" value="'+(L[s[0]]==null?'':L[s[0]])+'" placeholder="—"></div>'; }).join('');
+  var font='<div class="wzfield" style="max-width:220px"><label>'+T('Schriftart')+'</label><select data-wfont>'+FONTS.map(function(f){ return '<option value="'+esc(f.v)+'"'+(String(L.font||'')===f.v?' selected':'')+'>'+esc(f.label)+'</option>'; }).join('')+'</select></div>';
+  return '<p class="wzq mt">'+T('Panel-Farbe')+'</p>'+
+    '<p class="wznote" style="margin:0 0 8px">'+T('Eine Farbe wählen — Hintergrund, Kacheln, Leiste, Schrift und Icons werden daraus berechnet. Leer = Standard.')+'</p>'+
+    '<div class="wzsww">'+sw+custom+none+'</div>'+
+    '<p class="wznote" id="wzBaseVal" style="margin-top:6px">'+esc(L.baseColor||T('Standard-Farbschema'))+'</p>'+
+    '<p class="wzq mt">'+T('Größen & Schrift')+'</p><div class="wzrow">'+sizes+font+'</div>';
+}
+function wzSummary(){
+  var cmap={room:T('Raum-Panel'),classic:T('Klassische Visu'),pick:T('Freie Auswahl')};
+  var rows=[[T('Anzeige'),WZ.panes==='2'?T('2 Panes'):T('1 Pane · 4″')],[T('Raster'),WZ.grid.replace('x','×')],[T('Inhalt'),cmap[WZ.content]||''],[T('Design'),WZ.design==='global'?T('Einheitlich'):T('Individuell')]];
+  if(WZ.content==='pick') rows.push([T('Seiten'),String((WZ.pickPages||[]).length)]);
+  var L=WZ.look||{}; rows.push([T('Panel-Farbe'),L.baseColor||T('Standard')]);
+  if(L.iconSize||L.nameSize||L.subSize||L.font){ var det=[]; if(L.iconSize)det.push('Icon '+L.iconSize); if(L.nameSize)det.push('Name '+L.nameSize); if(L.subSize)det.push('Sub '+L.subSize); if(L.font)det.push((FONTS.find(function(f){return f.v===L.font;})||{label:L.font}).label); rows.push([T('Größen & Schrift'),det.join(' · ')]); }
+  rows.push([T('Aktiv-Overlay'),(WZ.overlay&&Object.keys(WZ.overlay).length)?T('Angepasst'):T('Standard')]);
+  if(WZ.panes==='2'){ var svm={'':T('Automatik'),off:T('Aus'),calendar:T('Kalender'),weather:T('Wetter'),energy:T('Energiefluss'),camera:T('Kamera'),chart:T('Verlauf')}; rows.push([T('Screensaver'),svm[WZ.svPane]||WZ.svPane]); }
+  return '<div class="wzopts">'+rows.map(function(r){return '<div class="wzo" style="cursor:default;padding:9px 14px"><span class="tx" style="flex:1;color:var(--muted);font-size:12.5px">'+r[0]+'</span><b style="font-size:13px">'+esc(r[1]||'—')+'</b></div>';}).join('')+'</div>';
+}
+function wzRender(){
+  var f=wzFlow(), key=f[WZ.step], b=$('#wzBody');
+  $('#wzStep').textContent=T('Schritt')+' '+(WZ.step+1)+' / '+f.length;
+  if(key==='anzeige'){
+    b.innerHTML='<p class="wzq">'+T('Anzahl Panes')+'</p><div class="wzopts">'+
+      wzOpt('panes','1','p1',T('1 Pane — 4″ Wandpanel'),T('Ein Pane, nur die Visu.'))+
+      wzOpt('panes','2','p2',T('2 Panes — Tablet / Breitbild'),T('Visu + rechte Fläche (je Tab wählbar).'))+
+      '</div><p class="wzq mt">'+T('Kachel-Raster — frei wählbar')+'</p><div class="wzgrid">'+
+      ['2x2','3x2','2x3','3x3'].map(function(g){ var x=wzGridCells(g); return '<button class="wzg'+(WZ.grid===g?' on':'')+'" data-wg="'+g+'"><span class="wzgm" style="--c:'+x.c+';--r:'+x.r+'">'+x.s+'</span><b>'+g.replace('x','×')+'</b></button>'; }).join('')+'</div>';
+  } else if(key==='inhalt'){
+    b.innerHTML='<p class="wzq">'+T('Wie möchtest du befüllen?')+'</p><div class="wzopts">'+
+      wzOpt('content','room','room',T('Raum-Panel'),T('Ein Raum aus Loxone + Kategorien als Sprungtabs.'))+
+      wzOpt('content','classic','grid',T('Klassische Visu'),T('Standard-Tabs (Favoriten/Zentral/Räume/Kategorien).'))+
+      wzOpt('content','pick','pick',T('Freie Auswahl'),T('Eigene Seiten mit handverlesenen Kacheln (bis 4).'))+'</div>';
+  } else if(key==='design'){
+    b.innerHTML='<p class="wzq">'+T('Wie sollen die Kacheln aussehen?')+'</p><div class="wzopts">'+
+      wzOpt('design','global','paint',T('Einheitliches Design'),T('Globale Kachelgrößen/Schrift. Später einzeln übersteuerbar.'))+
+      wzOpt('design','individual','brush',T('Individuell je Kachel'),T('Farbe, Schrift & Icon je Kachel — im Editor.'))+'</div>'+
+      wzLookHtml();
+  } else if(key==='overlay'){
+    b.innerHTML='<p class="wzq">'+T('Aktiv-Overlay — wie eine aktive Kachel hervorgehoben wird')+'</p>'+
+      '<div class="ovctrl">'+overlayFields(WZ.overlay,'wzov_')+'</div>'+
+      '<div class="wznote" style="margin-top:8px">'+T('Gilt für das ganze Panel; einzelne Kacheln kannst du später im Editor abweichend einstellen.')+'</div>';
+  } else if(key==='name'){
+    b.innerHTML='<div class="wzfield"><label>'+T('Anzeigename')+'</label><input id="wzTitleI" value="'+esc(WZ.title)+'" placeholder="'+T('z. B. Wohnzimmer')+'"></div>'+
+      '<div class="wzfield mt"><label>'+T('Panel-ID')+'</label><input id="wzId" value="'+esc(WZ.id)+'" placeholder="wohnzimmer"><div class="wznote">'+T('Aufruf am Panel:')+' <code>?panel='+(WZ.id||'wohnzimmer')+'</code></div></div>';
+  } else if(key==='setup'){
+    b.innerHTML=wzSetup();
+  } else if(key==='screensaver'){
+    if(WZ.panes!=='2'){ b.innerHTML='<div class="wznote">'+T('Am 4″-Panel ist die Uhr-Seite einspaltig (Uhr + automatisch Termine/Wetter) — keine zweite Spalte.')+'</div>'; }
+    else { var svHasE=!!firstEnergyControl(), svHasC=!!firstCamera(), svHasV=!!firstChartControl();
+      b.innerHTML='<p class="wzq">'+T('Uhr-Seite — zweite Spalte')+'</p><div class="wzopts">'+
+      wzOpt('svPane','','clock',T('Automatik (Termine/Wetter)'),'')+
+      wzOpt('svPane','off','clock',T('Aus — nur Uhr'),'')+
+      wzOpt('svPane','calendar','cal',T('Kalender'),'')+
+      wzOpt('svPane','weather','wx',T('Wetter'),'')+
+      (svHasE?wzOpt('svPane','energy','energy',T('Energiefluss'),''):'')+
+      (svHasC?wzOpt('svPane','camera','camera',T('Kamera'),''):'')+
+      (svHasV?wzOpt('svPane','chart','status',T('Verlauf'),''):'')+
+      '</div><div class="wznote">'+T('Statuswerte (mehrere Bausteine) in der Spalte legst du danach im Editor fest.')+((!svHasE||!svHasC||!svHasV)?' '+T('Energiefluss/Kamera/Verlauf erscheinen hier nur, wenn ein passender Baustein vorhanden ist.'):'')+'</div>'; }
+  } else if(key==='review'){
+    b.innerHTML='<p class="wzq">'+T('Zusammenfassung')+'</p>'+wzSummary()+
+      '<div class="wznote">'+T('Nach „Panel anlegen" bist du im Editor zum Feinschliff (Kacheln, Pane 2, Icons) und kannst das Panel über „Visu öffnen" testen.')+'</div>';
+  }
+  b.querySelectorAll('[data-wo]').forEach(function(el){ el.onclick=function(){ WZ[el.dataset.wk]=el.dataset.wo; if(el.dataset.wk==='content'){ WZ.classic=null; WZ.pickPages=null; WZ.pane2={}; } wzRender(); }; });
+  b.querySelectorAll('[data-wbase]').forEach(function(el){ el.onclick=function(){ var v=el.dataset.wbase; if(v) WZ.look.baseColor=v; else delete WZ.look.baseColor; wzRender(); }; });
+  b.querySelectorAll('[data-wsize]').forEach(function(el){ el.oninput=function(){ var k=el.dataset.wsize, v=el.value.trim(); if(v==='') delete WZ.look[k]; else WZ.look[k]=Number(v); }; });
+  { var wcb=b.querySelector('#wzBaseCustom'); if(wcb) wcb.oninput=function(){ WZ.look.baseColor=wcb.value; var lv=$('#wzBaseVal'); if(lv) lv.textContent=wcb.value; }; }
+  { var wf=b.querySelector('[data-wfont]'); if(wf) wf.onchange=function(){ if(wf.value) WZ.look.font=wf.value; else delete WZ.look.font; }; }
+  if(key==='overlay'){ bindOverlay('wzov_', function(){ return WZ.overlay; }, function(){}); }
+  b.querySelectorAll('[data-wg]').forEach(function(el){ el.onclick=function(){ WZ.grid=el.dataset.wg; wzRender(); }; });
+  b.querySelectorAll('[data-rc]').forEach(function(el){ el.onclick=function(){ var u=el.dataset.rc, i=WZ.roomCats.indexOf(u); if(i>=0) WZ.roomCats.splice(i,1); else { if(WZ.roomCats.length>=4) return; WZ.roomCats.push(u); } wzRender(); }; });
+  b.querySelectorAll('[data-std]').forEach(function(el){ el.onclick=function(){ var t=WZ.classic[+el.dataset.std]; t.on=!t.on; wzRender(); }; });
+  b.querySelectorAll('[data-pgn]').forEach(function(el){ el.oninput=function(){ WZ.pickPages[+el.dataset.pgn].name=el.value; wzUpd(); }; });
+  b.querySelectorAll('[data-pgico]').forEach(function(el){ el.onclick=function(){ var i=+el.dataset.pgico; WZ.icoPage=WZ.icoPage===i?-1:i; wzRender(); }; });
+  b.querySelectorAll('[data-wpico]').forEach(function(el){ el.onclick=function(){ WZ.pickPages[+el.dataset.wpico].icon=el.dataset.picv; WZ.icoPage=-1; wzRender(); }; });
+  b.querySelectorAll('[data-pgdel]').forEach(function(el){ el.onclick=function(){ WZ.pickPages.splice(+el.dataset.pgdel,1); if(WZ.icoPage>=WZ.pickPages.length) WZ.icoPage=-1; wzRender(); }; });
+  { var pa=$('#wzPgAdd'); if(pa) pa.onclick=function(){ if(WZ.pickPages.length<4){ WZ.pickPages.push({name:'',icon:'',picks:[]}); wzRender(); } }; }
+  b.querySelectorAll('[data-pgtiles]').forEach(function(el){ el.onclick=function(){ wzTileFor=+el.dataset.pgtiles; wzTileSearch=''; wzTileRoom=''; wzRender(); }; });
+  b.querySelectorAll('[data-wtroom]').forEach(function(el){ el.onclick=function(){ wzTileRoom=el.dataset.wtroom; wzTileSearch=''; wzRender(); }; });
+  b.querySelectorAll('[data-wtadd]').forEach(function(el){ el.onclick=function(){ var pg=WZ.pickPages[wzTileFor]; if(!pg.picks) pg.picks=[]; var u=el.dataset.wtadd, k=pg.picks.indexOf(u); if(k>=0) pg.picks.splice(k,1); else { if(pg.picks.length>=60) return; pg.picks.push(u); } wzRender(); }; });
+  b.querySelectorAll('[data-wtdel]').forEach(function(el){ el.onclick=function(){ var pg=WZ.pickPages[wzTileFor], k=pg.picks.indexOf(el.dataset.wtdel); if(k>=0){ pg.picks.splice(k,1); wzRender(); } }; });
+  { var tbk=$('#wzTileBack'); if(tbk) tbk.onclick=function(){ wzTileFor=-1; wzRender(); }; }
+  { var tnx=$('#wzTileNext'); if(tnx) tnx.onclick=function(){ var N=WZ.pickPages.length; if(wzTileFor>=N-1){ wzTileFor=-1; wzNext(); } else { wzTileFor++; wzTileSearch=''; wzTileRoom=''; wzRender(); } }; }
+  { var tsr=$('#wzTileSearch'); if(tsr) tsr.oninput=function(){ wzTileSearch=tsr.value; WZ._sf=true; wzRender(); }; }
+  b.querySelectorAll('.wzp2sel[data-p2k]').forEach(function(el){ el.onchange=function(){ WZ.pane2[el.dataset.p2k]=el.value; }; });
+  var rm=$('#wzRoom'); if(rm){ if(!WZ.roomTab&&rm.value) WZ.roomTab=rm.value; rm.onchange=function(){ WZ.roomTab=rm.value; WZ.roomCats=[]; WZ.pane2={}; wzRender(); }; }
+  var ti=$('#wzTitleI'); if(ti){ ti.oninput=function(){ WZ.title=ti.value; if(!WZ._idT){ WZ.id=ti.value.toLowerCase().replace(/[^a-z0-9-]/g,''); var e=$('#wzId'); if(e) e.value=WZ.id; } wzUpd(); }; setTimeout(function(){ti.focus();},30); }
+  var idI=$('#wzId'); if(idI) idI.oninput=function(){ WZ._idT=true; WZ.id=idI.value.toLowerCase().replace(/[^a-z0-9-]/g,''); idI.value=WZ.id; wzUpd(); };
+  if(WZ._sf){ WZ._sf=false; var tsx=$('#wzTileSearch'); if(tsx){ tsx.focus(); try{ tsx.setSelectionRange(tsx.value.length,tsx.value.length); }catch(e){} } }
+  $('#wzBack').disabled=WZ.step===0;
+  $('#wzNext').textContent=(WZ.step===f.length-1)?T('Panel anlegen ✓'):T('Weiter →');
+  wzUpd();
+}
+function wzUpd(){
+  var f=wzFlow(), key=f[WZ.step], ok=true;
+  if(key==='anzeige') ok=!!WZ.panes;
+  if(key==='inhalt') ok=!!WZ.content;
+  if(key==='name') ok=!!WZ.title.trim() && !!WZ.id;
+  if(key==='setup'){
+    if(WZ.content==='room') ok=!!WZ.roomTab;
+    else if(WZ.content==='classic') ok=(WZ.classic||[]).some(function(t){return t.on;});
+    else if(WZ.content==='pick'){ ok=(WZ.pickPages||[]).length>0 && WZ.pickPages.every(function(pg){return (pg.name||'').trim();});
+      if(ok && wzTileFor>=0 && wzTileFor<WZ.pickPages.length-1) ok=false; }
+  }
+  $('#wzNext').disabled=!ok;
+}
+function wzNext(){ var f=wzFlow(); if(WZ.step<f.length-1){ WZ.step++; wzRender(); return; } wzBuild(); }
+function wzBuild(){
+  var id=WZ.id; if(!id) return;
+  if(PANELS[id]){ alert('Panel „'+id+'" '+T('gibt es schon.')); return; }
+  var ui={};
+  if(WZ.grid==='3x2'||WZ.grid==='3x3') ui.cols=3;
+  if(WZ.grid==='2x3'||WZ.grid==='3x3') ui.rows=3;
+  if(WZ.panes==='1') ui.split=false;
+  if(WZ.panes==='2' && WZ.svPane){ var sv=WZ.svPane;
+    if(sv==='energy'){ var eu=firstEnergyControl(); sv=eu?'energy:'+eu:''; }
+    else if(sv==='camera'){ var cu=firstCamera(); sv=cu?'camera:'+cu:''; }
+    else if(sv==='chart'){ var vu=firstChartControl(); sv=vu?'chart:'+vu:''; }
+    if(sv) ui.svPane=sv; }
+  var tabs, e={};
+  if(WZ.content==='room'){ tabs=[WZ.roomTab]; if(WZ.roomCats&&WZ.roomCats.length) e.roomCats=WZ.roomCats.slice(0,4); }
+  else if(WZ.content==='pick'){ tabs=WZ.pickPages.map(function(_,i){return pickKey(i);}); e.pickTabs=WZ.pickPages.map(function(pg){ var o={name:(pg.name||'').trim()||'Auswahl',picks:(pg.picks||[]).slice()}; if(pg.icon) o.icon=pg.icon; return o; }); }
+  else { tabs=WZ.classic.filter(function(t){return t.on;}).map(function(t){return t.key;}); if(!tabs.length) tabs=defaultTabs(); }
+  var panes={}; Object.keys(WZ.pane2).forEach(function(k){ var rv=wzP2Real(WZ.pane2[k]); if(rv) panes[k]=rv; });
+  if(Object.keys(panes).length) ui.panes=panes;
+  // Aussehen (Farbschema, Größen, Schrift) aus Schritt „Design"
+  var L=WZ.look||{};
+  if(L.baseColor) ui.baseColor=L.baseColor;
+  ['iconSize','nameSize','subSize'].forEach(function(k){ if(L[k]!=null && L[k]!=='') ui[k]=Number(L[k]); });
+  if(L.font) ui.font=L.font;
+  // Aktiv-Overlay aus Schritt „Overlay" (nur, wenn vom Standard abgewichen)
+  if(WZ.overlay && Object.keys(WZ.overlay).length) ui.overlay=Object.assign({},WZ.overlay);
+  PANELS[id]=Object.assign({title:WZ.title.trim()||id, tabs:tabs, rooms:[], cats:[], ui:ui, states:{}, tiles:{}}, e);
+  cur=id; tileSel=null; curPickIdx=0; wzClose(); renderList(); setRubric('pconf'); markDirty();
+}
+$('#addBtn').onclick=wzOpen;
 
 window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 
@@ -2606,5 +3039,18 @@ loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); renderDevices(); po
 
 if(window.I18N) I18N.autoChrome('h2, h3, label.lbl, .btn, .minibtn, .addbtn, .navbtn .nbt, .navbtn .nbs, .brand small, .itab, .cclbl, .ccmut, .empty, .muted, .note, .lead, .hint, .rub, .stab, .sectlbl, option, [data-i18n]');
 </script>
+<div id="wzOv" class="wzov" hidden>
+  <div class="wzbox">
+    <div class="wzhd"><b>＋ Neues Panel — Assistent</b><span class="wzstep" id="wzStep"></span></div>
+    <div class="wzbody" id="wzBody"></div>
+    <div class="wzft">
+      <button class="wzbtn" id="wzBack">← Zurück</button>
+      <div style="display:flex;gap:10px">
+        <button class="wzbtn" id="wzBlank" title="Ohne Assistent, nur ID">Leer anlegen</button>
+        <button class="wzbtn prim" id="wzNext">Weiter →</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>

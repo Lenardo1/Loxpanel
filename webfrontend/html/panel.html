@@ -860,6 +860,8 @@ const TABS = [
 // Freie Bausteinauswahl: eine Seite je Panel, Name kommt per tabMeta vom
 // Server (PICK_TAB in bin/webvisu.py). Muss mit dem Server uebereinstimmen.
 const PICK_TAB = 'auswahl';
+// Bis zu 4 freie Seiten: auswahl, auswahl2..auswahl4 (muss mit _pick_index in webvisu.py uebereinstimmen).
+function isPick(t){ if(t===PICK_TAB) return true; if(typeof t==='string' && t.indexOf(PICK_TAB)===0){ const s=t.slice(PICK_TAB.length); return /^[2-4]$/.test(s); } return false; }
 
 const el = id => document.getElementById(id);
 let ws, stack = [{view:'tab',tab:'favoriten'}], view = null;
@@ -1174,7 +1176,9 @@ function chartBoxHtml(b){
 // dem Server neu (setchart), statt wie auf der Detailseite die Route zu ersetzen:
 // links bleibt die Kachelseite stehen.
 function renderChartPane(elc){ if(!elc) return;
-  const uuid=(paneForTab(activeTab())||'').slice(6);
+  // Unter dem Screensaver ist der aktive Tab nicht die Verlaufsquelle — dann gilt
+  // der beim Server abonnierte Baustein (curChartKey). Sonst die Pane des Tabs.
+  const uuid=curChartKey ? curChartKey.split('|')[0] : (paneForTab(activeTab())||'').slice(6);
   const d=(chartData && chartData.control===uuid) ? chartData : null;
   const blocks=d ? (d.blocks||[]) : [];
   const sig=uuid+'|'+(d?blocks.map(b=>b.kind+(b.ranges?'r':'')).join(','):'-');
@@ -1424,7 +1428,7 @@ function activeTab(){ const b=stack[0]; return b && b.view==='tab' ? b.tab : nul
 // sie sich fuer Ansichten ohne eigene catTabs. Der Name bleibt roomCatTabs bzw.
 // isRoomPanel, damit sich kuenftige Upstream-Merges nicht daran reiben.
 function isRoomPanel(){ const t = String(tabsCfg[0]||'');
-  return tabsCfg.length===1 && (t.indexOf('room:')===0 || t===PICK_TAB); }
+  return tabsCfg.length===1 && (t.indexOf('room:')===0 || isPick(t)); }
 let roomCatTabs=null, pendingCatScroll=null;
 
 function renderTabs(){
@@ -1470,7 +1474,7 @@ function renderTabs(){
       const m = tabMeta[tk]; if(!m) return '';   // dynamischer Tab (Kategorie/Raum)
       // Ohne Bild aus Loxone: Raum bekommt das Raum-Symbol, Kategorie den Wuerfel -
       // sonst sehen ein Raum- und ein Kategorie-Tab identisch aus.
-      const fallback = tk===PICK_TAB
+      const fallback = isPick(tk)
         // Checkliste: klar unterscheidbar von Favoriten-Stern, Haus, Raum und
         // Kategorie-Wuerfel. Die freie Auswahl hat kein Bild aus Loxone, weil
         // sie weder Raum noch Kategorie ist - dieses Symbol gilt immer.
@@ -1551,8 +1555,9 @@ function applyPane(){
     if(cuid){ if(svSideOn()) renderFront(); else if(kind==='camera') renderCameraPane(fp); }
   }
   // Verlaufs-Pane: Baustein und gewaehlten Zeitraum melden (er pusht dann
-  // {t:'chart'}); unter dem Screensaver abmelden, die Pane ist dann verdeckt.
-  const chuid=(kind==='chart' && !svSideOn()) ? raw.slice(6) : '';
+  // {t:'chart'}). Wie bei Energie/Kamera zaehlt der Screensaver, wenn er oben
+  // liegt (chart als zweite Uhr-Spalte), sonst die Pane des aktiven Tabs.
+  const chuid=qarg(qraw,'chart:');
   const chkey=chuid ? chuid+'|'+chartRange : '';
   if(chkey!==curChartKey){ curChartKey=chkey; try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
   // Frei gewaehlte Werte fuer die Uhr-Seite beim Server anmelden. Bewusst
@@ -1937,7 +1942,8 @@ function connect(){
     if(msg.t==='scale'){ uiScaleCfg=scaleCfg(msg.scale); applyScale(); return; }   // Skalierung des Geraets geaendert (ohne Neuladen)
     if(msg.t==='svstatus'){ svStatusData=Array.isArray(msg.items)?msg.items:[]; if(saverOn()) renderFront(); return; }   // frei gewaehlte Werte auf der Uhr-Seite
     if(msg.t==='chart'){ chartData=msg;   // Verlaufs-Pane
-      const fp=el('frontpane'); if(fp && !svSideOn() && paneKind(paneForTab(activeTab()))==='chart') renderChartPane(fp); return; }
+      if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> als zweite Uhr-Spalte zeichnen
+      const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='chart') renderChartPane(fp); return; }
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
@@ -2147,6 +2153,7 @@ function renderSvSide(evs){
   if(zwei && k!=='off' && k!=='calendar'){
     if(k==='energy'){ renderEnergyPane(box); inhalt=true; }
     else if(k==='camera'){ renderCameraPane(box); inhalt=true; }
+    else if(k==='chart'){ renderChartPane(box); inhalt=true; }
     else if(k==='status'){ renderSvStatus(box); inhalt=true; }
     else if(k==='weather' || (k==='' && !zeigeCal)){
       // Automatik: sobald die Termine die Spalte nicht fuellen, uebernimmt das
@@ -2159,7 +2166,7 @@ function renderSvSide(evs){
   // Energiefluss und Kamera fuellen eine Seite und brauchen die Hoehengrenze
   // oben; Termine, Wetter und Werte sind Listen und duerfen wachsen (svFit
   // nimmt ihnen notfalls die unterste Zeile).
-  box.classList.toggle('solo', inhalt && (k==='energy'||k==='camera'));
+  box.classList.toggle('solo', inhalt && (k==='energy'||k==='camera'||k==='chart'));
   box.hidden=!inhalt;
   return zeigeCal || inhalt;
 }

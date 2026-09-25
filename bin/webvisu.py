@@ -123,10 +123,53 @@ JAL = JalousieAdapter()
 
 SWITCHY = {"Switch"}   # TimedSwitch wird eigen behandelt (anderer State)
 VALID_TABS = ["favoriten", "zentral", "raeume", "kategorien"]
-# Freie Bausteinauswahl: EINE Seite je Panel, die Bausteine unabhaengig von Raum
-# und Kategorie zusammenstellt. Bewusst kein Praefix mit UUID wie cat:/room: -
-# es gibt genau eine je Panel, die Liste steht im Profil unter "picks".
+# Freie Bausteinauswahl: bis zu 4 Seiten je Panel, die Bausteine unabhaengig von
+# Raum und Kategorie zusammenstellen. Tabs: "auswahl", "auswahl2".."auswahl4".
+# Die Seiten stehen im Profil unter "pickTabs" [{name, picks}]; ein altes
+# picks/pickName (Einzel-Seite) wird rueckwaertskompatibel zur ersten Seite.
 PICK_TAB = "auswahl"
+PICK_TABS_MAX = 4
+
+
+def _pick_key(i):
+    """Tab-Kennung der i-ten freien Seite: auswahl, auswahl2, auswahl3, auswahl4."""
+    return PICK_TAB if i == 0 else PICK_TAB + str(i + 1)
+
+
+def _pick_index(t):
+    """Index (0..3) eines Auswahl-Tabs, sonst -1."""
+    if t == PICK_TAB:
+        return 0
+    if isinstance(t, str) and t.startswith(PICK_TAB):
+        s = t[len(PICK_TAB):]
+        if s.isdigit() and 2 <= int(s) <= PICK_TABS_MAX:
+            return int(s) - 1
+    return -1
+
+
+def _is_pick(t):
+    return _pick_index(t) >= 0
+
+
+def _pick_tabs(prof):
+    """Freie Seiten eines Profils als [{name, picks}] (max 4). Rueckwaerts-
+    kompatibel: ein altes picks/pickName wird zur ersten Seite."""
+    if not prof:
+        return []
+    pt = prof.get("pickTabs")
+    if isinstance(pt, list) and pt:
+        out = []
+        for e in pt[:PICK_TABS_MAX]:
+            if isinstance(e, dict):
+                out.append({"name": str(e.get("name") or "Auswahl"),
+                            "picks": [u for u in (e.get("picks") or []) if isinstance(u, str)],
+                            "icon": str(e.get("icon") or "")})
+        return out
+    if prof.get("picks"):
+        return [{"name": str(prof.get("pickName") or "Auswahl"),
+                 "picks": [u for u in prof.get("picks") if isinstance(u, str)],
+                 "icon": ""}]
+    return []
 # Display-Treiber fuer Kiosk-Apps (Android) mit Standard-Port ihrer HTTP-Schnittstelle
 DISPLAY_DRIVERS = {"fully": 2323, "wallpanel": 2971}
 # Nachtmodus: Rueckfall-Fenster, wenn keine Sonnenzeiten vorliegen (kein Wetter
@@ -138,7 +181,7 @@ def _is_tab(t) -> bool:
     """Gueltiges Tab-Kennzeichen: einer der 4 Standard-Tabs, die freie Auswahl
     (`auswahl`) ODER eine einzelne Kategorie bzw. ein einzelner Raum als
     Direkt-Tab (`cat:<uuid>`/`room:<uuid>`)."""
-    if t in VALID_TABS or t == PICK_TAB:
+    if t in VALID_TABS or _is_pick(t):
         return True
     if not isinstance(t, str):
         return False
@@ -299,7 +342,8 @@ def _clean_svpane(v) -> str:
     """Rechte Spalte der Uhr-Seite (Screensaver) pruefen und normieren.
 
     Erlaubt: "off" (keine zweite Spalte), "calendar", "weather",
-    "energy:<uuid>", "camera:<uuid>" und "status:<uuid>,<uuid>,...".
+    "energy:<uuid>", "camera:<uuid>", "chart:<uuid>" (Verlauf eines Bausteins
+    mit Aufzeichnung) und "status:<uuid>,<uuid>,...".
     Alles andere ergibt "" — das ist die Automatik: Termine, wenn welche
     anstehen, sonst die Wetter-Details. Unbekannte Werte wandern damit auf
     die Automatik statt eine leere Spalte zu erzeugen."""
@@ -308,7 +352,7 @@ def _clean_svpane(v) -> str:
     v = v.strip()
     if v in ("off", "calendar", "weather"):
         return v
-    for kopf in ("energy:", "camera:"):
+    for kopf in ("energy:", "camera:", "chart:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v
     if v.startswith("status:"):
@@ -1661,6 +1705,7 @@ class App:
             # Liste, kein Set: die Reihenfolge ist die Anzeigereihenfolge.
             "picks": [u for u in (prof.get("picks") or []) if isinstance(u, str)],
             "pickName": prof.get("pickName") or "",
+            "pickTabs": _pick_tabs(prof),   # bis 4 freie Seiten [{name, picks}]
             "lang": (ui.get("lang") or "de"),   # Panel-Sprache (Datum/Uhr; spaeter i18n der Texte)
             "fill": bool(ui.get("fill")),       # Visu fuellt grosse Screens (quadratische Kacheln)
             # Split-Screen an/aus (aus = 4"-Panel: nur die Visu, keine Pane 2, keine
@@ -1846,9 +1891,15 @@ class App:
         Symbol bringt das Panel selbst mit."""
         meta = {}
         for t in tab_keys or []:
-            if t == PICK_TAB:
-                meta[t] = {"label": (prof.get("pickName") if prof else "") or "Auswahl",
-                           "iconUrl": ""}
+            if _is_pick(t):
+                _pts = _pick_tabs(prof)
+                _i = _pick_index(t)
+                _e = _pts[_i] if 0 <= _i < len(_pts) else {}
+                _ic = _e.get("icon") or ""
+                # Fertige URL (/icon?p=… oder /loxlib?n=…) direkt, sonst ein
+                # Loxone-Pfad ueber _icon_url aufloesen (rueckwaertskompatibel).
+                _url = _ic if (isinstance(_ic, str) and _ic.startswith("/")) else (self._icon_url(_ic) or "")
+                meta[t] = {"label": (_e.get("name") or "Auswahl"), "iconUrl": _url}
             elif isinstance(t, str) and t.startswith("cat:"):
                 cat = self.cats.get(t[4:], {})
                 meta[t] = {"label": _clean(cat.get("name")) or "Kategorie",
@@ -2261,6 +2312,29 @@ class App:
             pname = str(p.get("pickName") or "").strip()[:40]
             if pname:
                 e["pickName"] = pname
+            # Bis zu 4 freie Seiten [{name, picks}] - Form pruefen (Existenz der
+            # UUIDs entscheidet _panel_export gegen self.controls, wie bei picks).
+            pts = p.get("pickTabs")
+            if isinstance(pts, list) and pts:
+                cpt = []
+                for it in pts[:PICK_TABS_MAX]:
+                    if not isinstance(it, dict):
+                        continue
+                    ps = [str(x) for x in (it.get("picks") or []) if isinstance(x, str)][:60]
+                    nm = str(it.get("name") or "").strip()[:40]
+                    ic = str(it.get("icon") or "").strip()[:200]
+                    # Nur erlaubte Icon-Formen behalten: interne Endpunkte oder
+                    # ein Loxone-Icon-Pfad. Alles andere (z. B. externe URL) raus.
+                    if ic and not (ic.startswith("/icon?") or ic.startswith("/loxlib?")
+                                   or ic.endswith(".svg") or ic.endswith(".png")):
+                        ic = ""
+                    if ps or nm or ic:
+                        entry = {"name": nm or "Auswahl", "picks": ps}
+                        if ic:
+                            entry["icon"] = ic
+                        cpt.append(entry)
+                if cpt:
+                    e["pickTabs"] = cpt
             ui = p.get("ui") or {}
             # Groessen genauso klemmen wie der globale Pfad (_sanitize_theme_ui)
             # und wie die Nachbarfelder unten - sonst nimmt der Panel-Override
@@ -3285,7 +3359,7 @@ class App:
     def _view_tab(self, tab: str, prof: dict | None = None) -> dict:
         ar = prof.get("rooms") if prof else None
         ac = prof.get("cats") if prof else None
-        if tab == PICK_TAB:
+        if _is_pick(tab):
             # Freie Auswahl: genau die handverlesenen Bausteine, in der
             # gespeicherten Reihenfolge (= Klickreihenfolge in der Konfig).
             #
@@ -3296,7 +3370,10 @@ class App:
             #
             # _shown bleibt: "hide" ist panelweit und das Sicherheitsnetz.
             # Die Konfigurationsseite zeigt so einen Baustein ausgegraut.
-            gewaehlt = (prof.get("picks") or []) if prof else []
+            _pts = _pick_tabs(prof)
+            _i = _pick_index(tab)
+            _entry = _pts[_i] if 0 <= _i < len(_pts) else {"name": "Auswahl", "picks": []}
+            gewaehlt = _entry["picks"]
             uuids, gesehen = [], set()
             for u in gewaehlt:
                 # Doppelte ueberspringen: zwei Kacheln mit derselben id wuerden
@@ -3328,7 +3405,7 @@ class App:
             # die unterste im Stapel ist.
             # Erst ab zwei Raeumen sind Sprungmarken ausserdem etwas wert: bei
             # einem einzigen zeigte die Leiste nur den Raum, in dem man steht.
-            allein = list((prof.get("tabs") or []) if prof else []) == [PICK_TAB]
+            allein = list((prof.get("tabs") or []) if prof else []) == [tab]
             marken = allein and len(raeume) > 1
             items = []
             for ru in raeume:
@@ -3350,7 +3427,7 @@ class App:
                            "label": _clean(self.rooms[ru].get("name")) or "Raum",
                            "iconUrl": self._icon_url(self.rooms[ru].get("image")) or ""}
                           for ru in raeume[:4]] if marken else [])
-            title = (prof.get("pickName") if prof else "") or "Auswahl"
+            title = _entry["name"] or "Auswahl"
             return {"t": "view", "title": title, "tab": tab,
                     "route": {"view": "tab", "tab": tab}, "items": items,
                     "catTabs": raum_tabs}
