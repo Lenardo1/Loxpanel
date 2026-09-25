@@ -414,6 +414,18 @@
   .wzsw.on{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent);}
   .wzsw.none{width:auto;padding:0 12px;color:var(--muted);font:inherit;font-size:12px;}
   .wzrow{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;}
+  details.discl>summary{cursor:pointer;list-style:none;outline:none;}
+  details.discl>summary::-webkit-details-marker{display:none;}
+  details.discl>summary::before{content:'▸';margin-right:8px;color:var(--muted);font-size:12px;}
+  details.discl[open]>summary::before{content:'▾';}
+  details.discl>summary b{font-size:15px;}
+  .discl-body{margin-top:10px;padding-top:6px;border-top:1px solid var(--line);}
+  .mzchips{display:flex;flex-wrap:wrap;gap:8px;}
+  .mztable{display:flex;flex-direction:column;gap:6px;}
+  .mzrow{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 12px;flex-wrap:wrap;}
+  .mzml{flex:1;min-width:140px;font-size:13px;}
+  .mzrow code,.mzml code{background:var(--bg);border-radius:3px;padding:1px 5px;font-size:12px;color:var(--accent);}
+  .mzprof{min-width:150px;}
 </style>
 </head>
 <body>
@@ -439,6 +451,7 @@
       <div class="rubrics">
         <button class="rub active" data-rub="overview">Übersicht</button>
         <button class="rub" data-rub="pconf">Panel Configuration</button>
+        <button class="rub" data-rub="displays">Displays</button>
         <button class="rub" data-rub="settings">Settings</button>
         <button class="rub" data-rub="devices">unterstützte Geräte</button>
       </div>
@@ -495,7 +508,7 @@
             <button class="ovbox" data-goto="settings:calendar"><b>Kalender &amp; Wetter</b><span>iCal-Abo + Feiertags-iCal, Wetter (Loxone-Wetterserver, sonst Open-Meteo mit dem Standort des Miniservers).</span></button>
             <button class="ovbox" data-goto="settings:audio"><b>Audio</b><span>Audioserver-Live-Daten (Cover/Titel/Favoriten), Direktkanal-Option.</span></button>
             <button class="ovbox" data-goto="settings:intercom"><b>Kamera / Türstation</b><span>Kamerabilder und Klingel-Popup je Intercom-Baustein.</span></button>
-            <button class="ovbox" data-goto="settings:panels"><b>Panels &amp; Geräte</b><span>Alle Anzeigegeräte, Online-Status, Ansicht wechseln, Betriebsmodus-Automatik.</span></button>
+            <button class="ovbox" data-goto="displays"><b>Displays</b><span>Welche Visu welches Gerät zeigt: Online-Status, Ansicht wechseln, Betriebsmodus-Automatik.</span></button>
             <button class="ovbox" data-goto="settings:newpanel"><b>Neues Panel</b><span>Start-URL für ein Android/Tablet erzeugen oder Agent per SSH aufs Linux-Panel.</span></button>
           </div>
         </div>
@@ -581,6 +594,41 @@
         </div>
       </div>
 
+      <!-- Displays: welches Gerät zeigt welche Visu -->
+      <div id="displaysHost" class="ovw" style="display:none">
+        <p class="lead" data-i18n>Welche Visu welches Gerät zeigt. Linux-Panels mit Agent melden sich automatisch; Android-Panels und Tablets erscheinen, sobald sie die Visu mit einer Gerätekennung öffnen (<code>?panel=&lt;start&gt;&amp;device=&lt;name&gt;</code>). Ein neues Gerät einrichten: <b>Settings → Neues Panel</b>.</p>
+        <div class="card">
+          <h3 data-i18n>Geräte &amp; Ansicht</h3>
+          <p class="note" data-i18n>Je Gerät die Ansicht (Profil) wählen und live umschalten. Geräte ohne Kennung stehen unten und bekommen hier einen Namen.</p>
+          <div id="ag_list"><div class="muted" data-i18n>Suche Panels…</div></div>
+          <div class="toast" id="ag_toast" style="margin-top:8px"></div>
+          <div class="actions" style="margin-top:12px"><button class="btn" id="mzOpenBtn" data-i18n>🧭 Betriebsmodus-Assistent</button>
+            <span class="note" style="margin-left:10px" data-i18n>Geführt: Modi → Ansicht je Gerät, mit fertiger Loxone-Adresse.</span></div>
+        </div>
+        <details class="card discl">
+          <summary><b data-i18n>Betriebsmodus-Automatik &amp; Display-Steuerung</b><span class="note" style="display:block;margin-top:2px" data-i18n>Ansicht je Loxone-Betriebsmodus automatisch wechseln; Fully/WallPanel-Display schalten.</span></summary>
+          <div class="discl-body">
+            <p class="note" data-i18n>Loxone schaltet die Ansicht automatisch um: in Loxone Config einen virtuellen HTTP-Ausgang anlegen, der pro Betriebsart einen Modusnamen an diesen Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint. Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
+            <pre class="cmdout" id="mode_hint">GET http://<span id="mode_host">…</span>/api/mode/&lt;modus&gt;</pre>
+            <p class="note" data-i18n>Panels mit Agent (Linux) erscheinen automatisch. Ein Panel ohne Agent (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: ?panel=&lt;start&gt;&amp;device=&lt;name&gt; — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
+            <div id="dev_list"><div class="muted" data-i18n>Noch kein Panel bekannt. Sobald ein Panel die Visu mit Kennung öffnet oder ein Agent läuft, erscheint es hier.</div></div>
+            <p class="note" data-i18n>Display-Steuerung je Gerät: Bei Fully Kiosk die Remote-Admin-Schnittstelle einschalten (Port 2323, Passwort), bei WallPanel den HTTP-Server (Port 2971). Der Server schaltet das Display dann auch bei Klingel, Wecker, Notify und Goto ein und nach der Abschaltzeit aus, unabhängig von der Seite.</p>
+            <div class="actions"><button class="btn" id="dev_save" data-i18n>Speichern</button><span class="toast" id="dev_toast"></span></div>
+          </div>
+        </details>
+        <details class="card discl">
+          <summary><b data-i18n>Nachtmodus</b><span class="note" style="display:block;margin-top:2px" data-i18n>Wann die Panels abdunkeln (Auslöser oder Sonnenuntergang).</span></summary>
+          <div class="discl-body">
+            <p class="note" data-i18n>Wann die Panels abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.</p>
+            <div class="row2">
+              <div class="field" style="max-width:460px"><label class="lbl" data-i18n>Auslöser (optional)</label><select id="nt_control"></select></div>
+            </div>
+            <p class="note" data-i18n>Wie stark abgedunkelt wird und ob eine Berührung kurz aufhellt, stellst du je Panel unter Panel Configuration → Darstellung ein.</p>
+            <div class="actions"><button class="btn" id="nt_save" data-i18n>Speichern</button><span class="toast" id="nt_toast"></span></div>
+          </div>
+        </details>
+      </div>
+
       <!-- Panel Configuration -->
       <div id="pconfHost" style="display:none"><div class="empty">lädt …</div></div>
 
@@ -625,32 +673,7 @@
           </div>
         </section>
 
-        <!-- Panels (Displays / Agenten / Kiosk-Apps) -->
-        <section class="spane" data-sub="panels">
-          <p class="lead" data-i18n>Alle Anzeigegeräte auf einen Blick: Linux-Panels mit Agent melden sich automatisch, Android-Panels und Tablets erscheinen, sobald sie die Visu mit einer Gerätekennung öffnen (?device=&lt;name&gt;). Geräte ohne Kennung stehen unten und bekommen hier einen Namen.</p>
-          <div class="card">
-            <div id="ag_list"><div class="muted" data-i18n>Suche Panels…</div></div>
-            <div class="toast" id="ag_toast" style="margin-top:8px"></div>
-          </div>
-          <div class="card">
-            <h3 data-i18n>Betriebsmodus-Automatik und Display-Steuerung</h3>
-            <p class="note" data-i18n>Loxone schaltet die Ansicht automatisch um: in Loxone Config einen virtuellen HTTP-Ausgang anlegen, der pro Betriebsart einen Modusnamen an diesen Server schickt. Hier legst du je Panel fest, welche Ansicht bei welchem Modus erscheint. Panel ohne Eintrag für einen Modus bleibt unverändert.</p>
-            <pre class="cmdout" id="mode_hint">GET http://<span id="mode_host">…</span>/api/mode/&lt;modus&gt;</pre>
-            <p class="note" data-i18n>Panels mit Agent (Linux) erscheinen automatisch. Ein Panel ohne Agent (z.B. NSPanel Pro, Tablet) muss nur die Visu mit einer Geräte-Kennung öffnen: ?panel=&lt;start&gt;&amp;device=&lt;name&gt; — dann wird es hier gelistet und live umgeschaltet (Browser lädt sich mit neuem Profil neu, kein Agent nötig).</p>
-            <div id="dev_list"><div class="muted" data-i18n>Noch kein Panel bekannt. Sobald ein Panel die Visu mit Kennung öffnet oder ein Agent läuft, erscheint es hier.</div></div>
-            <p class="note" data-i18n>Display-Steuerung je Gerät: Bei Fully Kiosk die Remote-Admin-Schnittstelle einschalten (Port 2323, Passwort), bei WallPanel den HTTP-Server (Port 2971). Der Server schaltet das Display dann auch bei Klingel, Wecker, Notify und Goto ein und nach der Abschaltzeit aus, unabhängig von der Seite.</p>
-            <div class="actions"><button class="btn" id="dev_save" data-i18n>Speichern</button><span class="toast" id="dev_toast"></span></div>
-          </div>
-          <div class="card">
-            <h3 data-i18n>Nachtmodus</h3>
-            <p class="note" data-i18n>Wann die Panels abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.</p>
-            <div class="row2">
-              <div class="field" style="max-width:460px"><label class="lbl" data-i18n>Auslöser (optional)</label><select id="nt_control"></select></div>
-            </div>
-            <p class="note" data-i18n>Wie stark abgedunkelt wird und ob eine Berührung kurz aufhellt, stellst du je Panel unter Panel Configuration → Darstellung ein.</p>
-            <div class="actions"><button class="btn" id="nt_save" data-i18n>Speichern</button><span class="toast" id="nt_toast"></span></div>
-          </div>
-        </section>
+        <!-- „Panels & Geräte" ist in den eigenen Reiter „Displays" umgezogen (#displaysHost). -->
 
         <!-- Audio -->
         <section class="spane" data-sub="audio">
@@ -803,7 +826,7 @@ const PCONF_TABS=[
 const GLOBAL_TABS=[{k:'appearance',label:'Darstellung'},{k:'catcolors',label:'Kategorie-Farben'}];
 const SET_TABS=[
   {k:'miniserver',label:'Miniserver'},{k:'intercom',label:'Kamera / Türstation'},
-  {k:'sip',label:'SIP'},{k:'panels',label:'Panels'},{k:'audio',label:'Audio'},
+  {k:'sip',label:'SIP'},{k:'audio',label:'Audio'},
   {k:'calendar',label:'Kalender & Wetter'},{k:'newpanel',label:'Neues Panel'}];
 
 async function load(){
@@ -840,23 +863,25 @@ function renderList(){
 function setRubric(r){
   rubric=r;
   document.querySelectorAll('.rub').forEach(b=>b.classList.toggle('active',b.dataset.rub===r));
-  const ov=r==='overview', pc=r==='pconf', dv=r==='devices';
+  const ov=r==='overview', pc=r==='pconf', dv=r==='devices', dp=r==='displays';
   const oh=$('#overviewHost'); if(oh) oh.style.display = ov?'':'none';
   const dh=$('#devicesHost'); if(dh) dh.style.display = dv?'':'none';
+  const dph=$('#displaysHost'); if(dph) dph.style.display = dp?'':'none';
   $('#pconfHost').style.display = pc?'':'none';
-  $('#setHost').style.display = (ov||pc||dv)?'none':'';
+  $('#setHost').style.display = (ov||pc||dv||dp)?'none':'';
   $('#savebar').style.display = pc?'':'none';
   $('#phead').style.display = pc?'':'none';
-  $('#subtabs').style.display = (ov||dv)?'none':'';
-  if(ov||dv) return;
+  $('#subtabs').style.display = (ov||dv||dp)?'none':'';
+  if(ov||dv||dp) return;
   if(pc){ renderEditor(); }
   else { renderSubtabs(); showSub(subSet); }
 }
 document.querySelectorAll('.rub').forEach(b=>b.onclick=()=>setRubric(b.dataset.rub));
 document.querySelectorAll('.ovbox').forEach(b=>b.onclick=()=>{
   const g=(b.dataset.goto||'').split(':'), r=g[0], sub=g[1];
-  if(r==='pconf') subPconf=sub; else subSet=sub;
-  setRubric(r); renderSubtabs(); showSub(sub);
+  if(r==='pconf'||r==='settings'){ if(r==='pconf') subPconf=sub; else subSet=sub;
+    setRubric(r); renderSubtabs(); showSub(sub); }
+  else setRubric(r);   // overview/displays/devices: keine Subtabs
 });
 
 function subTabs(){
@@ -1594,7 +1619,7 @@ function renderTabMode(p){
       if(mode==='classic' && tabsEigen(p) &&
          !confirm(T('Die zusammengestellte Tab-Leiste geht dabei verloren. Fortfahren?'))) return;
       if(ziel==='room') p.tabs=[rooms[0].tab];
-      else if(ziel==='pick'){ p.tabs=[PICK_TAB]; curPickIdx=0; ensurePickTabs(p); }
+      else if(ziel==='pick'){ curPickIdx=0; ensurePickTabs(p); p.tabs=p.pickTabs.map((_,i)=>pickKey(i)); }
       else p.tabs=defaultTabs();
       markDirty(); renderTabMode(p); renderPanes(p);
     };
@@ -2984,6 +3009,106 @@ $('#dev_save').onclick=async()=>{
   $('#dev_save').disabled=false;
 };
 
+// ---- Betriebsmodus-Assistent ----
+// Geführter Weg: Geräte -> Modi -> Ansicht je Modus -> fertige Loxone-Adresse.
+// Schreibt in dieselbe Struktur wie die Detail-Tabelle (DEV[name].modes) und
+// speichert über /api/devices - danach steht alles auch in der Tabelle.
+const MZ_PRESETS=[
+  {key:'anwesend',label:'Anwesend'},{key:'abwesend',label:'Abwesend'},
+  {key:'gaeste',label:'Gäste'},{key:'putzen',label:'Putzen'},
+  {key:'urlaub',label:'Urlaub'},{key:'nacht',label:'Nacht'}];
+const MZ={devices:[],modes:[],step:0,_wired:false};
+function mzKey(s){ return (s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,''); }
+function mzFlow(){ return ['geraete','modi','zuordnung','fertig']; }
+function mzDevNames(){ return Array.from(new Set(KNOWN_NAMES.concat(Object.keys(DEV)))).sort(); }
+function mzCustom(){ return MZ.modes.filter(m=>!MZ_PRESETS.some(p=>p.key===m.key)); }
+function mzOpen(){
+  if(!MZ._wired){ MZ._wired=true;
+    $('#mzBack').onclick=()=>{ if(MZ.step>0){ MZ.step--; mzRender(); } };
+    $('#mzNext').onclick=mzNext;
+    $('#mzOv').onclick=(e)=>{ if(e.target===$('#mzOv')) mzClose(); };
+  }
+  MZ.devices=[]; MZ.modes=[]; MZ.step=0;
+  $('#mzOv').hidden=false; mzRender();
+}
+function mzClose(){ $('#mzOv').hidden=true; }
+function mzRender(){
+  const f=mzFlow(), key=f[MZ.step], b=$('#mzBody');
+  $('#mzStep').textContent=T('Schritt')+' '+(MZ.step+1)+' / '+f.length;
+  if(key==='geraete'){
+    const names=mzDevNames();
+    b.innerHTML='<p class="wzq">'+T('Für welche Geräte?')+'</p>'+
+      (names.length? '<div class="mzchips">'+names.map(n=>'<button class="chip'+(MZ.devices.indexOf(n)>=0?' on':'')+'" data-mzdev="'+esc(n)+'">'+esc(n)+'</button>').join('')+'</div>'
+        : '<div class="wznote">'+T('Noch kein Gerät bekannt. Ein Panel muss die Visu einmal mit ?device=<name> öffnen oder einen Agent haben.')+'</div>')+
+      '<div class="wznote" style="margin-top:10px">'+T('Die Modus-Zuordnung gilt für alle gewählten Geräte gleich. Feinabstimmung je Gerät danach in der Detail-Tabelle.')+'</div>';
+  } else if(key==='modi'){
+    b.innerHTML='<p class="wzq">'+T('Welche Betriebsmodi?')+'</p><div class="wzopts">'+
+      MZ_PRESETS.map(m=>{ const on=MZ.modes.some(x=>x.key===m.key);
+        return '<button class="wzo'+(on?' on':'')+'" data-mzmode="'+esc(m.key)+'" data-mzlabel="'+esc(m.label)+'">'+wzg('grid')+
+          '<span class="tx"><b>'+esc(m.label)+'</b><span>'+T('Loxone sendet')+' <code>'+esc(m.key)+'</code></span></span></button>'; }).join('')+'</div>'+
+      '<div class="wzrow" style="margin-top:12px"><div class="wzfield" style="flex:1;max-width:240px"><label>'+T('Eigener Modus')+'</label>'+
+        '<input id="mzCustomIn" placeholder="'+T('z. B. Kino')+'"></div><button class="wzbtn" id="mzAdd" style="align-self:flex-end">＋ '+T('Hinzufügen')+'</button></div>'+
+      (mzCustom().length? '<div class="mzchips" style="margin-top:10px">'+mzCustom().map(m=>'<span class="chip on" data-mzdel="'+esc(m.key)+'">'+esc(m.label)+' <code>'+esc(m.key)+'</code> <span class="x">×</span></span>').join('')+'</div>':'');
+  } else if(key==='zuordnung'){
+    b.innerHTML='<p class="wzq">'+T('Welche Ansicht bei welchem Modus?')+'</p><div class="mztable">'+
+      MZ.modes.map(m=>'<div class="mzrow"><span class="mzml"><b>'+esc(m.label)+'</b> <code>'+esc(m.key)+'</code></span>'+
+        '<select class="mzprof" data-mzk="'+esc(m.key)+'"><option value="">'+T('unverändert lassen')+'</option>'+
+        PANEL_IDS.map(id=>'<option value="'+esc(id)+'"'+(m.profile===id?' selected':'')+'>'+esc(id)+'</option>').join('')+'</select></div>').join('')+'</div>'+
+      '<div class="wznote" style="margin-top:10px">'+T('„Unverändert lassen" heißt: dieser Modus schaltet das Panel nicht um.')+'</div>';
+  } else {
+    const host=location.host;
+    const lines=MZ.modes.map(m=>'http://'+host+'/api/mode/'+m.key).join('\n');
+    const zuo=MZ.modes.filter(m=>m.profile).map(m=>'<div class="mzrow"><span class="mzml"><b>'+esc(m.label)+'</b></span><b>→ '+esc(m.profile)+'</b></div>').join('')
+      ||('<div class="wznote">'+T('Keine Zuordnung gewählt — es würde nichts umgeschaltet.')+'</div>');
+    b.innerHTML='<p class="wzq">'+T('Fertig — in Loxone einrichten')+'</p>'+
+      '<div class="wznote">'+T('Lege in Loxone Config je Betriebsart einen virtuellen HTTP-Ausgang mit dieser Adresse an (der Modusname am Ende zählt):')+'</div>'+
+      '<pre class="cmdout" id="mzLines" style="margin-top:6px;white-space:pre-wrap">'+esc(lines)+'</pre>'+
+      '<button class="wzbtn" id="mzCopy" style="margin-top:6px">'+T('Adressen kopieren')+'</button>'+
+      '<p class="wzq mt">'+T('Zuordnung')+'</p><div class="mztable">'+zuo+'</div>'+
+      '<div class="wznote" style="margin-top:10px">'+T('Geräte:')+' <b>'+esc(MZ.devices.join(', ')||'—')+'</b>. '+T('„Übernehmen" speichert das für alle gewählten Geräte.')+'</div>';
+  }
+  b.querySelectorAll('[data-mzdev]').forEach(el=>el.onclick=()=>{ const n=el.dataset.mzdev, i=MZ.devices.indexOf(n); if(i>=0)MZ.devices.splice(i,1); else MZ.devices.push(n); mzRender(); });
+  b.querySelectorAll('[data-mzmode]').forEach(el=>el.onclick=()=>{ const k=el.dataset.mzmode, i=MZ.modes.findIndex(x=>x.key===k);
+    if(i>=0)MZ.modes.splice(i,1); else MZ.modes.push({key:k,label:el.dataset.mzlabel,profile:''}); mzRender(); });
+  b.querySelectorAll('[data-mzdel]').forEach(el=>el.onclick=()=>{ const k=el.dataset.mzdel, i=MZ.modes.findIndex(x=>x.key===k); if(i>=0){ MZ.modes.splice(i,1); mzRender(); } });
+  { const add=$('#mzAdd'), inp=$('#mzCustomIn');
+    const go=()=>{ const lbl=(inp&&inp.value||'').trim(), k=mzKey(lbl); if(!k) return; if(!MZ.modes.some(x=>x.key===k)) MZ.modes.push({key:k,label:lbl||k,profile:''}); mzRender(); };
+    if(add) add.onclick=go; if(inp) inp.onkeydown=(e)=>{ if(e.key==='Enter'){ e.preventDefault(); go(); } }; }
+  b.querySelectorAll('.mzprof').forEach(sel=>sel.onchange=()=>{ const m=MZ.modes.find(x=>x.key===sel.dataset.mzk); if(m) m.profile=sel.value; });
+  { const cp=$('#mzCopy'); if(cp) cp.onclick=()=>{ navigator.clipboard.writeText($('#mzLines').textContent)
+      .then(()=>flash($('#dev_toast'),T('✓ kopiert'),true)).catch(()=>{}); }; }
+  $('#mzBack').disabled=MZ.step===0;
+  $('#mzNext').textContent=(MZ.step===f.length-1)?T('Übernehmen ✓'):T('Weiter →');
+  let ok=true;
+  if(key==='geraete') ok=MZ.devices.length>0;
+  else if(key==='modi') ok=MZ.modes.length>0;
+  $('#mzNext').disabled=!ok;
+}
+function mzNext(){ const f=mzFlow(); if(MZ.step<f.length-1){ MZ.step++; mzRender(); return; } mzApply(); }
+async function mzApply(){
+  readDevFromDom();   // manuelle Tabellen-Edits nicht überschreiben
+  MZ.devices.forEach(name=>{
+    const d=DEV[name]||(DEV[name]={auto:true,modes:[]});
+    const map=new Map((d.modes||[]).map(([m,p])=>[m,p]));
+    MZ.modes.forEach(m=>{ if(m.profile) map.set(m.key,m.profile); else map.delete(m.key); });
+    d.modes=Array.from(map.entries()); d.auto=true;
+  });
+  const devices={};
+  Object.entries(DEV).forEach(([name,d])=>{ const modes={};
+    (d.modes||[]).forEach(([m,p])=>{ m=(m||'').trim(); if(m&&p) modes[m]=p; });
+    const display=(d.display&&d.display.driver&&d.display.host)?d.display:null;
+    const scale=(d.scale===''||d.scale===undefined||d.scale===null)?null:d.scale;
+    if(Object.keys(modes).length||display||scale!==null){ devices[name]={auto:d.auto!==false,modes};
+      if(display)devices[name].display=display; if(scale!==null)devices[name].scale=scale; } });
+  try{
+    const r=await fetch('/api/devices',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({devices})});
+    const j=await r.json();
+    if(j.ok){ mzClose(); renderDevices(); flash($('#dev_toast'),T('✓ Betriebsmodus gespeichert'),true); }
+    else flash($('#dev_toast'),j.error||T('Fehler'),false);
+  }catch(e){ flash($('#dev_toast'),'Fehler: '+e,false); }
+}
+{ const mo=$('#mzOpenBtn'); if(mo) mo.onclick=mzOpen; }
+
 // ---- Audio: Test-Ton ----
 function fillAudioPanels(){
   const sel=$('#at_panel'); if(!sel) return;
@@ -3048,6 +3173,18 @@ if(window.I18N) I18N.autoChrome('h2, h3, label.lbl, .btn, .minibtn, .addbtn, .na
       <div style="display:flex;gap:10px">
         <button class="wzbtn" id="wzBlank" title="Ohne Assistent, nur ID">Leer anlegen</button>
         <button class="wzbtn prim" id="wzNext">Weiter →</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="mzOv" class="wzov" hidden>
+  <div class="wzbox">
+    <div class="wzhd"><b>🧭 Betriebsmodus-Assistent</b><span class="wzstep" id="mzStep"></span></div>
+    <div class="wzbody" id="mzBody"></div>
+    <div class="wzft">
+      <button class="wzbtn" id="mzBack">← Zurück</button>
+      <div style="display:flex;gap:10px">
+        <button class="wzbtn prim" id="mzNext">Weiter →</button>
       </div>
     </div>
   </div>
