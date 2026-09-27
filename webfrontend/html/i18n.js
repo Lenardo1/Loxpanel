@@ -12,6 +12,24 @@
 
   var CAT = {
     en: {
+      // --- Widget-Terminologie (Pane 2 / Screensaver / eigener Tab) ---
+      'Widget (Pane 2)': 'Widget (Pane 2)',
+      'Widget je Tab': 'Widget per tab',
+      'Visu + Widget je Tab.': 'View + widget per tab.',
+      'Widget': 'Widget',
+      'Widget (Vollbild)': 'Widget (full screen)',
+      'Kein Widget (Screen füllen)': 'No widget (fill screen)',
+      'Seiteninhalt': 'Page content',
+      'Freie Seiten — bis 4, je Name, Icon & Inhalt (Kacheln oder Widget)':
+        'Free pages — up to 4, each with name, icon & content (tiles or widget)',
+      'Bausteine (Kacheln)': 'Blocks (tiles)',
+      'Baustein': 'Block',
+      'Musikzone': 'Music zone',
+      'Keine Musikzone in der Anlage.': 'No music zone in the system.',
+      'Diese Seite zeigt statt Kacheln das gewählte Widget über die ganze Fläche — auch am 1-Pane-Display. Wähle oben „Bausteine (Kacheln)", um wieder Kacheln zu setzen.':
+        'This page shows the chosen widget full-screen instead of tiles — on a 1-pane display too. Pick “Blocks (tiles)” above to use tiles again.',
+      '„Automatisch" vergrößert die Visu auf jedem Display so weit, wie es ohne Rand geht. „Wie global" erbt die globale Einstellung.':
+        '“Automatic” enlarges the view on each display as far as it goes without a border. “Like global” inherits the global setting.',
       // --- Nachgezogen: Assistent, Displays, Betriebsmodus, restliche Admin-UI ---
       "Standard-Farbschema": "Default color scheme",
       "Eine Farbe wählen — Hintergrund, Kacheln, Leiste, Schrift, Icons und Zustandsfarben werden daraus berechnet. Eigene Zustandsfarben behalten Vorrang.": "Pick a color — background, tiles, bar, text, icons and state colors are derived from it. Custom state colors keep priority.",

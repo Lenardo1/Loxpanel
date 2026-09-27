@@ -164,7 +164,11 @@ def _pick_tabs(prof):
             if isinstance(e, dict):
                 out.append({"name": str(e.get("name") or "Auswahl"),
                             "picks": [u for u in (e.get("picks") or []) if isinstance(u, str)],
-                            "icon": str(e.get("icon") or "")})
+                            "icon": str(e.get("icon") or ""),
+                            # Statt Kacheln kann eine freie Seite ein Widget sein
+                            # (Wetter/Kalender/Energie/Kamera/Verlauf/Werte/Audio),
+                            # als Vollbild-Tab. Leer = Kachelseite (picks).
+                            "widget": _clean_tabpane(e.get("widget"))})
         return out
     if prof.get("picks"):
         return [{"name": str(prof.get("pickName") or "Auswahl"),
@@ -324,19 +328,22 @@ def _clean_screen(d) -> dict:
 def _clean_tabpane(v) -> str:
     """Split-Pane eines Tabs pruefen: "weather" | "calendar" | "player:<uuid>"
     | "energy:<uuid>" | "camera:<uuid>" | "chart:<uuid>" (Verlauf eines Bausteins
-    mit Aufzeichnung). "" heisst "kein Widget" — die Visu
-    weitet sich dann nach rechts aus.
+    mit Aufzeichnung) | "status:<uuid>,<uuid>,..." (frei gewaehlte Werte, wie auf
+    der Uhr-Seite). "" heisst "kein Widget" — die Visu weitet sich nach rechts aus.
 
-    Stand vorher wortgleich an zwei Stellen (Export und Speichern). Laufen die
-    auseinander, zeigt der Konfigurator einen Wert an, den der Server beim
-    Speichern still verwirft. Prueft bewusst genau wie bisher, insbesondere
-    OHNE strip(): das Zusammenfassen soll am Ergebnis nichts aendern."""
+    Derselbe Widget-Katalog wie die Uhr-Seite (_clean_svpane), damit Zusatz und
+    Screensaver dieselben Inhalte anbieten. Prueft OHNE strip() am Gesamtwert;
+    nur die status-Liste wird (wie dort) je Eintrag getrimmt und begrenzt."""
     if v in ("weather", "calendar"):
         return v
     if isinstance(v, str):
         for kopf in ("player:", "energy:", "camera:", "chart:"):
             if v.startswith(kopf) and len(v) > len(kopf):
                 return v
+        if v.startswith("status:"):
+            uu = [x.strip() for x in v[7:].split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return "status:" + ",".join(uu)
     return ""
 
 
@@ -344,8 +351,8 @@ def _clean_svpane(v) -> str:
     """Rechte Spalte der Uhr-Seite (Screensaver) pruefen und normieren.
 
     Erlaubt: "off" (keine zweite Spalte), "calendar", "weather",
-    "energy:<uuid>", "camera:<uuid>", "chart:<uuid>" (Verlauf eines Bausteins
-    mit Aufzeichnung) und "status:<uuid>,<uuid>,...".
+    "player:<zone>", "energy:<uuid>", "camera:<uuid>", "chart:<uuid>" (Verlauf
+    eines Bausteins mit Aufzeichnung) und "status:<uuid>,<uuid>,...".
     Alles andere ergibt "" — das ist die Automatik: Termine, wenn welche
     anstehen, sonst die Wetter-Details. Unbekannte Werte wandern damit auf
     die Automatik statt eine leere Spalte zu erzeugen."""
@@ -354,7 +361,7 @@ def _clean_svpane(v) -> str:
     v = v.strip()
     if v in ("off", "calendar", "weather"):
         return v
-    for kopf in ("energy:", "camera:", "chart:"):
+    for kopf in ("player:", "energy:", "camera:", "chart:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v
     if v.startswith("status:"):
@@ -2342,10 +2349,15 @@ class App:
                     if ic and not (ic.startswith("/icon?") or ic.startswith("/loxlib?")
                                    or ic.endswith(".svg") or ic.endswith(".png")):
                         ic = ""
-                    if ps or nm or ic:
+                    # Widget-Seite statt Kacheln (Wetter/Kalender/Energie/Kamera/
+                    # Verlauf/Werte/Audio) - Form pruefen wie eine Tab-Pane.
+                    wdg = _clean_tabpane(it.get("widget"))
+                    if ps or nm or ic or wdg:
                         entry = {"name": nm or "Auswahl", "picks": ps}
                         if ic:
                             entry["icon"] = ic
+                        if wdg:
+                            entry["widget"] = wdg
                         cpt.append(entry)
                 if cpt:
                     e["pickTabs"] = cpt
@@ -3387,6 +3399,15 @@ class App:
             _pts = _pick_tabs(prof)
             _i = _pick_index(tab)
             _entry = _pts[_i] if 0 <= _i < len(_pts) else {"name": "Auswahl", "picks": []}
+            # Widget-Seite: die ganze Seite ist EIN Widget (Vollbild-Tab), keine
+            # Kacheln. Das Panel rendert es wie eine Pane, nur ueber die volle
+            # Flaeche; der Datenkanal (energy/camera/status/player/chart) laeuft
+            # ueber dieselbe set*-Mechanik wie Pane 2.
+            _wdg = _clean_tabpane(_entry.get("widget"))
+            if _wdg:
+                return {"t": "view", "title": _clean(_entry.get("name")) or "",
+                        "tab": tab, "widget": _wdg,
+                        "route": {"view": "tab", "tab": tab}}
             gewaehlt = _entry["picks"]
             uuids, gesehen = [], set()
             for u in gewaehlt:

@@ -63,6 +63,22 @@
   /* "Bildschirm fuellen" im Split: ganzen Tablet-Schirm nutzen (Kacheln passen
      sich an, statt zentriertem 2:1-Kasten mit Rand). */
   .screen.split.fill{width:100vw;height:100vh;}
+  /* Widget-Seite (Vollbild-Tab): das Widget fuellt die ganze Flaeche, kein
+     Kachelgrid, kein Split - gleiche gerahmte fp-page wie in Pane 2. */
+  .screen.widgettab #grid{display:none;}
+  .screen.widgettab #frontpane{display:flex;flex-direction:column;grid-column:1/-1;grid-row:1;
+    min-height:0;overflow-y:auto;padding:10px;gap:10px;scroll-snap-type:y mandatory;scroll-padding-top:10px;}
+  .screen.widgettab #playerpane{display:flex;flex-direction:column;grid-column:1/-1;grid-row:1;
+    min-height:0;overflow:hidden;padding:10px;gap:10px;}
+  .screen.widgettab #frontpane .fp-page,
+  .screen.widgettab #playerpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
+    display:flex;flex-direction:column;gap:10px;padding:16px;
+    background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:16px;
+    scroll-snap-align:start;scroll-snap-stop:always;}
+  .screen.widgettab #frontpane .fp-page.solo,
+  .screen.widgettab #playerpane .fp-page.solo{flex:1 1 0;min-height:0;max-height:100%;overflow:hidden;}
+  .screen.widgettab #frontpane .fp-page.solo.cpage{overflow-y:auto;gap:10px;}
   #playerpane{display:none;}
   #frontpane{display:none;}
   .screen.split #grid{grid-column:1;grid-row:1;}
@@ -616,6 +632,14 @@
   .saver .sv-box.solo{height:var(--sv-frei,auto);}
   .saver .sv-box.solo .fp-page{flex:1 1 0;min-height:0;}
   .saver .sv-box.solo .video{max-height:100%;}
+  /* Audio-Karte (Now Playing) in der Uhr-Spalte: Cover + Titel + Interpret, passiv. */
+  .svplayer{align-items:center;text-align:center;justify-content:center;}
+  .svplayer .svp-cover{width:100%;flex:1;min-height:0;display:grid;place-items:center;}
+  .svplayer .svp-cover img{max-width:min(100%,220px);max-height:100%;border-radius:12px;object-fit:contain;}
+  .svplayer .svp-cover .coverph{width:88px;height:88px;display:grid;place-items:center;color:var(--muted);}
+  .svplayer .svp-cover .coverph svg{width:52px;height:52px;}
+  .svplayer .svp-title{font-weight:650;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .svplayer .svp-sub{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
   /* Kamera ist durch die Breite begrenzt (4:3): sie steht mittig in der Spalte,
      statt oben zu kleben und unten einen leeren Streifen zu lassen. */
   .saver .sv-box .campage{justify-content:center;}
@@ -883,6 +907,7 @@ let panesCfg = {}, themeFill = false, curPlayerZone = '', curEnergyUuid = '', cu
 let svPaneCfg = '', svStatusData = null, curSvStatus = '';
 let cameraData = null;   // letzter {t:'camera'}-Push (Intercom-Bloecke) fuer die Kamera-Pane
 let energyData = null;   // letzter {t:'energy'}-Push fuer die Energiefluss-Pane
+let playerData = null;   // letzter {t:'player'}-Push (Player-Bloecke) fuer die Audio-Pane
 // Verlaufs-Pane (chart:<uuid>): gemeldeter Baustein|Zeitraum, letzter {t:'chart'}-Push,
 // in der Pane gewaehlter Zeitraum (gilt fuer alle Verlaufs-Panes dieses Panels).
 let curChartKey = '', chartData = null, chartRange = '24h';
@@ -1176,9 +1201,13 @@ function chartBoxHtml(b){
 // dem Server neu (setchart), statt wie auf der Detailseite die Route zu ersetzen:
 // links bleibt die Kachelseite stehen.
 function renderChartPane(elc){ if(!elc) return;
-  // Unter dem Screensaver ist der aktive Tab nicht die Verlaufsquelle — dann gilt
-  // der beim Server abonnierte Baustein (curChartKey). Sonst die Pane des Tabs.
-  const uuid=curChartKey ? curChartKey.split('|')[0] : (paneForTab(activeTab())||'').slice(6);
+  // Quelle des Verlaufs: eine Widget-Seite bringt den Baustein direkt mit
+  // (view.widget), sonst der beim Server abonnierte (curChartKey), sonst die
+  // Pane des Tabs. Die Widget-Seite zuerst, damit auch nach Weg-und-Zurueck der
+  // richtige Baustein steht (curChartKey ist da noch der alte/leere Stand).
+  const wraw=(view && view.widget) || '';
+  const uuid=(wraw.indexOf('chart:')===0) ? wraw.slice(6)
+           : (curChartKey ? curChartKey.split('|')[0] : (paneForTab(activeTab())||'').slice(6));
   const d=(chartData && chartData.control===uuid) ? chartData : null;
   const blocks=d ? (d.blocks||[]) : [];
   const sig=uuid+'|'+(d?blocks.map(b=>b.kind+(b.ranges?'r':'')).join(','):'-');
@@ -1507,20 +1536,30 @@ function scrollToCat(key){
   const rt = tabsCfg[0]; if(rt) goTab(rt);
 }
 // ---- Split-Pane pro Tab: entscheidet je aktuellem Tab, was rechts steht ----
-// Wert je Tab: "weather" | "calendar" | "player:<zone-uuid>" | "energy:<uuid>" | "camera:<uuid>" | "chart:<uuid>".
+// Wert je Tab: "weather" | "calendar" | "player:<zone>" | "energy:<uuid>" | "camera:<uuid>" | "chart:<uuid>" | "status:<uuid>,...".
 function paneForTab(tk){ return tk ? (panesCfg[tk]||null) : null; }
-function paneKind(v){ return v ? (v.indexOf('player:')===0 ? 'player' : (v.indexOf('energy:')===0 ? 'energy' : (v.indexOf('camera:')===0 ? 'camera' : (v.indexOf('chart:')===0 ? 'chart' : v)))) : null; }
+// Der aktuell gezeigte Pane-Wert: eine Widget-Seite (Vollbild-Tab, view.widget)
+// ODER die Pane 2 des aktiven Tabs (nur im 2-Pane-Betrieb). Damit finden die
+// Push-Handler (energy/camera/chart/status) auch das Widget eines Widget-Tabs.
+function paneRawNow(){ return (view && view.widget) ? view.widget : (themeSplit ? paneForTab(activeTab()) : null); }
+function paneKind(v){ if(!v) return null;
+  for(const k of ['player','energy','camera','chart','status']) if(v.indexOf(k+':')===0) return k;
+  return v; }
 function applyPane(){
   const sc=document.querySelector('.screen'); if(!sc) return;
-  const raw=themeSplit?paneForTab(activeTab()):null;   // Split aus (4"-Panel) -> keine Pane 2
+  // Widget-Seite (Vollbild-Tab): das ganze Tab IST das Widget, kein Kachelgrid,
+  // kein Split. Sonst die Pane 2 des aktiven Tabs (nur im 2-Pane-Betrieb).
+  const wt = (view && view.widget) ? view.widget : null;
+  const raw = wt ? wt : (themeSplit?paneForTab(activeTab()):null);
   const kind=paneKind(raw);
-  const isPane=(kind==='player'||kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera'||kind==='chart');   // Widget in Pane 2
-  sc.classList.toggle('split', isPane);   // Widget -> zweigeteilt, sonst "Screen fuellen"
+  const isPane=(kind==='player'||kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera'||kind==='chart'||kind==='status');   // Widget in Pane 2
+  sc.classList.toggle('widgettab', !!wt);   // Widget fuellt die ganze Flaeche
+  sc.classList.toggle('split', isPane && !wt);   // Widget in Pane 2 -> zweigeteilt
   sc.classList.toggle('fill', themeFill);  // "Bildschirm fuellen" fuellt Split UND Screen-fuellen
   const pp=el('playerpane'), fp=el('frontpane');
   if(pp) pp.hidden=(kind!=='player');
   if(fp){
-    fp.hidden=!(kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera'||kind==='chart');
+    fp.hidden=!(kind==='weather'||kind==='calendar'||kind==='energy'||kind==='camera'||kind==='chart'||kind==='status');
     fp.classList.toggle('cam', kind==='camera');
     // Kamera verlassen -> Video-Stream stoppen (Inhalt leeren), keine Hintergrund-Verbindung.
     // Auch, wenn der Screensaver darueber liegt: das <img> haengt direkt an
@@ -1532,9 +1571,7 @@ function applyPane(){
   else if(kind==='energy') renderEnergyPane(fp);
   else if(kind==='camera' && !svSideOn()) renderCameraPane(fp);
   else if(kind==='chart') renderChartPane(fp);
-  // Player-Zone dieses Tabs dem Server melden (nur bei Aenderung -> er pusht die Blocks).
-  const zone=(kind==='player')?raw.slice(7):'';
-  if(zone!==curPlayerZone){ curPlayerZone=zone; _playerBuilt=false; try{ send({t:'setplayer',zone:zone}); }catch(e){} }
+  else if(kind==='status') renderSvStatus(fp);   // frei gewaehlte Werte als Pane 2
   // Energiefluss und Kamera hat der Server je Verbindung nur EINMAL. Liegt der
   // Screensaver oben, gilt SEINE Wahl — die Pane darunter ist verdeckt, und ein
   // Kamerabild hinter dem Screensaver waere eine Dauerverbindung zur
@@ -1560,11 +1597,13 @@ function applyPane(){
   const chuid=qarg(qraw,'chart:');
   const chkey=chuid ? chuid+'|'+chartRange : '';
   if(chkey!==curChartKey){ curChartKey=chkey; try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
-  // Frei gewaehlte Werte fuer die Uhr-Seite beim Server anmelden. Bewusst
-  // unabhaengig davon, ob der Screensaver gerade oben liegt: sonst stuende die
-  // Spalte beim Einblenden erst einmal leer da.
-  const sraw = themeSplit ? (svPaneCfg||'') : '';
-  const suu = (svKind(sraw)==='status') ? svArg(sraw) : '';
+  // Player-Zone (Audio) kontextabhaengig: liegt der Screensaver oben, seine Zone
+  // (Audio als zweite Uhr-Spalte), sonst die Pane 2 des aktiven Tabs. Server
+  // pusht {t:'player'} mit Cover/Titel/Transport.
+  const zone=qarg(qraw,'player:');
+  if(zone!==curPlayerZone){ curPlayerZone=zone; _playerBuilt=false; try{ send({t:'setplayer',zone:zone}); }catch(e){} }
+  // Frei gewaehlte Werte (status) ebenso kontextabhaengig — Pane 2 ODER Uhr-Seite.
+  const suu = (svKind(qraw)==='status') ? svArg(qraw) : '';
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
 }
@@ -1661,7 +1700,7 @@ function render(){
   // Kacheln). Nur im Querformat (2-Pane-Tablet); das quadratische 4"-Panel
   // bleibt einspaltig. Unabhaengig vom Zoom ("Bildschirm fuellen").
   const _k = themeSplit ? paneKind(paneForTab(activeTab())) : null;   // Split aus -> nie Pane/Verdopplung
-  const _widget = (_k==='player'||_k==='weather'||_k==='calendar'||_k==='energy'||_k==='camera'||_k==='chart');
+  const _widget = (_k==='player'||_k==='weather'||_k==='calendar'||_k==='energy'||_k==='camera'||_k==='chart'||_k==='status');
   // Querformat-Entscheidung merken: beim Kiosk-Start / Auto-Reload meldet das
   // Fenster kurz eine quere Groesse, bevor die echte Flaeche steht. Der
   // resize-Handler rendert neu, sobald sie kippt (sonst bliebe das 4"-Panel in
@@ -1675,6 +1714,17 @@ function render(){
   closeMenu();
   setMore(null);
   el('conn').classList.toggle('vis', !!(view.route && view.route.view==='tab'));
+  // Widget-Seite: ganzer Tab = ein Widget (Vollbild). Kein Kachelgrid; die
+  // Flaeche bleibt beim Profil-Standard (nicht verdoppeln). applyPane (ueber
+  // renderTabs) zeichnet das Widget und meldet seinen Datenkanal an.
+  if(view.widget){
+    gridCols=profCols; gridRows=profRows;
+    document.documentElement.style.setProperty('--cols', gridCols);
+    document.documentElement.style.setProperty('--rows', gridRows);
+    el('grid').classList.remove('panel','bigpage','anchorbot','scheme','list');
+    renderTabs();
+    return;
+  }
   el('grid').classList.remove('panel','bigpage','anchorbot','scheme');
   el('grid').classList.toggle('list', view.layout==='list');
   const items = view.items || [];
@@ -1932,18 +1982,22 @@ function connect(){
     if(msg.t==='alarm'){ if(msg.on){ wake(); startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
     if(msg.t==='testtone'){ playTestTone(); return; }
     if(msg.t==='front'){ frontData=msg; renderFront(); if(FRONT_TEST) renderFrontRich(el('frontPage')); applyPane(); return; }   // Kalender/Wetter fuer die Uhr-Seite
-    if(msg.t==='player'){ renderPlayer(msg.blocks); return; }   // fester Player im Split-Layout
+    if(msg.t==='player'){ playerData=Array.isArray(msg.blocks)?msg.blocks:[];
+      if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> Audio als zweite Uhr-Spalte
+      renderPlayer(playerData); return; }   // sonst fester Player in Pane 2
     if(msg.t==='energy'){ energyData=msg;
       if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> dort zeichnen, nicht in die verdeckte Pane
-      const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='energy') renderEnergyPane(fp); return; }   // Energiefluss-Pane
+      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='energy') renderEnergyPane(fp); return; }   // Energiefluss-Pane
     if(msg.t==='camera'){ cameraData=msg;
       if(svSideOn()){ renderFront(); return; }
-      const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='camera') renderCameraPane(fp); return; }   // Kamera-Pane (Intercom-Vollansicht)
+      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='camera') renderCameraPane(fp); return; }   // Kamera-Pane (Intercom-Vollansicht)
     if(msg.t==='scale'){ uiScaleCfg=scaleCfg(msg.scale); applyScale(); return; }   // Skalierung des Geraets geaendert (ohne Neuladen)
-    if(msg.t==='svstatus'){ svStatusData=Array.isArray(msg.items)?msg.items:[]; if(saverOn()) renderFront(); return; }   // frei gewaehlte Werte auf der Uhr-Seite
+    if(msg.t==='svstatus'){ svStatusData=Array.isArray(msg.items)?msg.items:[];
+      if(saverOn()){ renderFront(); return; }   // Uhr-Seite oben -> dort
+      const fp=el('frontpane'); if(fp && !svSideOn() && paneKind(paneRawNow())==='status') renderSvStatus(fp); return; }   // sonst Werte als Pane 2
     if(msg.t==='chart'){ chartData=msg;   // Verlaufs-Pane
       if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> als zweite Uhr-Spalte zeichnen
-      const fp=el('frontpane'); if(fp && paneKind(paneForTab(activeTab()))==='chart') renderChartPane(fp); return; }
+      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='chart') renderChartPane(fp); return; }
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
@@ -1963,6 +2017,7 @@ function connect(){
       if(!(sameS && updateScheme(msg))) renderScheme(msg);   // gleiche Seite: nur Werte patchen (Zoom bleibt)
       return;
     }
+    if(msg.widget){ view=msg; render(); return; }   // Widget-Seite (Vollbild-Tab)
     const same = view && key(view.route)===key(msg.route);
     if(msg.blocks){
       view=msg;
@@ -2135,6 +2190,23 @@ function renderSvStatus(box){
       (it.room?'<span class="rm">'+esc(it.room)+'</span>':'')+'</span>'+
       '<span class="vl">'+esc(it.sublabel||'')+'</span></div>'; }).join('');
 }
+// Audio als zweite Uhr-Spalte: passive "Now Playing"-Karte (Cover, Titel,
+// Interpret) — ohne Transport/Lautstaerke, die Uhr-Seite ist zum Ansehen da.
+function renderSvPlayer(box){
+  const b=Array.isArray(playerData)?playerData:[];
+  const title=b.find(x=>x.k==='title'), cover=b.find(x=>x.k==='cover');
+  const hasT=title&&(title.text||title.sub);
+  if(!b.length || !hasT){
+    box.innerHTML='<div class="lbl">Audio</div><div class="fp-empty">'+
+      (playerData===null?'Wird geladen …':'Nichts gewählt oder keine Wiedergabe.')+'</div>';
+    return;
+  }
+  const src=(cover&&cover.src)||'';
+  box.innerHTML='<div class="fp-page solo svplayer">'+
+    '<div class="svp-cover">'+(src?'<img src="'+esc(src)+'" alt="">':'<span class="coverph">'+svg(ICONS.music)+'</span>')+'</div>'+
+    '<div class="svp-title">'+esc(title.text||'')+'</div>'+
+    '<div class="svp-sub">'+esc(title.sub||'')+'</div></div>';
+}
 // Liefert true, wenn rechts (bzw. einspaltig: unten) ueberhaupt etwas steht.
 function renderSvSide(evs){
   const cal=el('svCal'), box=el('svBox');
@@ -2155,6 +2227,7 @@ function renderSvSide(evs){
     else if(k==='camera'){ renderCameraPane(box); inhalt=true; }
     else if(k==='chart'){ renderChartPane(box); inhalt=true; }
     else if(k==='status'){ renderSvStatus(box); inhalt=true; }
+    else if(k==='player'){ renderSvPlayer(box); inhalt=true; }
     else if(k==='weather' || (k==='' && !zeigeCal)){
       // Automatik: sobald die Termine die Spalte nicht fuellen, uebernimmt das
       // Wetter sie — sonst bliebe die halbe Flaeche leer.
@@ -2166,7 +2239,7 @@ function renderSvSide(evs){
   // Energiefluss und Kamera fuellen eine Seite und brauchen die Hoehengrenze
   // oben; Termine, Wetter und Werte sind Listen und duerfen wachsen (svFit
   // nimmt ihnen notfalls die unterste Zeile).
-  box.classList.toggle('solo', inhalt && (k==='energy'||k==='camera'||k==='chart'));
+  box.classList.toggle('solo', inhalt && (k==='energy'||k==='camera'||k==='chart'||k==='player'));
   box.hidden=!inhalt;
   return zeigeCal || inhalt;
 }

@@ -426,6 +426,82 @@
   .mzml{flex:1;min-width:140px;font-size:13px;}
   .mzrow code,.mzml code{background:var(--bg);border-radius:3px;padding:1px 5px;font-size:12px;color:var(--accent);}
   .mzprof{min-width:150px;}
+  /* ---- Einrichtungsassistent-Reiter ---- */
+  .as-start{display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#161018;border:0;border-radius:9px;padding:12px 20px;font:inherit;font-size:15px;font-weight:700;cursor:pointer;}
+  .as-start:hover{filter:brightness(1.06);}
+  .as-lead{color:var(--muted);margin:12px 0 0;max-width:64ch;}
+  .as-concepts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px;}
+  @media(max-width:560px){.as-concepts{grid-template-columns:1fr;}}
+  .as-def{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;}
+  .as-def .tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;margin-bottom:8px;}
+  .as-def.blocks .tag{background:var(--panel2);color:var(--muted);border:1px solid var(--line);}
+  .as-def.widget .tag{background:rgba(82,184,129,.14);color:var(--good);}
+  .as-def b{font-size:15px;display:block;}
+  .as-def p{margin:5px 0 0;color:var(--muted);font-size:13px;}
+  .as-steps{display:flex;flex-direction:column;gap:12px;margin-top:22px;}
+  .as-step{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;}
+  .as-h{display:flex;align-items:baseline;gap:14px;margin-bottom:6px;}
+  .as-num{font-family:inherit;font-size:28px;font-weight:800;line-height:1;color:var(--accent);min-width:1.3ch;font-variant-numeric:tabular-nums;}
+  .as-of{font-size:11px;font-weight:600;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;}
+  .as-step h4{margin:2px 0 0;font-size:17px;font-weight:600;color:var(--fg);}
+  .as-body{display:grid;grid-template-columns:1fr 220px;gap:20px;align-items:center;}
+  @media(max-width:640px){.as-body{grid-template-columns:1fr;}}
+  .as-desc{color:var(--muted);margin:0;font-size:13.5px;line-height:1.55;}
+  .as-desc strong{color:var(--fg);font-weight:600;}
+  .as-desc em{color:var(--fg);font-style:normal;border-bottom:1.5px solid var(--accent);}
+  .as-opts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .as-chip{font-size:12px;padding:4px 9px;border-radius:7px;background:var(--panel2);border:1px solid var(--line);color:var(--fg);white-space:nowrap;}
+  .as-chip.k{background:rgba(224,162,77,.14);border-color:transparent;color:var(--accent);font-weight:600;}
+  .as-chip.w{background:rgba(82,184,129,.14);border-color:transparent;color:var(--good);font-weight:600;}
+  .as-fig{--sc:#0f1319;--st:#1d222b;--stl:#232935;--sl:#2c333f;--sa:#e0a24d;--sg:#52b881;--sm:#8b929c;--stx:#cfd3d8;
+    background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:14px;display:flex;align-items:center;justify-content:center;min-height:130px;}
+  .as-scr{background:var(--sc);border:1px solid var(--sl);border-radius:9px;padding:7px;width:100%;}
+  .as-tiles{display:grid;gap:5px;}
+  .as-tiles i{background:var(--st);border-radius:5px;display:block;aspect-ratio:1;}
+  .as-tiles i.a{box-shadow:inset 0 0 0 1.5px var(--sa);background:rgba(224,162,77,.22);}
+  .as-tabs{display:flex;gap:4px;margin-top:6px;}
+  .as-tabs u{flex:1;height:9px;background:var(--st);border-radius:3px;display:block;}
+  .as-tabs u.on{background:var(--sa);}
+  .as-row2{display:flex;gap:8px;width:100%;}
+  .as-row2>div{flex:1;}
+  .as-cap{font-size:10px;color:var(--sm);text-align:center;margin-top:4px;}
+  .as-p2{background:var(--st);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--sa);}
+  .as-p2 small{font-size:8px;color:var(--sm);}
+  .as-fld{background:var(--st);border:1px solid var(--sl);border-radius:6px;height:19px;display:flex;align-items:center;padding:0 7px;color:var(--stx);font-size:9px;}
+  .as-fld.mono{font-family:ui-monospace,monospace;color:var(--sa);}
+  .as-sw{display:flex;gap:5px;margin-bottom:8px;}
+  .as-sw span{width:15px;height:15px;border-radius:4px;}
+  .as-sld{height:5px;border-radius:3px;background:var(--st);margin:5px 0;position:relative;}
+  .as-sld::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--v,55%);background:var(--sa);border-radius:3px;}
+  .as-lab{font-size:9px;color:var(--sm);margin-bottom:2px;}
+  .as-sel{display:flex;align-items:center;gap:5px;background:var(--st);border:1px solid var(--sl);border-radius:6px;padding:5px 6px;margin-bottom:5px;}
+  .as-sel:last-child{margin-bottom:0;}
+  .as-sel .ic{width:14px;height:14px;border-radius:4px;background:var(--stl);flex:none;display:grid;place-items:center;color:var(--sa);}
+  .as-sel .nm{flex:1;height:7px;background:var(--stl);border-radius:2px;}
+  .as-sel .dd{font-size:8px;background:var(--stl);border-radius:4px;padding:3px 6px;white-space:nowrap;color:var(--stx);}
+  .as-sel .dd.k{color:var(--sa);} .as-sel .dd.w{color:var(--sg);}
+  .as-clock{display:flex;gap:8px;}
+  .as-clock .t{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--stx);}
+  .as-clock .t b{font-size:20px;font-weight:700;line-height:1;}
+  .as-clock .t span{font-size:8px;color:var(--sm);margin-top:3px;}
+  .as-clock .w{flex:1;background:var(--st);border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--sg);padding:8px 0;}
+  .as-clock .w small{font-size:8px;color:var(--sm);}
+  .as-sum .r0{display:flex;justify-content:space-between;padding:5px 2px;border-bottom:1px solid var(--stl);font-size:9px;}
+  .as-sum .r0:last-child{border-bottom:0;}
+  .as-sum .l{color:var(--sm);} .as-sum .r{color:var(--stx);font-weight:600;}
+  .as-band{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-top:12px;}
+  .as-band h4{margin:0;font-size:16px;font-weight:600;color:var(--fg);display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
+  .as-band h4 .pin{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);background:rgba(224,162,77,.14);padding:3px 8px;border-radius:999px;}
+  .as-band p{color:var(--muted);font-size:13px;margin:8px 0 0;}
+  .as-band code{background:var(--bg);border-radius:3px;padding:1px 5px;font-size:12px;color:var(--accent);}
+  .as-split{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;}
+  @media(max-width:560px){.as-split{grid-template-columns:1fr;}}
+  .as-mini{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .as-mini b{font-size:14px;color:var(--fg);} .as-mini p{margin:5px 0 0;}
+  .as-cat{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px;}
+  .as-wc{display:flex;gap:9px;align-items:flex-start;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;}
+  .as-wc .ic{color:var(--good);flex:none;margin-top:1px;}
+  .as-wc b{font-size:13px;color:var(--fg);display:block;} .as-wc span{font-size:12px;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -450,6 +526,7 @@
     <div class="topbar">
       <div class="rubrics">
         <button class="rub active" data-rub="overview">Übersicht</button>
+        <button class="rub" data-rub="assistant">Einrichtungsassistent</button>
         <button class="rub" data-rub="pconf">Panel Configuration</button>
         <button class="rub" data-rub="displays">Displays</button>
         <button class="rub" data-rub="settings">Settings</button>
@@ -461,7 +538,7 @@
     <div class="scroll" id="scroll">
       <!-- Übersicht / Beschreibung -->
       <div id="overviewHost" class="ovw">
-        <p class="lead">LoxPanel baut auf einem quadratischen <b>480×480-Pane</b> auf – der Größe eines 4″-Wandpanels. Das 4″-Panel zeigt eines, das Tablet zwei nebeneinander (Visu links, Zusatz rechts). Hier ein Überblick, darunter die einstellbaren Bereiche.</p>
+        <p class="lead">LoxPanel baut auf einem quadratischen <b>480×480-Pane</b> auf – der Größe eines 4″-Wandpanels. Das 4″-Panel zeigt eines, das Tablet zwei nebeneinander (Visu links, Widget rechts). Hier ein Überblick, darunter die einstellbaren Bereiche.</p>
 
         <h3><span class="n">A</span>Geräteklassen</h3>
         <div class="dev">
@@ -482,20 +559,25 @@
           <figure><div class="pane"><div class="pfull"><b>21,4<small>°C</small></b></div></div><figcaption><b>Vollbild</b>Status</figcaption></figure>
         </div>
 
-        <h3><span class="n">C</span>Zusatz-Inhalt (Pane 2, je Tab)</h3>
+        <h3><span class="n">C</span>Widget (Pane 2, Screensaver oder eigener Tab)</h3>
+        <p class="lead" style="font-size:13.5px">Ein <b>Widget</b> ist eine fertige Inhaltsfläche — kein Kachelraster aus <b>Bausteinen</b>, sondern eine eigene Ansicht: <b>Wetter</b>, <b>Kalender</b>, <b>Energiefluss</b>, <b>Kamera</b> (Türstation), <b>Verlauf</b> (Aufzeichnung eines Bausteins), <b>Werte</b> (frei gewählte Bausteine als Liste) oder <b>Audio</b> (Now Playing der Musikzone).</p>
+        <p class="lead" style="font-size:13.5px;margin-top:6px">Dasselbe Widget lässt sich an <b>drei Stellen</b> einsetzen: im <b>Pane 2</b> eines 2-Pane-Panels (rechts neben der Visu, je Tab), in der <b>zweiten Spalte des Screensavers</b> (Uhr-Seite im Querformat) und — <b>bald</b> — als <b>eigener Vollbild-Tab</b> in der unteren Leiste (auch am 1-Pane-Panel). Welche Widgets erscheinen, hängt von der Anlage ab: <b>Werte</b> braucht ausgewählte Bausteine, <b>Audio/Energiefluss/Kamera/Verlauf</b> je einen passenden Baustein.</p>
         <div class="row">
           <figure><div class="pane"><div class="p2"><div class="p2h">Audio · Zone</div><div class="cover"></div><div class="ppb"><span></span><span class="m"></span><span></span></div></div></div><figcaption><b>Audio</b>Musikzone je Tab</figcaption></figure>
           <figure><div class="pane"><div class="p2"><div class="p2h">Wetter</div><div class="wxr"><svg viewBox="0 0 24 24" fill="none" stroke="#5aa9e6" stroke-width="1.7" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/></svg><b>13°</b></div><div class="fore"><span></span><span></span><span></span><span></span></div></div></div><figcaption><b>Wetter</b>Kurve &amp; Vorschau</figcaption></figure>
           <figure><div class="pane"><div class="p2"><div class="p2h">Kalender</div><div class="mcal"><b></b><b></b><b class="rd"></b><b></b><b></b><b></b><b class="rd"></b><b></b><b class="hi"></b><b></b><b></b><b></b><b></b><b class="rd"></b></div></div></div><figcaption><b>Kalender</b>Monat + Termine</figcaption></figure>
           <figure><div class="pane"><div class="p2"><div class="p2h">Energie</div><div class="eflow"><svg viewBox="0 0 62 46" fill="none" stroke-width="2" stroke-linecap="round"><line x1="31" y1="23" x2="31" y2="9" stroke="#52b881"/><line x1="31" y1="23" x2="50" y2="23" stroke="#e0a24d"/><line x1="31" y1="23" x2="17" y2="38" stroke="#e0a24d"/><line x1="31" y1="23" x2="12" y2="23" stroke="#52b881"/><circle cx="31" cy="15" r="1.5" fill="#52b881" stroke="none"/><circle cx="41" cy="23" r="1.5" fill="#e0a24d" stroke="none"/><circle cx="31" cy="9" r="4.3" stroke="#52b881" fill="#101319"/><circle cx="50" cy="23" r="4.3" stroke="#e0a24d" fill="#101319"/><circle cx="17" cy="38" r="4.3" stroke="#e0a24d" fill="#101319"/><circle cx="12" cy="23" r="4.3" stroke="#52b881" fill="#101319"/><circle cx="31" cy="23" r="6" stroke="#8b929c" fill="#1e232c"/></svg></div></div></div><figcaption><b>Energiefluss</b>Radial, live</figcaption></figure>
+          <figure><div class="pane"><div class="p2"><div class="p2h">Kamera</div><div style="flex:1;min-height:0;display:grid;place-items:center"><svg viewBox="0 0 62 46" style="width:80%;max-height:100%" fill="none" stroke="#5aa9e6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="12" width="34" height="26" rx="3"/><path d="M40 20l12-6v18l-12-6z"/><circle cx="18" cy="25" r="5"/></svg></div></div></div><figcaption><b>Kamera</b>Türstation live</figcaption></figure>
+          <figure><div class="pane"><div class="p2"><div class="p2h">Verlauf</div><div style="flex:1;min-height:0;display:grid;place-items:center"><svg viewBox="0 0 62 40" style="width:84%;max-height:100%" fill="none" stroke="#e0a24d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="34" x2="58" y2="34" stroke="#8b929c" stroke-width="1"/><polyline points="4,30 15,20 25,24 35,10 45,16 58,5"/></svg></div></div></div><figcaption><b>Verlauf</b>Aufzeichnung eines Bausteins</figcaption></figure>
+          <figure><div class="pane"><div class="p2"><div class="p2h">Werte</div><div style="flex:1;min-height:0;display:grid;place-items:center"><svg viewBox="0 0 62 40" style="width:82%;max-height:100%" fill="none" stroke-linecap="round" stroke-width="2.6"><line x1="6" y1="9" x2="34" y2="9" stroke="#8b929c"/><line x1="47" y1="9" x2="56" y2="9" stroke="#e0a24d"/><line x1="6" y1="20" x2="29" y2="20" stroke="#8b929c"/><line x1="45" y1="20" x2="56" y2="20" stroke="#52b881"/><line x1="6" y1="31" x2="37" y2="31" stroke="#8b929c"/><line x1="49" y1="31" x2="56" y2="31" stroke="#e2695f"/></svg></div></div></div><figcaption><b>Werte</b>Frei gewählte Bausteine</figcaption></figure>
           <figure><div class="pane"><div class="soonic"><svg viewBox="0 0 48 48" fill="none" stroke="#5aa9e6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 31c3-3 6-3 9 0s6 3 9 0 6-3 9 0 6 3 9 0"/><path d="M6 39c3-3 6-3 9 0s6 3 9 0 6-3 9 0 6 3 9 0"/><path d="M14 23V13a4 4 0 0 1 8 0"/></svg></div></div><figcaption><b>Pool</b><span class="badge">Bald</span></figcaption></figure>
           <figure><div class="pane"><div class="soonic"><svg viewBox="0 0 48 48" fill="none" stroke="#e08a4a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="11" y="8" width="26" height="32" rx="3"/><rect x="16" y="20" width="16" height="14" rx="2"/><path d="M16 13h.01M21 13h.01"/></svg></div></div><figcaption><b>Ofensteuerung</b><span class="badge">Bald</span></figcaption></figure>
         </div>
-        <p class="lead" style="margin-top:16px;font-size:13.5px">Ohne Zusatzinhalt: <b>„Screen füllen"</b> verdoppelt die Kacheln nach rechts (aus 2×2 wird 2×2 | 2×2 = 4×2, gleiche Kachelgröße). <b>„Bildschirm füllen"</b> zoomt zusätzlich auf die echte Tablet-Auflösung.</p>
+        <p class="lead" style="margin-top:16px;font-size:13.5px">Ohne Widget: <b>„Screen füllen"</b> verdoppelt die Kacheln nach rechts (aus 2×2 wird 2×2 | 2×2 = 4×2, gleiche Kachelgröße). <b>„Bildschirm füllen"</b> zoomt zusätzlich auf die echte Tablet-Auflösung.</p>
 
         <div class="ovcols">
           <div class="ovcol"><h4>Panel-Konfiguration</h4>
-            <button class="ovbox" data-goto="pconf:appearance"><b>Aussehen &amp; Verhalten</b><span>Panel-Farbe &amp; Schrift, Kachel-Layout, Split/Pane 2, Display &amp; Nacht (Abdunkeln, Auto-Neustart), Feinjustierung.</span></button>
+            <button class="ovbox" data-goto="pconf:appearance"><b>Aussehen &amp; Verhalten</b><span>Panel-Farbe &amp; Schrift, Kachel-Layout, Widget (Pane 2), Display &amp; Nacht (Abdunkeln, Auto-Neustart), Feinjustierung.</span></button>
             <button class="ovbox" data-goto="pconf:tabs"><b>Tabs</b><span>Untere Leiste: bis 4 Buttons – Standard-Tabs und/oder einzelne Kategorien bzw. Räume als Abkürzung. Der erste ist die Startseite.</span></button>
             <button class="ovbox" data-goto="pconf:rooms"><b>Räume</b><span>Welche Räume dieses Panel zeigt. Nichts angehakt = alle.</span></button>
             <button class="ovbox" data-goto="pconf:cats"><b>Kategorien</b><span>Welche Kategorien im Tab „Kategorien" erscheinen.</span></button>
@@ -588,7 +670,7 @@
             </div>
             <div class="nm">7–8″-Tablet <span class="badge">2 Panes / Zoom</span></div>
             <div class="spec">~1024×600 / 1280×800 · Android · quer</div>
-            <div class="desc">Zwei Panes (Visu + Zusatz) nebeneinander – oder Zoom auf den ganzen Schirm.</div>
+            <div class="desc">Zwei Panes (Visu + Widget) nebeneinander – oder Zoom auf den ganzen Schirm.</div>
           </figure>
 
         </div>
@@ -627,6 +709,81 @@
             <div class="actions"><button class="btn" id="nt_save" data-i18n>Speichern</button><span class="toast" id="nt_toast"></span></div>
           </div>
         </details>
+      </div>
+
+      <!-- Einrichtungsassistent: Start-Button + Schritt-für-Schritt-Erklärung -->
+      <div id="assistantHost" class="ovw" style="display:none">
+        <button class="as-start" id="asStartWiz">＋ Neues Panel einrichten starten</button>
+        <p class="as-lead">In acht Schritten vom leeren Panel zur fertigen Visu — geführt, mit Sofort-Vorschau. Danach lässt sich jedes Detail unter <b>Panel Configuration</b> nachjustieren.</p>
+
+        <div class="as-concepts">
+          <div class="as-def blocks"><span class="tag">Bausteine</span><b>Deine Loxone-Controls</b><p>Licht, Beschattung, Taster, Sensoren … als einzelne <strong>Kacheln</strong> im Raster.</p></div>
+          <div class="as-def widget"><span class="tag">Widget</span><b>Fertige Inhaltsfläche</b><p>Wetter, Kalender, Audio, Energiefluss, Kamera, Verlauf oder Werte — eine ganze Ansicht statt einzelner Kacheln.</p></div>
+        </div>
+
+        <div class="as-steps">
+
+          <section class="as-step"><div class="as-h"><div class="as-num">1</div><div><div class="as-of">Schritt 1 / 8</div><h4>Anzeige &amp; Kachel-Raster</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Zuerst die Bauform: ein einzelnes 4″-Panel oder ein breites 2-Pane-Gerät. Darunter das Kachel-Raster (2×2 · 3×2 · 2×3 · 3×3) — es bestimmt nur, wie viele Kacheln je Seite passen.</p></div>
+              <div class="as-fig"><div class="as-row2">
+                <div><div class="as-scr"><div class="as-tiles" style="grid-template-columns:repeat(2,1fr)"><i></i><i></i><i></i><i></i></div></div><div class="as-cap">1 Pane</div></div>
+                <div><div class="as-scr"><div style="display:flex;gap:5px"><div class="as-tiles" style="grid-template-columns:repeat(2,1fr);flex:1"><i></i><i></i><i></i><i></i></div><div class="as-p2" style="flex:1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/></svg><small>Widget</small></div></div></div><div class="as-cap">2 Panes</div></div>
+              </div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">2</div><div><div class="as-of">Schritt 2 / 8</div><h4>Inhalt</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Wie das Panel befüllt wird.</p><div class="as-opts"><span class="as-chip">Raum-Panel</span><span class="as-chip">Klassische Visu</span><span class="as-chip k">Freie Auswahl — bis 4 Seiten</span></div></div>
+              <div class="as-fig"><div class="as-scr"><div class="as-tiles" style="grid-template-columns:repeat(3,1fr)"><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="as-tabs"><u class="on"></u><u></u><u></u><u></u></div></div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">3</div><div><div class="as-of">Schritt 3 / 8</div><h4>Design</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Aussehen für das ganze Panel — später je Kachel übersteuerbar.</p><div class="as-opts"><span class="as-chip">Panel-Farbe</span><span class="as-chip">Icon 38 · Name 20 · Sub 16</span><span class="as-chip">Schriftart</span><span class="as-chip">Skalierung</span></div></div>
+              <div class="as-fig"><div class="as-scr" style="padding:11px"><div class="as-sw"><span style="background:#e0a24d"></span><span style="background:#b0344a"></span><span style="background:#3e4468"></span><span style="background:#3e5240"></span><span style="background:#cedcdd"></span></div><div class="as-lab">Icon-Größe</div><div class="as-sld" style="--v:60%"></div><div class="as-lab">Skalierung</div><div class="as-sld" style="--v:40%"></div></div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">4</div><div><div class="as-of">Schritt 4 / 8</div><h4>Name &amp; ID</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Anzeigename und Panel-ID. Die ID ist der Aufruf am Gerät: <code>?panel=wohnzimmer</code>.</p></div>
+              <div class="as-fig"><div class="as-scr" style="padding:12px;display:flex;flex-direction:column;gap:7px"><div class="as-lab" style="margin:0">Anzeigename</div><div class="as-fld">Wohnzimmer</div><div class="as-lab" style="margin:0">Panel-ID</div><div class="as-fld mono">?panel=wohnzimmer</div></div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">5</div><div><div class="as-of">Schritt 5 / 8</div><h4>Seiten befüllen</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Bei <strong>Freier Auswahl</strong>: bis zu 4 Seiten sind offen — ungenutzte mit <strong>✕</strong> entfernen. Je Seite Name, Icon und der Inhalt:</p><div class="as-opts"><span class="as-chip k">Bausteine (Kacheln)</span><span class="as-chip w">Widget</span></div><p class="as-desc" style="margin-top:10px"><strong>Kacheln:</strong> links Raum, rechts die Bausteine — mit Suche. <em>Nächsten Tab befüllen</em> führt weiter.<br><strong>Widget:</strong> gleich daneben der konkrete Baustein — <em>welcher</em> Verlauf, <em>welche</em> Kamera, <em>welche</em> Zone.</p></div>
+              <div class="as-fig"><div class="as-scr" style="padding:10px">
+                <div class="as-sel"><span class="ic"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span><span class="nm"></span><span class="dd k">Kacheln ▾</span></div>
+                <div class="as-sel"><span class="ic"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><span class="nm"></span><span class="dd w">Widget ▾</span></div>
+                <div class="as-sel"><span class="ic"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="m17 10 5-3v10l-5-3z"/></svg></span><span class="nm"></span><span class="dd w">Kamera ▾</span></div>
+              </div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">6</div><div><div class="as-of">Schritt 6 / 8</div><h4>Screensaver — Uhr-Seite</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Im Querformat steht rechts neben der Uhr Platz für ein Widget (die zweite Spalte).</p><div class="as-opts"><span class="as-chip">Automatik</span><span class="as-chip">Aus</span><span class="as-chip w">Kalender</span><span class="as-chip w">Wetter</span><span class="as-chip w">Audio</span><span class="as-chip w">Energiefluss</span><span class="as-chip w">Kamera</span><span class="as-chip w">Verlauf</span><span class="as-chip w">Werte</span></div></div>
+              <div class="as-fig"><div class="as-scr" style="padding:10px"><div class="as-clock"><div class="t"><b>20:45</b><span>Sa · 27. Sep</span></div><div class="w"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><small>Widget</small></div></div></div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">7</div><div><div class="as-of">Schritt 7 / 8</div><h4>Aktiv-Overlay</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Wie eine <strong>aktive</strong> Kachel hervorgehoben wird — Rahmen, Füllung, Deckkraft — und der Rahmen der inaktiven Kacheln und rechten Panes.</p><div class="as-opts"><span class="as-chip">Rahmen + Füllung</span><span class="as-chip">Deckkraft</span><span class="as-chip">Positionsring</span></div></div>
+              <div class="as-fig"><div class="as-scr"><div class="as-tiles" style="grid-template-columns:repeat(2,1fr)"><i class="a"></i><i></i><i></i><i></i></div></div></div></div></section>
+
+          <section class="as-step"><div class="as-h"><div class="as-num">8</div><div><div class="as-of">Schritt 8 / 8</div><h4>Zusammenfassung</h4></div></div>
+            <div class="as-body"><div><p class="as-desc">Alle Einstellungen auf einen Blick, dann <strong>„Panel anlegen ✓"</strong>. Danach im Editor für den Feinschliff und jederzeit über <em>„Visu öffnen"</em> testbar.</p></div>
+              <div class="as-fig"><div class="as-scr as-sum" style="padding:11px 12px"><div class="r0"><span class="l">Anzeige</span><span class="r">1 Pane · 4″</span></div><div class="r0"><span class="l">Inhalt</span><span class="r">Freie Auswahl</span></div><div class="r0"><span class="l">Seiten</span><span class="r">3</span></div><div class="r0"><span class="l">Skalierung</span><span class="r">Automatisch</span></div></div></div></div></section>
+
+        </div>
+
+        <div class="as-band"><h4><span class="pin">2 Panes</span> Was am Breitbild anders ist</h4>
+          <p>Der Ablauf ist derselbe — nur bekommt die zweite Spalte einen eigenen Inhalt:</p>
+          <div class="as-split">
+            <div class="as-mini"><b>Widget je Tab</b><p>Statt „nur Visu" hat jeder Tab rechts ein eigenes Widget — <code>Kein Widget (Screen füllen)</code> oder Wetter/Kalender/Audio/Energiefluss/Kamera/Verlauf. Pro Tab getrennt wählbar.</p></div>
+            <div class="as-mini"><b>Screensaver-Widget</b><p>Dieselbe Widget-Auswahl steht als zweite Spalte der Uhr-Seite — im Querformat neben der Uhr.</p></div>
+          </div>
+        </div>
+
+        <div class="as-band"><h4>Der Widget-Katalog</h4>
+          <p>Ein Widget ist eine fertige Inhaltsfläche. Dieselben sieben stehen an drei Orten zur Wahl: <b>Pane 2</b> (Breitbild), <b>Screensaver</b> (Uhr-Seite) und <b>eigener Vollbild-Tab</b> (auch am 1-Pane-Panel).</p>
+          <div class="as-cat">
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6 1.5A4 4 0 0 0 6.5 19z"/></svg></span><div><b>Wetter</b><span>Kurve &amp; Vorschau</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg></span><div><b>Kalender</b><span>Monat + Termine</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg></span><div><b>Audio</b><span>Now Playing</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span><div><b>Energiefluss</b><span>Radial, live</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="m17 10 5-3v10l-5-3z"/></svg></span><div><b>Kamera</b><span>Türstation live</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l5-5 3 3 5-6"/><path d="M4 20h16"/></svg></span><div><b>Verlauf</b><span>Aufzeichnung</span></div></div>
+            <div class="as-wc"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19V5M4 19h16"/><path d="M8 14h3M8 10h6"/></svg></span><div><b>Werte</b><span>Frei gewählte Bausteine</span></div></div>
+          </div>
+        </div>
       </div>
 
       <!-- Panel Configuration -->
@@ -863,16 +1020,17 @@ function renderList(){
 function setRubric(r){
   rubric=r;
   document.querySelectorAll('.rub').forEach(b=>b.classList.toggle('active',b.dataset.rub===r));
-  const ov=r==='overview', pc=r==='pconf', dv=r==='devices', dp=r==='displays';
+  const ov=r==='overview', pc=r==='pconf', dv=r==='devices', dp=r==='displays', as=r==='assistant';
   const oh=$('#overviewHost'); if(oh) oh.style.display = ov?'':'none';
   const dh=$('#devicesHost'); if(dh) dh.style.display = dv?'':'none';
   const dph=$('#displaysHost'); if(dph) dph.style.display = dp?'':'none';
+  const ash=$('#assistantHost'); if(ash) ash.style.display = as?'':'none';
   $('#pconfHost').style.display = pc?'':'none';
-  $('#setHost').style.display = (ov||pc||dv||dp)?'none':'';
+  $('#setHost').style.display = (ov||pc||dv||dp||as)?'none':'';
   $('#savebar').style.display = pc?'':'none';
   $('#phead').style.display = pc?'':'none';
-  $('#subtabs').style.display = (ov||dv||dp)?'none':'';
-  if(ov||dv||dp) return;
+  $('#subtabs').style.display = (ov||dv||dp||as)?'none':'';
+  if(ov||dv||dp||as) return;
   if(pc){ renderEditor(); }
   else { renderSubtabs(); showSub(subSet); }
 }
@@ -1221,7 +1379,7 @@ function renderEditor(){
             T('Wie global')+' ('+scaleName(((PANELS.__global__||{}).ui||{}).scale)+')')+'</select></div>'+
      '</div>'+
      '<div class="hint" style="padding-top:4px">'+T('Skalierung „Automatisch": Jedes Display vergrößert die Visu so weit, wie es ohne Rand und ohne Verzerrung geht – Schrift, Icons, Uhr-Seite und Panes wachsen mit. Ein fester Faktor wird nie größer, als der Bildschirm hergibt. Wirkt nicht zusammen mit „Bildschirm füllen", das den Schirm schon ausfüllt. „Wie global" übernimmt die Einstellung unter Global → Darstellung; pro Gerät übersteuerbar unter Settings → Panels.')+'</div>'+
-     '<div class="grph">'+T('Split / Pane 2')+'</div>'+
+     '<div class="grph">'+T('Widget (Pane 2)')+'</div>'+
      '<div class="sizes">'+
        '<div class="field" style="max-width:220px"><label class="lbl">Split-Screen</label>'+
          '<select id="fSplit">'+
@@ -1230,14 +1388,14 @@ function renderEditor(){
          '</select>'+
          '<div class="hint" style="padding-top:4px">Bei „Aus" zeigt das Panel nur die linke Visu im Kachel-Layout – keine Pane 2, keine Verdopplung. Für 4″-Wandpanels.</div></div>'+
      '</div>'+
-     '<div class="field" style="max-width:none" id="paneField"><label class="lbl">Split-Pane je Tab</label>'+
+     '<div class="field" style="max-width:none" id="paneField"><label class="lbl">Widget je Tab</label>'+
        '<div class="cclist" id="panePerTab"></div>'+
-       '<div class="hint" style="padding-top:4px">Je Tab rechts eine Zusatzfläche: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Kamera</b> (Intercom-Live-Bild – Kamera daneben wählbar, Zugang unter Einstellungen → Intercom), <b>Wetter</b>, <b>Kalender</b> oder <b>Energiefluss</b>. <b>Screen füllen</b> = kein Zusatz, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
+       '<div class="hint" style="padding-top:4px">Je Tab rechts ein <b>Widget</b>: <b>Audio</b> (Musikzone – Zone daneben wählbar), <b>Kamera</b> (Intercom-Live-Bild – Kamera daneben wählbar, Zugang unter Einstellungen → Intercom), <b>Wetter</b>, <b>Kalender</b>, <b>Energiefluss</b>, <b>Verlauf</b> (Baustein mit Aufzeichnung) oder <b>Werte</b> (frei gewählte Bausteine). <b>Screen füllen</b> = kein Widget, die Visu weitet sich nach rechts aus (doppelte Spalten). „Bildschirm füllen" zoomt alles auf den ganzen Schirm. Wetter/Kalender-Quelle: Einstellungen → Kalender &amp; Wetter.</div></div>'+
      '<div id="svPaneField">'+
        '<div class="grph">'+T('Screensaver (Uhr-Seite)')+'</div>'+
        '<div class="field" style="max-width:none"><label class="lbl">Rechte Spalte im Querformat</label>'+
        '<div id="svPaneBox"></div>'+
-       '<div class="hint" style="padding-top:4px">Die Uhr-Startseite im <b>Querformat</b> hat rechts neben der Uhr Platz. <b>Automatisch</b> zeigt dort die nächsten Termine und, sobald keine anstehen, die Wetter-Details – so bleibt die Fläche nie leer. Fest wählbar sind <b>Termine</b>, <b>Wetter-Details</b> (Stundenverlauf, Luftfeuchte, Wind, Sonne), <b>Energiefluss</b>, <b>Kamera</b> oder <b>Werte</b> aus frei gewählten Bausteinen. <b>Nichts</b> rückt Uhr und Wetter auf die volle Breite. Hochkant und auf dem 4″-Panel bleibt es unverändert bei Wetter, Uhr und Terminen. Bedenke bei <b>Kamera</b> und <b>Energiefluss</b>: die Uhr-Seite steht auf einem Wandpanel stundenlang still – ein weitgehend unveränderliches Bild begünstigt Einbrennen. Das Kamerabild läuft nur, solange die Uhr-Seite zu sehen ist.</div></div></div>'+
+       '<div class="hint" style="padding-top:4px">Die Uhr-Startseite im <b>Querformat</b> hat rechts neben der Uhr Platz. <b>Automatisch</b> zeigt dort die nächsten Termine und, sobald keine anstehen, die Wetter-Details – so bleibt die Fläche nie leer. Als <b>Widget</b> fest wählbar sind <b>Termine</b>, <b>Wetter-Details</b> (Stundenverlauf, Luftfeuchte, Wind, Sonne), <b>Audio</b> (Now Playing), <b>Energiefluss</b>, <b>Kamera</b>, <b>Verlauf</b> oder <b>Werte</b> aus frei gewählten Bausteinen. <b>Nichts</b> rückt Uhr und Wetter auf die volle Breite. Hochkant und auf dem 4″-Panel bleibt es unverändert bei Wetter, Uhr und Terminen. Bedenke bei <b>Kamera</b> und <b>Energiefluss</b>: die Uhr-Seite steht auf einem Wandpanel stundenlang still – ein weitgehend unveränderliches Bild begünstigt Einbrennen. Das Kamerabild läuft nur, solange die Uhr-Seite zu sehen ist.</div></div></div>'+
      '<div class="grph">'+T('Display &amp; Nacht')+'</div>'+
      '<div class="sizes">'+
        '<div class="field" style="max-width:180px"><label class="lbl">Display aus nach (Sek.)</label>'+
@@ -1426,23 +1584,38 @@ function renderPanes(p){
     const meta=(META.tabs||[]).find(t=>t.tab===tk);
     const label=meta?meta.label:tk;
     const v=panes[tk]||'';
-    const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0, isV=v.indexOf('chart:')===0;
-    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':v))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'', vuid=isV?v.slice(6):'';
+    const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0, isV=v.indexOf('chart:')===0, isS=v.indexOf('status:')===0;
+    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':v)))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'', vuid=isV?v.slice(6):'';
+    const suu=isS?v.slice(7).split(',').filter(Boolean):[];
     let row='<div class="ccrow"><span class="ccnm">'+esc(label)+'</span>'+
       '<select data-pane="'+esc(tk)+'">'+
-        '<option value=""'+(kind===''?' selected':'')+'>Screen füllen</option>'+
-        '<option value="player"'+(kind==='player'?' selected':'')+'>Audio</option>'+
-        '<option value="camera"'+(kind==='camera'?' selected':'')+'>Kamera</option>'+
-        '<option value="weather"'+(kind==='weather'?' selected':'')+'>Wetter</option>'+
-        '<option value="calendar"'+(kind==='calendar'?' selected':'')+'>Kalender</option>'+
-        '<option value="energy"'+(kind==='energy'?' selected':'')+'>Energiefluss</option>'+
-        (statControls().length?'<option value="chart"'+(kind==='chart'?' selected':'')+'>Verlauf</option>':'')+
+        '<option value=""'+(kind===''?' selected':'')+'>'+T('Kein Widget (Screen füllen)')+'</option>'+
+        '<optgroup label="'+T('Widget')+'">'+
+          '<option value="weather"'+(kind==='weather'?' selected':'')+'>Wetter</option>'+
+          '<option value="calendar"'+(kind==='calendar'?' selected':'')+'>Kalender</option>'+
+          '<option value="player"'+(kind==='player'?' selected':'')+'>Audio</option>'+
+          '<option value="energy"'+(kind==='energy'?' selected':'')+'>Energiefluss</option>'+
+          '<option value="camera"'+(kind==='camera'?' selected':'')+'>Kamera</option>'+
+          (statControls().length?'<option value="chart"'+(kind==='chart'?' selected':'')+'>Verlauf</option>':'')+
+          '<option value="status"'+(kind==='status'?' selected':'')+'>Werte</option>'+
+        '</optgroup>'+
       '</select>';
     if(isP) row+='<select data-panez="'+esc(tk)+'">'+audioZoneOptions(zone)+'</select>';
     if(isE) row+='<select data-panee="'+esc(tk)+'">'+energyControlOptions(euid)+'</select>';
     if(isC) row+='<select data-panec="'+esc(tk)+'">'+cameraOptions(camu)+'</select>';
     if(isV) row+='<select data-panev="'+esc(tk)+'">'+chartControlOptions(vuid)+'</select>';
-    return row+'</div>';
+    row+='</div>';
+    if(isS){   // Werte = mehrere Bausteine, wie auf der Uhr-Seite
+      row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
+        '<select class="pstat-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
+        ((svMax()&&suu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
+        '<div class="picked" style="margin:6px 0 2px">'+(suu.length
+          ? suu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+              return '<span class="chip on" data-pk="'+esc(tk)+'" data-su="'+esc(u)+'">'+esc(c?c.name:u)+
+                '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+    }
+    return row;
   }).join('') || '<div class="ccmut">Keine Tabs.</div>';
   const setPane=(tk,val)=>{ p.ui=p.ui||{}; p.ui.panes=p.ui.panes||{};
     if(val) p.ui.panes[tk]=val; else delete p.ui.panes[tk];
@@ -1457,9 +1630,18 @@ function renderPanes(p){
       const u=cur.indexOf('camera:')===0?cur.slice(7):firstCamera(); setPane(tk,'camera:'+u); }
     else if(k==='chart'){ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
       const u=cur.indexOf('chart:')===0?cur.slice(6):firstChartControl(); setPane(tk,'chart:'+u); }
+    else if(k==='status'){ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
+      setPane(tk, cur.indexOf('status:')===0?cur:'status:'); }   // Bausteine unten wählen
     else setPane(tk,k);
-    renderPanes(p);   // Zonen-/Control-/Kamera-Dropdown ein-/ausblenden
+    renderPanes(p);   // Zonen-/Control-/Kamera-/Werte-Auswahl ein-/ausblenden
   });
+  const paneStatUu=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('status:')===0?cur.slice(7).split(',').filter(Boolean):[]; };
+  box.querySelectorAll('.pstat-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
+    const uu=paneStatUu(tk); if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
+    setPane(tk,'status:'+uu.concat([u]).join(',')); renderPanes(p); });
+  box.querySelectorAll('.chip[data-su][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
+    const rest=paneStatUu(tk).filter(x=>x!==n.dataset.su);
+    setPane(tk, rest.length?('status:'+rest.join(',')):'status:'); renderPanes(p); });
   box.querySelectorAll('select[data-panez]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panez,'player:'+s.value);
   });
@@ -1498,19 +1680,21 @@ function renderSvPane(p){
   let h='<div class="ccrow"><span class="ccnm">'+T('Inhalt')+'</span>'+
     '<select id="fSvPane">'+
       '<option value=""'+(k===''?' selected':'')+'>Automatisch (Termine, sonst Wetter)</option>'+
-      '<option value="calendar"'+(k==='calendar'?' selected':'')+'>Termine</option>'+
-      '<option value="weather"'+(k==='weather'?' selected':'')+'>Wetter-Details</option>'+
+      '<option value="calendar"'+(k==='calendar'?' selected':'')+'>Kalender</option>'+
+      '<option value="weather"'+(k==='weather'?' selected':'')+'>Wetter</option>'+
+      '<option value="player"'+(k==='player'?' selected':'')+'>Audio</option>'+
       '<option value="energy"'+(k==='energy'?' selected':'')+'>Energiefluss</option>'+
       '<option value="camera"'+(k==='camera'?' selected':'')+'>Kamera</option>'+
-      '<option value="chart"'+(k==='chart'?' selected':'')+'>Verlauf (Baustein)</option>'+
-      '<option value="status"'+(k==='status'?' selected':'')+'>Werte (eigene Auswahl)</option>'+
+      '<option value="chart"'+(k==='chart'?' selected':'')+'>Verlauf</option>'+
+      '<option value="status"'+(k==='status'?' selected':'')+'>Werte</option>'+
       '<option value="off"'+(k==='off'?' selected':'')+'>Nichts (Uhr über volle Breite)</option>'+
     '</select>';
-  if(k==='energy'||k==='camera'||k==='chart'){
-    const opt=(k==='energy')?energyControlOptions(arg):(k==='camera')?cameraOptions(arg):chartControlOptions(arg);
+  if(k==='player'||k==='energy'||k==='camera'||k==='chart'){
+    const opt=(k==='player')?audioZoneOptions(arg):(k==='energy')?energyControlOptions(arg):(k==='camera')?cameraOptions(arg):chartControlOptions(arg);
     h+= opt ? '<select id="fSvArg">'+opt+'</select>'
-      : '<span class="ccmut">'+(k==='energy'
-          ? T('Kein Energieflussmonitor in der Anlage.')
+      : '<span class="ccmut">'+(k==='player'
+          ? T('Keine Musikzone in der Anlage.')
+          : k==='energy' ? T('Kein Energieflussmonitor in der Anlage.')
           : k==='camera' ? T('Kein Intercom-Baustein in der Anlage.')
           : T('Kein Baustein mit Aufzeichnung in der Anlage.'))+'</span>';
   }
@@ -1536,12 +1720,13 @@ function renderSvPane(p){
     // Arten mit Ziel: nur speichern, wenn es das Ziel wirklich gibt. Sonst die
     // Auswahl nur merken (Hinweis erscheint), aber nichts Halbes ablegen.
     let ziel='';
-    if(nk==='energy') ziel=(k==='energy'&&arg)?arg:firstEnergyControl();
+    if(nk==='player') ziel=(k==='player'&&arg)?arg:firstAudioZone();
+    else if(nk==='energy') ziel=(k==='energy'&&arg)?arg:firstEnergyControl();
     else if(nk==='camera') ziel=(k==='camera'&&arg)?arg:firstCamera();
     else if(nk==='chart') ziel=(k==='chart'&&arg)?arg:firstChartControl();
     else if(nk==='status') ziel=uu.join(',');
-    svWant=(nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') && !ziel ? cur+'|'+nk : '';
-    if(nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') setSv(ziel?(nk+':'+ziel):'');
+    svWant=(nk==='player'||nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') && !ziel ? cur+'|'+nk : '';
+    if(nk==='player'||nk==='energy'||nk==='camera'||nk==='chart'||nk==='status') setSv(ziel?(nk+':'+ziel):'');
     else setSv(nk);
   };
   const sa=$('#fSvArg');
@@ -1946,12 +2131,52 @@ function pickWizHtml(p){
 }
 
 // ---- Direkter Editor (sobald etwas gewaehlt ist) ----
+// Widget-Wert einer freien Seite (statt Kacheln). Kind/Arg wie eine Tab-Pane.
+function wKind(v){ if(!v) return ''; const i=v.indexOf(':'); return i>0?v.slice(0,i):v; }
+function wArg(v){ const i=v.indexOf(':'); return i>0?v.slice(i+1):''; }
+// "Seiteninhalt": Bausteine (Kacheln) ODER ein Widget als Vollbild-Tab.
+function pickContentHtml(p){
+  const w=curPT(p).widget||'', k=wKind(w), arg=wArg(w);
+  let h='<div class="field" style="max-width:280px"><label class="lbl">'+T('Seiteninhalt')+'</label>'+
+    '<select id="pickContent">'+
+      '<option value=""'+(k===''?' selected':'')+'>'+T('Bausteine (Kacheln)')+'</option>'+
+      '<optgroup label="'+T('Widget (Vollbild)')+'">'+
+        '<option value="weather"'+(k==='weather'?' selected':'')+'>'+T('Wetter')+'</option>'+
+        '<option value="calendar"'+(k==='calendar'?' selected':'')+'>'+T('Kalender')+'</option>'+
+        (firstAudioZone()?'<option value="player"'+(k==='player'?' selected':'')+'>'+T('Audio')+'</option>':'')+
+        (firstEnergyControl()?'<option value="energy"'+(k==='energy'?' selected':'')+'>'+T('Energiefluss')+'</option>':'')+
+        (firstCamera()?'<option value="camera"'+(k==='camera'?' selected':'')+'>'+T('Kamera')+'</option>':'')+
+        (statControls().length?'<option value="chart"'+(k==='chart'?' selected':'')+'>'+T('Verlauf')+'</option>':'')+
+        '<option value="status"'+(k==='status'?' selected':'')+'>'+T('Werte')+'</option>'+
+      '</optgroup>'+
+    '</select></div>';
+  if(k==='player') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Musikzone')+'</label><select id="pickWArg">'+audioZoneOptions(arg)+'</select></div>';
+  else if(k==='energy') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+energyControlOptions(arg)+'</select></div>';
+  else if(k==='camera') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+cameraOptions(arg)+'</select></div>';
+  else if(k==='chart') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+chartControlOptions(arg)+'</select></div>';
+  else if(k==='status'){ const suu=arg?arg.split(',').filter(Boolean):[];
+    h+='<div class="ccrow" style="margin:4px 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
+       '<select id="pickWStatAdd"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
+       ((svMax()&&suu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
+       '<div class="picked" style="margin:6px 0 2px">'+(suu.length
+         ? suu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+             return '<span class="chip on" data-wsu="'+esc(u)+'">'+esc(c?c.name:u)+
+               '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+         : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+  }
+  return h;
+}
 function pickEditHtml(p){
-  return '<div class="grph">'+T('Eigene Auswahl')+
-      '<button class="minibtn" id="wizAgain" style="float:right;margin-top:-4px">'+T('Schritt für Schritt')+'</button></div>'+
+  const w=curPT(p).widget||'';
+  const head='<div class="grph">'+T('Eigene Auswahl')+
+      (w?'':'<button class="minibtn" id="wizAgain" style="float:right;margin-top:-4px">'+T('Schritt für Schritt')+'</button>')+'</div>'+
     '<div class="field" style="max-width:280px"><label class="lbl">'+T('Name der Seite')+'</label>'+
       '<input type="text" id="pickName" maxlength="40" value="'+esc(pickNameOf(p))+'" placeholder="'+T('Auswahl')+'"></div>'+
     '<div class="field"><label class="lbl">'+T('Icon der Seite')+'</label>'+pickIcoGridHtml(p)+'</div>'+
+    pickContentHtml(p);
+  if(w) return head+
+    '<p class="note" style="margin:10px 0 0">'+T('Diese Seite zeigt statt Kacheln das gewählte Widget über die ganze Fläche — auch am 1-Pane-Display. Wähle oben „Bausteine (Kacheln)", um wieder Kacheln zu setzen.')+'</p>';
+  return head+
     '<div style="margin-top:10px">'+pickAnchorsHtml(p)+'</div>'+
     pickChosenHtml()+
     '<p class="note" style="margin:8px 0 0">'+T('Tippen auf <b>×</b> nimmt einen Baustein wieder heraus; die Nummern rutschen nach.')+'</p>'+
@@ -1967,7 +2192,9 @@ function renderPick(p){
   if(pickFor!==cur){ pickFor=cur; pickWiz=0; pickQ=''; pickRoomF=''; curPickIdx=0; }
   if(!(p.tabs||[]).some(isPick)){ box.style.display='none'; box.innerHTML=''; return; }
   box.style.display='';
-  if(!pickWiz) pickWiz = pickList(p).length ? -1 : 1;
+  // Direkt-Editor als Standard: dort steht der „Seiteninhalt"-Wähler (Kacheln
+  // ODER Widget). Der gefuehrte Mini-Assistent ist ueber „Schritt fuer Schritt".
+  if(!pickWiz) pickWiz = -1;
   const bar = tabMode(p)==='pick' ? pickTabBar(p) : '';
   box.innerHTML = bar + (pickWiz>0 ? pickWizHtml(p) : pickEditHtml(p));
   bindPick(p);
@@ -1990,6 +2217,24 @@ function bindPick(p){
   $('#tabPick').querySelectorAll('.picogrid [data-pic]').forEach(el=>el.onclick=()=>{
     const v=el.dataset.pic; if(v) curPT(p).icon=v; else delete curPT(p).icon;
     markDirty(); renderPick(p); renderChips(p); });
+  // Seiteninhalt: Bausteine (Kacheln) vs Widget
+  { const pc=$('#pickContent'); if(pc) pc.onchange=()=>{ const k=pc.value, e=curPT(p);
+      if(!k) delete e.widget;
+      else if(k==='weather'||k==='calendar') e.widget=k;
+      else if(k==='player') e.widget='player:'+(firstAudioZone()||'');
+      else if(k==='energy') e.widget='energy:'+(firstEnergyControl()||'');
+      else if(k==='camera') e.widget='camera:'+(firstCamera()||'');
+      else if(k==='chart') e.widget='chart:'+(firstChartControl()||'');
+      else if(k==='status') e.widget=(wKind(e.widget||'')==='status'?e.widget:'status:');
+      pickWiz=-1; markDirty(); renderPick(p); renderChips(p); }; }
+  { const wa=$('#pickWArg'); if(wa) wa.onchange=()=>{ const e=curPT(p); e.widget=wKind(e.widget||'')+':'+wa.value; markDirty(); renderPick(p); }; }
+  { const wsAdd=$('#pickWStatAdd'); if(wsAdd) wsAdd.onchange=()=>{ const e=curPT(p), u=wsAdd.value; wsAdd.value='';
+      const uu=(wKind(e.widget||'')==='status'?wArg(e.widget).split(',').filter(Boolean):[]);
+      if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
+      e.widget='status:'+uu.concat([u]).join(','); markDirty(); renderPick(p); }; }
+  $('#tabPick').querySelectorAll('.chip[data-wsu]').forEach(n=>n.onclick=()=>{ const e=curPT(p);
+      const rest=(wKind(e.widget||'')==='status'?wArg(e.widget).split(',').filter(Boolean):[]).filter(x=>x!==n.dataset.wsu);
+      e.widget=rest.length?('status:'+rest.join(',')):'status:'; markDirty(); renderPick(p); });
   const psr=$('#pickSearch');
   if(psr) psr.oninput=()=>{ pickQ=psr.value; renderPickList(); };
   const prm=$('#pickRoom');
@@ -2275,7 +2520,8 @@ const WZIC={
   camera:'<svg viewBox="0 0 24 24"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>',
   status:'<svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><rect x="7" y="11" width="3" height="5"/><rect x="12" y="8" width="3" height="8"/><rect x="17" y="13" width="3" height="3"/></svg>',
   ext:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>',
-  photo:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5-9 9"/></svg>'
+  photo:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 16-5-5-9 9"/></svg>',
+  audio:'<svg viewBox="0 0 24 24"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg>'
 };
 function wzg(k){ return '<span class="ic">'+(WZIC[k]||WZIC.grid)+'</span>'; }
 function wzOpt(key,val,icon,title,desc){ return '<button class="wzo'+(WZ[key]===val?' on':'')+'" data-wk="'+key+'" data-wo="'+esc(val)+'">'+wzg(icon)+'<span class="tx"><b>'+title+'</b>'+(desc?'<span>'+desc+'</span>':'')+'</span></button>'; }
@@ -2300,7 +2546,10 @@ function wzGridCells(g){ const c={'2x2':[2,2],'3x2':[3,2],'2x3':[2,3],'3x3':[3,3
 function wzInitSetup(){
   if(WZ.content==='room' && !WZ.roomTab){ var rr=(META.tabs||[]).filter(function(t){return t.room;}); if(rr[0]) WZ.roomTab=rr[0].tab; }
   if(WZ.content==='classic' && !WZ.classic) WZ.classic=defaultTabs().map(function(k){ var m=(META.tabs||[]).find(function(t){return t.tab===k;}); return {key:k,label:(m&&m.label)||k,on:true}; });
-  if(WZ.content==='pick' && !WZ.pickPages) WZ.pickPages=[{name:'Favoriten',icon:''}];
+  // Standardmäßig alle 4 Seiten offen — man sieht sofort, dass bis zu 4 Tabs
+  // befüllbar sind; ungenutzte entfernt man mit dem ✕. Leere Seiten (keine
+  // Kacheln, kein Widget) werden beim Anlegen ohnehin verworfen (wzBuild).
+  if(WZ.content==='pick' && !WZ.pickPages) WZ.pickPages=[{name:'Favoriten',icon:''},{name:'',icon:''},{name:'',icon:''},{name:'',icon:''}];
 }
 function wzRoomCats(roomTab){ var ru=(roomTab||'').indexOf('room:')===0?roomTab.slice(5):''; return (META.cats||[]).filter(function(cat){ return (META.controls||[]).some(function(c){return c.room===ru && c.cat===cat.uuid;}); }); }
 function wzViews(){
@@ -2309,7 +2558,9 @@ function wzViews(){
   if(WZ.content==='classic') return (WZ.classic||[]).filter(function(t){return t.on;}).map(function(t){return {key:t.key,label:t.label};});
   return (WZ.pickPages||[]).map(function(pg,i){return {key:pickKey(i),label:(pg.name||'').trim()||(T('Seite')+' '+(i+1))};});
 }
-function wzP2Opts(sel){ var o=[['','Visu erweitern'],['weather','Wetter'],['calendar','Kalender'],['audio','Audio'],['energy','Energiefluss'],['camera','Kamera'],['chart','Verlauf']]; return o.map(function(x){return '<option value="'+x[0]+'"'+((sel||'')===x[0]?' selected':'')+'>'+T(x[1])+'</option>';}).join(''); }
+function wzP2Opts(sel){ var o=[['weather','Wetter'],['calendar','Kalender'],['audio','Audio'],['energy','Energiefluss'],['camera','Kamera'],['chart','Verlauf']];
+  return '<option value=""'+((sel||'')===''?' selected':'')+'>'+T('Kein Widget (Screen füllen)')+'</option>'+
+    '<optgroup label="'+T('Widget')+'">'+o.map(function(x){return '<option value="'+x[0]+'"'+((sel||'')===x[0]?' selected':'')+'>'+T(x[1])+'</option>';}).join('')+'</optgroup>'; }
 function wzP2Real(v){
   if(v==='weather'||v==='calendar') return v;
   if(v==='audio'){ var z=firstAudioZone(); return z?'player:'+z:''; }
@@ -2320,7 +2571,7 @@ function wzP2Real(v){
 }
 function wzPaneRows(){
   var v=wzViews(); if(!v.length) return '';
-  return '<p class="wzq mt">'+T('Rechtes Pane je Ansicht')+'</p><div class="wzopts">'+v.map(function(x){
+  return '<p class="wzq mt">'+T('Widget je Tab')+'</p><div class="wzopts">'+v.map(function(x){
     return '<div class="wzo" style="cursor:default"><span class="tx" style="flex:1"><b>'+esc(x.label)+'</b></span><select class="wzp2sel" data-p2k="'+esc(x.key)+'" style="max-width:170px">'+wzP2Opts(WZ.pane2[x.key])+'</select></div>';
   }).join('')+'</div><div class="wznote">'+T('Audio/Energie/Kamera/Verlauf nehmen automatisch den ersten passenden Baustein — den genauen wählst du bei Bedarf im Editor.')+'</div>';
 }
@@ -2332,6 +2583,28 @@ function wzIcoGrid(i){
   (((META.icons||{}).loxone)||[]).forEach(function(pth){ g+=btn('/icon?p='+encodeURIComponent(pth),pth); });
   (LOXLIB||[]).forEach(function(n){ g+=btn('/loxlib?n='+encodeURIComponent(n),n.replace(/\.svg$/i,'')); });
   return '<input class="pgi-search" oninput="pickIcoFilter(this.value)" placeholder="'+T('Icon suchen…')+'" style="width:100%;margin-top:6px"><div class="picogrid" style="width:100%">'+g+'</div>';
+}
+// Inhalts-Wahl einer freien Seite (Kacheln ODER Widget) — genutzt in der
+// Seiten-Liste UND im Befüll-Editor, damit jede Seite zuerst danach fragt.
+// pg.widget speichert den FERTIGEN Wert (weather|calendar|player:zone|
+// energy:uuid|camera:uuid|chart:uuid); die Detailauswahl steht direkt daneben.
+function wzWidgetKinds(){ var o=[['weather','Wetter'],['calendar','Kalender']];
+  if(firstAudioZone()) o.push(['player','Audio']);
+  if(firstEnergyControl()) o.push(['energy','Energiefluss']);
+  if(firstCamera()) o.push(['camera','Kamera']);
+  if(statControls().length) o.push(['chart','Verlauf']);
+  return o; }
+function wzWidgetFirst(k){ return k==='player'?firstAudioZone():k==='energy'?firstEnergyControl():k==='camera'?firstCamera():k==='chart'?firstChartControl():''; }
+function wzPageContentSel(i,maxw){ var pg=WZ.pickPages[i], k=wKind(pg.widget||'');
+  var opts=wzWidgetKinds().map(function(x){ return '<option value="'+x[0]+'"'+(k===x[0]?' selected':'')+'>'+T(x[1])+'</option>'; }).join('');
+  return '<select class="wzp2sel" data-pgw="'+i+'" style="max-width:'+(maxw||200)+'px">'+
+    '<option value=""'+(k===''?' selected':'')+'>'+T('Bausteine (Kacheln)')+'</option>'+
+    '<optgroup label="'+T('Widget (Vollbild)')+'">'+opts+'</optgroup></select>';
+}
+function wzPageArgSel(i){ var pg=WZ.pickPages[i], k=wKind(pg.widget||''), a=wArg(pg.widget||''), o='';
+  if(k==='player') o=audioZoneOptions(a); else if(k==='energy') o=energyControlOptions(a);
+  else if(k==='camera') o=cameraOptions(a); else if(k==='chart') o=chartControlOptions(a); else return '';
+  return o?'<select class="wzp2sel" data-pgwarg="'+i+'" style="max-width:180px">'+o+'</select>':'<span class="wznote" style="margin:0">'+T('Kein passender Baustein')+'</span>';
 }
 function wzSetup(){
   wzInitSetup();
@@ -2349,14 +2622,16 @@ function wzSetup(){
     return h2+'</div>'+wzPaneRows();
   }
   if(wzTileFor>=0 && wzTileFor<WZ.pickPages.length) return wzTileEditor(wzTileFor);
-  var h3='<p class="wzq">'+T('Freie Seiten — bis 4, je Name, Icon & Kacheln')+'</p><div class="wzopts">';
+  var h3='<p class="wzq">'+T('Freie Seiten — bis 4, je Name, Icon & Inhalt (Kacheln oder Widget)')+'</p><div class="wzopts">';
   h3+=WZ.pickPages.map(function(pg,i){
     var ic=pg.icon?'<span class="loxi" style="--u:url(\''+esc(icoUrl(pg.icon))+'\')"></span>':WZIC.pick;
     var del=WZ.pickPages.length>1?'<button class="wzbtn" data-pgdel="'+i+'" style="padding:5px 9px">✕</button>':'';
-    var n=(pg.picks||[]).length;
+    var n=(pg.picks||[]).length, wk=pg.widget||'';
+    var wsel=wzPageContentSel(i,150), argsel=wk?wzPageArgSel(i):'';
+    var tiles=wk?'':'<button class="wzbtn'+(n?' prim':'')+'" data-pgtiles="'+i+'" style="padding:6px 11px">▦ '+T('Kacheln')+' ('+n+')</button>';
     var row='<div class="wzo" style="cursor:default;flex-wrap:wrap;gap:8px"><button class="ic" data-pgico="'+i+'" style="cursor:pointer;padding:0">'+ic+'</button>'+
       '<input class="wzp2sel" data-pgn="'+i+'" value="'+esc(pg.name)+'" placeholder="'+T('Seitenname')+'" style="flex:1;min-width:120px">'+
-      '<button class="wzbtn'+(n?' prim':'')+'" data-pgtiles="'+i+'" style="padding:6px 11px">▦ '+T('Kacheln')+' ('+n+')</button>'+del+'</div>';
+      wsel+argsel+tiles+del+'</div>';
     if(WZ.icoPage===i) row+=wzIcoGrid(i);
     return row;
   }).join('');
@@ -2392,7 +2667,11 @@ function wzTileEditor(i){
   if(!comps) comps='<div class="wznote" style="margin:0">'+T('Nichts gefunden.')+'</div>';
   var N=WZ.pickPages.length, last=(i>=N-1);
   var prog='<button class="wzbtn prim" id="wzTileNext" style="width:100%;margin-top:12px;padding:11px">'+(last?(T('Weiter')+' →'):(T('Nächsten Tab befüllen')+' →'))+'</button>';
-  return '<div class="wzq" style="display:flex;align-items:center;gap:10px"><button class="wzbtn" id="wzTileBack" style="padding:4px 10px">← '+T('Übersicht')+'</button><b style="text-transform:none;letter-spacing:0;color:var(--fg)">'+esc(pg.name||T('Seite'))+' <span style="color:var(--muted);font-weight:400">('+(i+1)+'/'+N+')</span></b></div>'+
+  var header='<div class="wzq" style="display:flex;align-items:center;gap:10px"><button class="wzbtn" id="wzTileBack" style="padding:4px 10px">← '+T('Übersicht')+'</button><b style="text-transform:none;letter-spacing:0;color:var(--fg)">'+esc(pg.name||T('Seite'))+' <span style="color:var(--muted);font-weight:400">('+(i+1)+'/'+N+')</span></b></div>';
+  var content='<div class="wzrow" style="align-items:center;gap:8px;margin:6px 0 4px"><span style="font-size:12px;color:var(--muted)">'+T('Seiteninhalt')+'</span>'+wzPageContentSel(i,220)+(pg.widget?wzPageArgSel(i):'')+'</div>';
+  if(pg.widget) return header+content+
+    '<div class="wznote" style="margin-top:10px">'+T('Diese Seite zeigt das Widget über die ganze Fläche (Vollbild-Tab) — auch am 1-Pane-Display. Baustein/Zone wählst du oben direkt.')+'</div>'+prog;
+  return header+content+
     chosen+
     '<div class="wztiles3"><div class="wztcol"><div class="wzq" style="margin:0 0 6px;font-size:11px">'+T('Raum')+'</div><div class="wzrooms">'+roomList+'</div></div>'+
     '<div class="wztcol"><input id="wzTileSearch" class="wzp2sel" style="width:100%;margin-bottom:8px" placeholder="'+T('Baustein suchen (alle Räume)…')+'" value="'+esc(wzTileSearch)+'"><div class="wzavail">'+comps+'</div></div></div>'+prog;
@@ -2412,7 +2691,10 @@ function wzLookHtml(){
     '<p class="wznote" style="margin:0 0 8px">'+T('Eine Farbe wählen — Hintergrund, Kacheln, Leiste, Schrift und Icons werden daraus berechnet. Leer = Standard.')+'</p>'+
     '<div class="wzsww">'+sw+custom+none+'</div>'+
     '<p class="wznote" id="wzBaseVal" style="margin-top:6px">'+esc(L.baseColor||T('Standard-Farbschema'))+'</p>'+
-    '<p class="wzq mt">'+T('Größen & Schrift')+'</p><div class="wzrow">'+sizes+font+'</div>';
+    '<p class="wzq mt">'+T('Größen & Schrift')+'</p><div class="wzrow">'+sizes+font+
+      '<div class="wzfield" style="max-width:220px"><label>'+T('Skalierung')+'</label><select data-wscale class="skal">'+scaleOptions(L.scale,T('Wie global'))+'</select></div>'+
+    '</div>'+
+    '<p class="wznote" style="margin-top:6px">'+T('„Automatisch" vergrößert die Visu auf jedem Display so weit, wie es ohne Rand geht. „Wie global" erbt die globale Einstellung.')+'</p>';
 }
 function wzSummary(){
   var cmap={room:T('Raum-Panel'),classic:T('Klassische Visu'),pick:T('Freie Auswahl')};
@@ -2420,8 +2702,9 @@ function wzSummary(){
   if(WZ.content==='pick') rows.push([T('Seiten'),String((WZ.pickPages||[]).length)]);
   var L=WZ.look||{}; rows.push([T('Panel-Farbe'),L.baseColor||T('Standard')]);
   if(L.iconSize||L.nameSize||L.subSize||L.font){ var det=[]; if(L.iconSize)det.push('Icon '+L.iconSize); if(L.nameSize)det.push('Name '+L.nameSize); if(L.subSize)det.push('Sub '+L.subSize); if(L.font)det.push((FONTS.find(function(f){return f.v===L.font;})||{label:L.font}).label); rows.push([T('Größen & Schrift'),det.join(' · ')]); }
+  rows.push([T('Skalierung'),(L.scale===undefined||L.scale==='')?T('Wie global'):scaleName(L.scale)]);
   rows.push([T('Aktiv-Overlay'),(WZ.overlay&&Object.keys(WZ.overlay).length)?T('Angepasst'):T('Standard')]);
-  if(WZ.panes==='2'){ var svm={'':T('Automatik'),off:T('Aus'),calendar:T('Kalender'),weather:T('Wetter'),energy:T('Energiefluss'),camera:T('Kamera'),chart:T('Verlauf')}; rows.push([T('Screensaver'),svm[WZ.svPane]||WZ.svPane]); }
+  if(WZ.panes==='2'){ var svm={'':T('Automatik'),off:T('Aus'),calendar:T('Kalender'),weather:T('Wetter'),player:T('Audio'),energy:T('Energiefluss'),camera:T('Kamera'),chart:T('Verlauf')}; rows.push([T('Screensaver'),svm[WZ.svPane]||WZ.svPane]); }
   return '<div class="wzopts">'+rows.map(function(r){return '<div class="wzo" style="cursor:default;padding:9px 14px"><span class="tx" style="flex:1;color:var(--muted);font-size:12.5px">'+r[0]+'</span><b style="font-size:13px">'+esc(r[1]||'—')+'</b></div>';}).join('')+'</div>';
 }
 function wzRender(){
@@ -2430,7 +2713,7 @@ function wzRender(){
   if(key==='anzeige'){
     b.innerHTML='<p class="wzq">'+T('Anzahl Panes')+'</p><div class="wzopts">'+
       wzOpt('panes','1','p1',T('1 Pane — 4″ Wandpanel'),T('Ein Pane, nur die Visu.'))+
-      wzOpt('panes','2','p2',T('2 Panes — Tablet / Breitbild'),T('Visu + rechte Fläche (je Tab wählbar).'))+
+      wzOpt('panes','2','p2',T('2 Panes — Tablet / Breitbild'),T('Visu + Widget je Tab.'))+
       '</div><p class="wzq mt">'+T('Kachel-Raster — frei wählbar')+'</p><div class="wzgrid">'+
       ['2x2','3x2','2x3','3x3'].map(function(g){ var x=wzGridCells(g); return '<button class="wzg'+(WZ.grid===g?' on':'')+'" data-wg="'+g+'"><span class="wzgm" style="--c:'+x.c+';--r:'+x.r+'">'+x.s+'</span><b>'+g.replace('x','×')+'</b></button>'; }).join('')+'</div>';
   } else if(key==='inhalt'){
@@ -2454,16 +2737,17 @@ function wzRender(){
     b.innerHTML=wzSetup();
   } else if(key==='screensaver'){
     if(WZ.panes!=='2'){ b.innerHTML='<div class="wznote">'+T('Am 4″-Panel ist die Uhr-Seite einspaltig (Uhr + automatisch Termine/Wetter) — keine zweite Spalte.')+'</div>'; }
-    else { var svHasE=!!firstEnergyControl(), svHasC=!!firstCamera(), svHasV=!!firstChartControl();
+    else { var svHasE=!!firstEnergyControl(), svHasC=!!firstCamera(), svHasV=!!firstChartControl(), svHasA=!!firstAudioZone();
       b.innerHTML='<p class="wzq">'+T('Uhr-Seite — zweite Spalte')+'</p><div class="wzopts">'+
       wzOpt('svPane','','clock',T('Automatik (Termine/Wetter)'),'')+
       wzOpt('svPane','off','clock',T('Aus — nur Uhr'),'')+
       wzOpt('svPane','calendar','cal',T('Kalender'),'')+
       wzOpt('svPane','weather','wx',T('Wetter'),'')+
+      (svHasA?wzOpt('svPane','player','audio',T('Audio'),''):'')+
       (svHasE?wzOpt('svPane','energy','energy',T('Energiefluss'),''):'')+
       (svHasC?wzOpt('svPane','camera','camera',T('Kamera'),''):'')+
       (svHasV?wzOpt('svPane','chart','status',T('Verlauf'),''):'')+
-      '</div><div class="wznote">'+T('Statuswerte (mehrere Bausteine) in der Spalte legst du danach im Editor fest.')+((!svHasE||!svHasC||!svHasV)?' '+T('Energiefluss/Kamera/Verlauf erscheinen hier nur, wenn ein passender Baustein vorhanden ist.'):'')+'</div>'; }
+      '</div><div class="wznote">'+T('Statuswerte (mehrere Bausteine) in der Spalte legst du danach im Editor fest.')+((!svHasE||!svHasC||!svHasV||!svHasA)?' '+T('Audio/Energiefluss/Kamera/Verlauf erscheinen hier nur, wenn ein passender Baustein vorhanden ist.'):'')+'</div>'; }
   } else if(key==='review'){
     b.innerHTML='<p class="wzq">'+T('Zusammenfassung')+'</p>'+wzSummary()+
       '<div class="wznote">'+T('Nach „Panel anlegen" bist du im Editor zum Feinschliff (Kacheln, Pane 2, Icons) und kannst das Panel über „Visu öffnen" testen.')+'</div>';
@@ -2473,6 +2757,7 @@ function wzRender(){
   b.querySelectorAll('[data-wsize]').forEach(function(el){ el.oninput=function(){ var k=el.dataset.wsize, v=el.value.trim(); if(v==='') delete WZ.look[k]; else WZ.look[k]=Number(v); }; });
   { var wcb=b.querySelector('#wzBaseCustom'); if(wcb) wcb.oninput=function(){ WZ.look.baseColor=wcb.value; var lv=$('#wzBaseVal'); if(lv) lv.textContent=wcb.value; }; }
   { var wf=b.querySelector('[data-wfont]'); if(wf) wf.onchange=function(){ if(wf.value) WZ.look.font=wf.value; else delete WZ.look.font; }; }
+  { var ws=b.querySelector('[data-wscale]'); if(ws) ws.onchange=function(){ var v=scaleValue(ws.value); if(v==='') delete WZ.look.scale; else WZ.look.scale=v; }; }
   if(key==='overlay'){ bindOverlay('wzov_', function(){ return WZ.overlay; }, function(){}); }
   b.querySelectorAll('[data-wg]').forEach(function(el){ el.onclick=function(){ WZ.grid=el.dataset.wg; wzRender(); }; });
   b.querySelectorAll('[data-rc]').forEach(function(el){ el.onclick=function(){ var u=el.dataset.rc, i=WZ.roomCats.indexOf(u); if(i>=0) WZ.roomCats.splice(i,1); else { if(WZ.roomCats.length>=4) return; WZ.roomCats.push(u); } wzRender(); }; });
@@ -2482,6 +2767,10 @@ function wzRender(){
   b.querySelectorAll('[data-wpico]').forEach(function(el){ el.onclick=function(){ WZ.pickPages[+el.dataset.wpico].icon=el.dataset.picv; WZ.icoPage=-1; wzRender(); }; });
   b.querySelectorAll('[data-pgdel]').forEach(function(el){ el.onclick=function(){ WZ.pickPages.splice(+el.dataset.pgdel,1); if(WZ.icoPage>=WZ.pickPages.length) WZ.icoPage=-1; wzRender(); }; });
   { var pa=$('#wzPgAdd'); if(pa) pa.onclick=function(){ if(WZ.pickPages.length<4){ WZ.pickPages.push({name:'',icon:'',picks:[]}); wzRender(); } }; }
+  b.querySelectorAll('[data-pgw]').forEach(function(el){ el.onchange=function(){ var pg=WZ.pickPages[+el.dataset.pgw], k=el.value;
+    if(!k) delete pg.widget; else if(k==='weather'||k==='calendar') pg.widget=k; else pg.widget=k+':'+(wzWidgetFirst(k)||'');
+    wzRender(); }; });
+  b.querySelectorAll('[data-pgwarg]').forEach(function(el){ el.onchange=function(){ var pg=WZ.pickPages[+el.dataset.pgwarg], k=wKind(pg.widget||''); pg.widget=k+':'+el.value; wzRender(); }; });
   b.querySelectorAll('[data-pgtiles]').forEach(function(el){ el.onclick=function(){ wzTileFor=+el.dataset.pgtiles; wzTileSearch=''; wzTileRoom=''; wzRender(); }; });
   b.querySelectorAll('[data-wtroom]').forEach(function(el){ el.onclick=function(){ wzTileRoom=el.dataset.wtroom; wzTileSearch=''; wzRender(); }; });
   b.querySelectorAll('[data-wtadd]').forEach(function(el){ el.onclick=function(){ var pg=WZ.pickPages[wzTileFor]; if(!pg.picks) pg.picks=[]; var u=el.dataset.wtadd, k=pg.picks.indexOf(u); if(k>=0) pg.picks.splice(k,1); else { if(pg.picks.length>=60) return; pg.picks.push(u); } wzRender(); }; });
@@ -2506,8 +2795,7 @@ function wzUpd(){
   if(key==='setup'){
     if(WZ.content==='room') ok=!!WZ.roomTab;
     else if(WZ.content==='classic') ok=(WZ.classic||[]).some(function(t){return t.on;});
-    else if(WZ.content==='pick'){ ok=(WZ.pickPages||[]).length>0 && WZ.pickPages.every(function(pg){return (pg.name||'').trim();});
-      if(ok && wzTileFor>=0 && wzTileFor<WZ.pickPages.length-1) ok=false; }
+    else if(WZ.content==='pick'){ ok=(WZ.pickPages||[]).some(function(pg){ return (pg.picks&&pg.picks.length)||pg.widget; }); }   // mind. eine befüllte Seite
   }
   $('#wzNext').disabled=!ok;
 }
@@ -2520,13 +2808,19 @@ function wzBuild(){
   if(WZ.grid==='2x3'||WZ.grid==='3x3') ui.rows=3;
   if(WZ.panes==='1') ui.split=false;
   if(WZ.panes==='2' && WZ.svPane){ var sv=WZ.svPane;
-    if(sv==='energy'){ var eu=firstEnergyControl(); sv=eu?'energy:'+eu:''; }
+    if(sv==='player'){ var az=firstAudioZone(); sv=az?'player:'+az:''; }
+    else if(sv==='energy'){ var eu=firstEnergyControl(); sv=eu?'energy:'+eu:''; }
     else if(sv==='camera'){ var cu=firstCamera(); sv=cu?'camera:'+cu:''; }
     else if(sv==='chart'){ var vu=firstChartControl(); sv=vu?'chart:'+vu:''; }
     if(sv) ui.svPane=sv; }
   var tabs, e={};
   if(WZ.content==='room'){ tabs=[WZ.roomTab]; if(WZ.roomCats&&WZ.roomCats.length) e.roomCats=WZ.roomCats.slice(0,4); }
-  else if(WZ.content==='pick'){ tabs=WZ.pickPages.map(function(_,i){return pickKey(i);}); e.pickTabs=WZ.pickPages.map(function(pg){ var o={name:(pg.name||'').trim()||'Auswahl',picks:(pg.picks||[]).slice()}; if(pg.icon) o.icon=pg.icon; return o; }); }
+  else if(WZ.content==='pick'){
+    // Nur befüllte Seiten (Kacheln ODER Widget) werden zu Tabs; leere fallen weg.
+    var pages=(WZ.pickPages||[]).filter(function(pg){ return (pg.picks&&pg.picks.length)||pg.widget; });
+    if(!pages.length) pages=[WZ.pickPages[0]||{name:'Auswahl'}];
+    tabs=pages.map(function(_,i){return pickKey(i);});
+    e.pickTabs=pages.map(function(pg){ var o={name:(pg.name||'').trim()||'Auswahl',picks:(pg.picks||[]).slice()}; if(pg.icon) o.icon=pg.icon; if(pg.widget) o.widget=pg.widget; return o; }); }
   else { tabs=WZ.classic.filter(function(t){return t.on;}).map(function(t){return t.key;}); if(!tabs.length) tabs=defaultTabs(); }
   var panes={}; Object.keys(WZ.pane2).forEach(function(k){ var rv=wzP2Real(WZ.pane2[k]); if(rv) panes[k]=rv; });
   if(Object.keys(panes).length) ui.panes=panes;
@@ -2535,12 +2829,14 @@ function wzBuild(){
   if(L.baseColor) ui.baseColor=L.baseColor;
   ['iconSize','nameSize','subSize'].forEach(function(k){ if(L[k]!=null && L[k]!=='') ui[k]=Number(L[k]); });
   if(L.font) ui.font=L.font;
+  if(L.scale!==undefined && L.scale!=='') ui.scale=L.scale;   // '' = wie global (nicht setzen)
   // Aktiv-Overlay aus Schritt „Overlay" (nur, wenn vom Standard abgewichen)
   if(WZ.overlay && Object.keys(WZ.overlay).length) ui.overlay=Object.assign({},WZ.overlay);
   PANELS[id]=Object.assign({title:WZ.title.trim()||id, tabs:tabs, rooms:[], cats:[], ui:ui, states:{}, tiles:{}}, e);
   cur=id; tileSel=null; curPickIdx=0; wzClose(); renderList(); setRubric('pconf'); markDirty();
 }
 $('#addBtn').onclick=wzOpen;
+{ const asb=$('#asStartWiz'); if(asb) asb.onclick=wzOpen; }
 
 window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
 
