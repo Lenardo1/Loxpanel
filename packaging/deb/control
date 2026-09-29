@@ -1,0 +1,20 @@
+Package: loxpanel-server
+Version: 0.6.0
+Architecture: all
+Maintainer: Lenardo1 <noreply@users.noreply.github.com>
+Depends: systemd, curl, ca-certificates
+Recommends: chromium
+Suggests: cog
+Section: web
+Priority: optional
+Homepage: https://github.com/Lenardo1/Loxpanel
+Description: LoxPanel - Web-Touch-Visu fuer Loxone (Server + Kiosk)
+ Self-hosted LoxPanel-Server fuer Loxone-Wandpanels. Richtet einen
+ eingebetteten Python-3.12-Server als systemd-Dienst ein (Port 8099) und
+ liefert einen Kiosk-Launcher (Chromium als Standard, Cog als leichte
+ Alternative) fuer die lokale Visu unter http://127.0.0.1:8099 mit.
+ .
+ Python 3.12 und die Abhaengigkeiten werden beim Installieren per uv
+ eingerichtet (Internetzugang noetig), unabhaengig vom System-Python.
+ Der Miniserver wird geraeteseitig ueber die Weboberflaeche (/config)
+ eingetragen - das Paket enthaelt keine Zugangsdaten.

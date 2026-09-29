@@ -1,0 +1,36 @@
+#!/bin/sh
+# Richtet nach der Installation Python 3.12 + venv ein (per uv, unabhaengig vom
+# System-Python) und startet den systemd-Dienst. Idempotent (auch bei Update).
+set -e
+
+LOX=/opt/loxpanel
+BIN="$LOX/bin"
+export UV_INSTALL_DIR="$BIN"            # uv-Binary hierhin
+export UV_PYTHON_INSTALL_DIR="$LOX/python"  # Standalone-Python hierhin
+
+if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
+    mkdir -p "$BIN" "$UV_PYTHON_INSTALL_DIR"
+
+    # uv installieren, falls noch nicht vorhanden
+    if [ ! -x "$BIN/uv" ]; then
+        echo "LoxPanel: installiere uv ..."
+        curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$BIN" sh
+    fi
+    UV="$BIN/uv"
+
+    echo "LoxPanel: richte Python 3.12 + venv ein (einmalig, kann etwas dauern) ..."
+    "$UV" python install 3.12
+    "$UV" venv --python 3.12 "$LOX/venv"
+    "$UV" pip install --python "$LOX/venv/bin/python" -r "$LOX/app/requirements.txt"
+
+    # systemd
+    systemctl daemon-reload || true
+    systemctl enable loxpanel-server.service || true
+    systemctl restart loxpanel-server.service || true
+
+    echo "LoxPanel: fertig. Server laeuft auf http://127.0.0.1:8099"
+    echo "  - Konfiguration/Miniserver eintragen: http://<geraet-ip>:8099/config"
+    echo "  - Kiosk starten: 'loxpanel-kiosk' (Browser/URL in /etc/loxpanel/browser.conf)"
+fi
+
+exit 0

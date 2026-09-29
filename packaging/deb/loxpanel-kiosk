@@ -1,0 +1,21 @@
+#!/bin/sh
+# Startet den Kiosk-Browser auf die lokale LoxPanel-Visu.
+# Browser + URL kommen aus /etc/loxpanel/kiosk.conf:
+#   BROWSER=chromium   (Standard, Blink - identisch zur getesteten Android-WebView)
+#   BROWSER=cog        (leichter WebKit-Kiosk, sparsam; ohne Desktop moeglich)
+CONF=/etc/loxpanel/browser.conf
+BROWSER=chromium
+URL="http://127.0.0.1:8099/?panel=default"
+[ -r "$CONF" ] && . "$CONF"
+
+case "$BROWSER" in
+  cog)
+    exec cog -F "$URL"
+    ;;
+  *)
+    exec chromium --kiosk --noerrdialogs --disable-infobars --no-first-run \
+      --disable-pinch --overscroll-history-navigation=0 --disable-session-crashed-bubble \
+      --autoplay-policy=no-user-gesture-required --check-for-update-interval=31536000 \
+      --user-data-dir=/tmp/loxpanel-kiosk "$URL"
+    ;;
+esac

@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+if [ "$1" = "purge" ]; then
+    # Bei purge alles Erzeugte entfernen (venv, python, uv). App/Config auch weg.
+    rm -rf /opt/loxpanel/venv /opt/loxpanel/python /opt/loxpanel/bin
+    rm -rf /opt/loxpanel/app
+    rmdir /opt/loxpanel 2>/dev/null || true
+fi
+systemctl daemon-reload 2>/dev/null || true
+exit 0

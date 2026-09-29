@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "purge" ] || [ "$1" = "deconfigure" ]; then
+    systemctl stop loxpanel-server.service 2>/dev/null || true
+    systemctl disable loxpanel-server.service 2>/dev/null || true
+fi
+exit 0

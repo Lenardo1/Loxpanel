@@ -1,0 +1,17 @@
+[Unit]
+Description=LoxPanel Server (lokale Loxone-Visu)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Environment=LOXPANEL_PORT=8099
+WorkingDirectory=/opt/loxpanel/app
+ExecStart=/opt/loxpanel/venv/bin/python bin/webvisu.py
+Restart=on-failure
+RestartSec=5
+# Server reagiert nicht auf SIGTERM -> nach 12s hart beenden statt 90s zu warten
+TimeoutStopSec=12
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
