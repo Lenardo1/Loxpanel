@@ -107,8 +107,13 @@
      Wetter/Kalender bleiben mehrseitig (Snap) und duerfen scrollen. */
   .screen.split #frontpane .fp-page.solo,
   .screen.split #playerpane .fp-page.solo{flex:1 1 0;min-height:0;max-height:100%;overflow:hidden;}
-  /* Verlaufs-Pane: eine Seite, aber mehrere Diagramme duerfen scrollen */
-  .screen.split #frontpane .fp-page.solo.cpage{overflow-y:auto;gap:10px;}
+  /* Verlaufs-Pane: die Diagramme teilen sich die Pane-Hoehe (fit statt scrollen),
+     damit sie auf kurzen Displays (z.B. 480px) nicht ueberlaufen. */
+  .screen.split #frontpane .fp-page.solo.cpage,
+  .screen.widgettab #frontpane .fp-page.solo.cpage{overflow:hidden;gap:8px;display:flex;flex-direction:column;}
+  .fp-page.solo.cpage .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  .fp-page.solo.cpage .chbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .fp-page.solo.cpage .chbody>svg{flex:1 1 auto;min-height:0;width:100%;height:100%;}
   #frontpane .cphead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
   #frontpane .cpname{font-weight:650;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   #frontpane .cpval{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
@@ -1139,7 +1144,7 @@ function paintChart(box,b){
     body.innerHTML='<div class="chmsg">'+(b.state==='loading'?'Verlauf wird geladen …'
       :b.state==='error'?'Verlauf nicht abrufbar':'Keine Aufzeichnung in diesem Zeitraum')+'</div>';
     return; }
-  const W=440,H=150,pL=46,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
+  const W=440,H=150,pL=36,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
   const unit=b.unit?(' '+b.unit):'', dec=Math.max(0,...b.series.map(s=>s.dec||0));
   const vals=b.series.flatMap(s=>s.pts.map(p=>p[1]));
   let lo=vals.length?Math.min(...vals):0, hi=vals.length?Math.max(...vals):1, mn, mx;
@@ -1152,7 +1157,7 @@ function paintChart(box,b){
         '<stop offset="1" style="stop-color:'+c0+';stop-opacity:0"/></linearGradient></defs>';
   const yt=b.kind==='digital'?[[0,'Aus'],[1,'Ein']]:[lo,(lo+hi)/2,hi].map(v=>[v,chNum(v,dec)]);
   yt.forEach(([v,l])=>{ s+='<line class="chgrid" x1="'+pL+'" x2="'+(W-pR)+'" y1="'+f(Y(v))+'" y2="'+f(Y(v))+'"/>'+
-    '<text class="chax" x="'+(pL-6)+'" y="'+f(Y(v)+4)+'" text-anchor="end">'+esc(l)+'</text>'; });
+    '<text class="chax" x="2" y="'+f(Y(v)+4)+'" text-anchor="start">'+esc(l)+'</text>'; });
   const tk=chTicks(t0,t1);
   tk.ticks.forEach(t=>{ const x=X(t), a=x<pL+18?'start':(x>W-pR-18?'end':'middle');
     s+='<line class="chvgrid" x1="'+f(x)+'" x2="'+f(x)+'" y1="'+pT+'" y2="'+(H-pB)+'"/>'+
@@ -1186,7 +1191,7 @@ function paintChart(box,b){
     }
     leg.push('<span><span class="chdot" style="background:'+col+'"></span>'+esc(se.name)+' · '+info+'</span>');
   });
-  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'">'+s+'</svg><div class="chleg">'+leg.join('')+'</div>';
+  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg">'+leg.join('')+'</div>';
 }
 // Rahmen eines Diagramms (Detailseite und Verlaufs-Pane); die Zeitraum-Knoepfe
 // traegt nur das erste Diagramm einer Seite (b.ranges).
