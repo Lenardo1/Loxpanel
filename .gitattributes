@@ -12,6 +12,14 @@ loxberry-plugin/cron/cron.05min      text eol=lf
 loxberry-plugin/uninstall/uninstall  text eol=lf
 loxberry-plugin/dpkg/apt             text eol=lf
 loxberry-plugin/sudoers/sudoers      text eol=lf
+# Debian-Packaging-Skripte ohne Dateiendung (muessen auf Linux LF haben)
+packaging/deb/control          text eol=lf
+packaging/deb/conffiles        text eol=lf
+packaging/deb/postinst         text eol=lf
+packaging/deb/prerm            text eol=lf
+packaging/deb/postrm           text eol=lf
+packaging/deb/loxpanel-kiosk   text eol=lf
+packaging/deb/loxpanel-display text eol=lf
 # Bilder binaer
 *.png binary
 *.jpg binary

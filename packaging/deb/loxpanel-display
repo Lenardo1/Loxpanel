@@ -1,0 +1,81 @@
+#!/bin/sh
+# LoxPanel Display-Abschaltung bei Inaktivitaet. Setzt X-DPMS (Bildsignal aus nach
+# DPMS_OFF Sek. ohne Eingabe) und zieht ALLE Backlight-Devices per sysfs nach:
+# auf ARM-Panels (z.B. PX30) schaltet DPMS nur das Bildsignal ab, die LED-
+# Beleuchtung bliebe an -> Panel bleibt hell und wird heiss. Antippen weckt sofort
+# (Input-Event -> DPMS On). Konfig: /etc/loxpanel/display.conf.
+set -u
+CONF=/etc/loxpanel/display.conf
+[ -r "$CONF" ] && . "$CONF"
+DPMS_OFF="${DPMS_OFF:-180}"
+BL_ON="${BL_ON:-}"
+XUSER="${XUSER:-}"
+export DISPLAY="${DISPLAY:-:0}"
+
+log(){ echo "loxpanel-display: $*"; }
+
+# xset noetig (Paket x11-xserver-utils). Fehlt es (z.B. Headless-Server) -> sauber
+# beenden, damit der Dienst nicht in eine Neustart-Schleife laeuft.
+command -v xset >/dev/null 2>&1 || {
+    log "xset fehlt (Paket x11-xserver-utils) - Display-Abschaltung inaktiv"; exit 0; }
+
+# X-Authority finden: konfiguriert -> lightdm-Root-Auth -> Home des Autologin-Users
+# bzw. aller Nutzer -> root. So unabhaengig vom konkreten Benutzernamen.
+find_xauth(){
+    [ -n "${XAUTHORITY:-}" ] && [ -f "${XAUTHORITY:-}" ] && return 0
+    for c in /var/run/lightdm/root/"$DISPLAY" /run/lightdm/root/"$DISPLAY" \
+             ${XUSER:+/home/"$XUSER"/.Xauthority} /home/*/.Xauthority /root/.Xauthority; do
+        [ -f "$c" ] && { XAUTHORITY="$c"; export XAUTHORITY; return 0; }
+    done
+    return 1
+}
+
+# Auf laufendes X warten (Autologin startet die Sitzung erst nach Boot).
+i=0
+while :; do
+    find_xauth && xset q >/dev/null 2>&1 && break
+    i=$((i+1)); [ "$i" -ge 150 ] && { log "X/$DISPLAY nicht erreichbar - beende"; exit 1; }
+    sleep 2
+done
+log "X gefunden (DISPLAY=$DISPLAY, XAUTHORITY=${XAUTHORITY:-?})"
+
+# Nur DPMS soll abschalten (X-eigenen Blank-Screensaver aus), DPMS aktivieren.
+apply_dpms(){ xset s off; xset s noblank; xset +dpms; xset dpms 0 0 "$DPMS_OFF"; }
+apply_dpms
+log "aktiv: Display aus nach ${DPMS_OFF}s Inaktivitaet"
+
+# "Ein"-Helligkeit je Backlight: BL_ON, sonst aktueller Wert, sonst max_brightness.
+on_value(){
+    mx=$(cat "${1}max_brightness" 2>/dev/null || echo 255)
+    if [ -n "$BL_ON" ]; then echo "$BL_ON"; return; fi
+    cur=$(cat "${1}brightness" 2>/dev/null || echo 0)
+    if [ "${cur:-0}" -gt 0 ] 2>/dev/null; then echo "$cur"; else echo "$mx"; fi
+}
+
+ONVALS=""
+for dir in /sys/class/backlight/*/; do
+    [ -e "${dir}brightness" ] || continue
+    ONVALS="$ONVALS ${dir}|$(on_value "$dir")"
+done
+log "Backlights:${ONVALS:- keine gefunden}"
+
+set_backlight(){   # $1 = on|off
+    for pair in $ONVALS; do
+        d=${pair%|*}; v=${pair#*|}
+        if [ "$1" = "off" ]; then echo 0  > "${d}brightness" 2>/dev/null || true
+        else                     echo "$v" > "${d}brightness" 2>/dev/null || true; fi
+    done
+}
+
+# Monitorstatus (aus xset q) auf die Backlights spiegeln; DPMS bei Bedarf neu
+# setzen, falls es ein anderer Power-Manager deaktiviert hat.
+last=""
+while :; do
+    q=$(xset q 2>/dev/null) || { sleep 2; continue; }
+    echo "$q" | grep -q "DPMS is Disabled" && apply_dpms
+    if echo "$q" | grep -q "Monitor is Off"; then mon=off; else mon=on; fi
+    if [ "$mon" != "$last" ]; then
+        set_backlight "$mon"; log "Monitor $mon -> Backlight $mon"; last="$mon"
+    fi
+    sleep 1
+done

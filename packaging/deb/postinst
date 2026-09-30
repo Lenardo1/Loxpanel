@@ -20,17 +20,22 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ]; then
 
     echo "LoxPanel: richte Python 3.12 + venv ein (einmalig, kann etwas dauern) ..."
     "$UV" python install 3.12
-    "$UV" venv --python 3.12 "$LOX/venv"
+    # venv nur anlegen, wenn noch keins da ist -> Upgrades ueberschreiben es nicht
+    [ -x "$LOX/venv/bin/python" ] || "$UV" venv --python 3.12 "$LOX/venv"
     "$UV" pip install --python "$LOX/venv/bin/python" -r "$LOX/app/requirements.txt"
 
-    # systemd
+    # systemd: Server + Display-Abschaltung
     systemctl daemon-reload || true
     systemctl enable loxpanel-server.service || true
     systemctl restart loxpanel-server.service || true
+    systemctl enable loxpanel-display.service || true
+    systemctl restart loxpanel-display.service || true
 
     echo "LoxPanel: fertig. Server laeuft auf http://127.0.0.1:8099"
     echo "  - Konfiguration/Miniserver eintragen: http://<geraet-ip>:8099/config"
     echo "  - Kiosk starten: 'loxpanel-kiosk' (Browser/URL in /etc/loxpanel/browser.conf)"
+    echo "  - Display-Abschaltung: Zeit in /etc/loxpanel/display.conf (DPMS_OFF), dann"
+    echo "    'systemctl restart loxpanel-display'"
 fi
 
 exit 0

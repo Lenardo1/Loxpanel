@@ -29,10 +29,13 @@ for s in postinst prerm postrm; do
     cp "$HERE/$s" "$PKG/DEBIAN/$s"; chmod 0755 "$PKG/DEBIAN/$s"
 done
 
-# --- systemd + Kiosk + Conf ---
-cp "$HERE/loxpanel-server.service" "$PKG/usr/lib/systemd/system/"
-cp "$HERE/loxpanel-kiosk"          "$PKG/usr/bin/loxpanel-kiosk"; chmod 0755 "$PKG/usr/bin/loxpanel-kiosk"
-cp "$HERE/browser.conf"            "$PKG/etc/loxpanel/browser.conf"
+# --- systemd + Kiosk + Display-Abschaltung + Conf ---
+cp "$HERE/loxpanel-server.service"  "$PKG/usr/lib/systemd/system/"
+cp "$HERE/loxpanel-display.service" "$PKG/usr/lib/systemd/system/"
+cp "$HERE/loxpanel-kiosk"   "$PKG/usr/bin/loxpanel-kiosk";   chmod 0755 "$PKG/usr/bin/loxpanel-kiosk"
+cp "$HERE/loxpanel-display" "$PKG/usr/bin/loxpanel-display"; chmod 0755 "$PKG/usr/bin/loxpanel-display"
+cp "$HERE/browser.conf"     "$PKG/etc/loxpanel/browser.conf"
+cp "$HERE/display.conf"     "$PKG/etc/loxpanel/display.conf"
 
 OUT="$REPO/loxpanel-server_${VERSION}_all.deb"
 dpkg-deb --root-owner-group --build "$PKG" "$OUT"

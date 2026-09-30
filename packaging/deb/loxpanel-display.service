@@ -1,0 +1,14 @@
+[Unit]
+Description=LoxPanel Display-Abschaltung (DPMS + Backlight bei Inaktivitaet)
+After=display-manager.service systemd-user-sessions.service
+Wants=display-manager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/loxpanel-display
+# xset fehlt -> Skript beendet mit 0 (kein Neustart); X noch nicht da -> 1 (Retry)
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

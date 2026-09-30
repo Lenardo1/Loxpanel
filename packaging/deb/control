@@ -1,9 +1,9 @@
 Package: loxpanel-server
-Version: 0.6.0
+Version: 0.7.0
 Architecture: all
 Maintainer: Lenardo1 <noreply@users.noreply.github.com>
 Depends: systemd, curl, ca-certificates
-Recommends: chromium
+Recommends: chromium, x11-xserver-utils
 Suggests: cog
 Section: web
 Priority: optional
@@ -13,6 +13,11 @@ Description: LoxPanel - Web-Touch-Visu fuer Loxone (Server + Kiosk)
  eingebetteten Python-3.12-Server als systemd-Dienst ein (Port 8099) und
  liefert einen Kiosk-Launcher (Chromium als Standard, Cog als leichte
  Alternative) fuer die lokale Visu unter http://127.0.0.1:8099 mit.
+ .
+ Enthaelt ausserdem eine Display-Abschaltung bei Inaktivitaet
+ (Dienst loxpanel-display): schaltet nach einer einstellbaren Zeit das
+ Bildsignal per DPMS und die Hintergrundbeleuchtung per sysfs ab (wichtig auf
+ ARM-Panels, wo DPMS allein die LED nicht abschaltet) - Antippen weckt sofort.
  .
  Python 3.12 und die Abhaengigkeiten werden beim Installieren per uv
  eingerichtet (Internetzugang noetig), unabhaengig vom System-Python.
