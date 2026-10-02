@@ -106,6 +106,7 @@ und „Display an“.
 | Funktion | Wer ruft sie | Wirkung in der App |
 |---|---|---|
 | `setDisplayOff(sekunden)` | Visu beim Laden der Einstellungen (`dpmsOff`) und wenn der Präsenzmelder des Geräts wechselt | Leerlaufzeit bis zum Bildschirmschoner, `0` schaltet ihn ab |
+| `setDisplayBrightness(prozent)` | Visu im Nachtmodus (*Nachts abdunkeln*) und beim Aufhellen per Berührung | Helligkeit in Prozent der eingestellten Systemhelligkeit, `100` = unverändert; `false` bei automatischer Helligkeit, dann dunkelt die Visu selbst ab |
 | `turnScreenOn()` | Visu bei Klingel, Wecker, Notify, Goto und wenn der Server das Display einschaltet | Schoner weg, Leerlaufzeit beginnt neu |
 | `turnScreenOff()` | Visu, wenn der Server das Display abschaltet (*Displays*, `/api/display`) | Schoner an |
 | `isScreenOn()` | Visu vor `turnScreenOn()` | `true`, solange kein Schoner zu sehen ist |
@@ -117,3 +118,11 @@ Hat das Gerät unter *Displays* einen Präsenzmelder, gibt die Visu der App
 `setDisplayOff(0)`, solange er jemanden meldet: Der Schoner wartet, bis der
 Raum leer ist. Dann bekommt die App wieder die eingestellte Leerlaufzeit und
 gleich `turnScreenOff()`; kommt jemand, `turnScreenOn()`.
+
+Nachts senkt die Visu über `setDisplayBrightness` die echte Helligkeit, statt
+eine dunkle Fläche über sich zu legen. Schwarz leuchtet dann nicht mehr grau.
+Sie rechnet „Nachts abdunkeln“ so um, dass die Leuchtdichte dieselbe ist wie
+mit der Fläche: 70 % abdunkeln ergibt 7 % der eingestellten Helligkeit. Die
+App setzt nur die Helligkeit ihres Fensters, die Einstellung des Geräts
+bleibt. Bei automatischer Helligkeit kennt sie die tatsächliche Helligkeit
+nicht und lehnt ab; dann dunkelt die Visu wie im Browser ab.

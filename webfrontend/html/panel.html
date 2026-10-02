@@ -2805,9 +2805,20 @@ function nightLayer(){
   }
   return nightEl;
 }
+// LoxPanel-App: Dort senkt die App statt der Auflage die echte Helligkeit
+// (LoxKiosk.setDisplayBrightness, Prozent der eingestellten Helligkeit). Die
+// Auflage wirkt auf die Farbwerte, die Leuchtdichte faellt also mit der Potenz
+// 2,2 (sRGB): 70 % abdunkeln liess etwa 7 % Leuchtdichte uebrig. Dieselbe
+// Einstellung ergibt in der App dieselbe Leuchtdichte. Lehnt die App ab
+// (automatische Helligkeit am Geraet) oder kennt sie die Funktion nicht (aeltere
+// App), dunkelt wie bisher die Auflage ab.
+function appHelligkeit(dim){
+  const prozent = dim>0 ? Math.max(1, Math.round(100*Math.pow(1-dim/100, 2.2))) : 100;
+  try{ return !!(window.LoxKiosk && typeof LoxKiosk.setDisplayBrightness==='function'
+                 && LoxKiosk.setDisplayBrightness(prozent)); }catch(e){ return false; } }
 function applyNight(awake){
-  nightLayer().style.opacity =
-    (NIGHT.on && NIGHT.dim>0 && !awake) ? Math.min(90,NIGHT.dim)/100 : 0;
+  const dim = (NIGHT.on && NIGHT.dim>0 && !awake) ? Math.min(90,NIGHT.dim) : 0;
+  nightLayer().style.opacity = appHelligkeit(dim) ? 0 : dim/100;
 }
 function setNight(on){ NIGHT.on=!!on; clearTimeout(nightWakeTimer); applyNight(false); }
 function nightWake(){          // Beruehrung -> kurz voll aufhellen, dann zurueck

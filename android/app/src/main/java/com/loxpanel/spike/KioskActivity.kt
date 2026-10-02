@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.res.Resources
 import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -13,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -40,6 +42,11 @@ import android.widget.FrameLayout
  * dieselben Display-Funktionen wie Fully Kiosk (turnScreenOn/turnScreenOff/
  * isScreenOn). Damit wecken Klingel, Wecker, Notify und Goto das Display, und
  * der Server kann es schalten (Displays-Seite, /api/display).
+ *
+ * Nachtmodus: Die Visu senkt nachts über setDisplayBrightness die echte
+ * Helligkeit des Fensters auf einen Teil der eingestellten Systemhelligkeit,
+ * statt eine dunkle Fläche über sich zu legen. Bei automatischer Helligkeit
+ * lehnt die App ab, dann dunkelt die Visu wie bisher selbst ab.
  */
 class KioskActivity : Activity(), SensorEventListener {
 
@@ -62,6 +69,9 @@ class KioskActivity : Activity(), SensorEventListener {
     // nativ wird nur das Backlight gedunkelt (nach idleMs) und auf Annäherung/
     // Berührung geweckt.
     private var visuSaver = false
+    // Helligkeit des Fensters außerhalb des Schoners: die Systemhelligkeit oder,
+    // im Nachtmodus der Visu, ein Teil davon (setDisplayBrightness).
+    private var helligkeit = Helligkeit.SYSTEM
     private val goDark = Runnable { enterScreensaver() }
 
     private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as? SensorManager }
@@ -261,6 +271,21 @@ class KioskActivity : Activity(), SensorEventListener {
         /** Wie Fully Kiosk: ob das Display gerade an ist (kein Schoner). */
         @JavascriptInterface
         fun isScreenOn(): Boolean = !saverOn
+
+        /** Nachtmodus der Visu: Helligkeit in Prozent der eingestellten
+         *  Systemhelligkeit, 100 = unverändert. Gilt nur für dieses Fenster, die
+         *  Einstellung des Geräts bleibt. Im Schoner bleibt es dunkel, der Wert
+         *  gilt ab dem Aufwecken. false, wenn die App das nicht übernimmt
+         *  (automatische Helligkeit am Gerät): dann dunkelt die Visu selbst ab. */
+        @JavascriptInterface
+        fun setDisplayBrightness(prozent: Int): Boolean {
+            val wert = Helligkeit.fensterwert(prozent, systemHelligkeit())
+            ui.post {
+                helligkeit = wert ?: Helligkeit.SYSTEM
+                if (!saverOn) setBrightness(helligkeit)
+            }
+            return wert != null
+        }
     }
 
     /** Backlight aus: schwarzes Overlay (echtes Schwarz) + Helligkeit 0. KEINE
@@ -273,19 +298,44 @@ class KioskActivity : Activity(), SensorEventListener {
         setBrightness(0f)      // praktisch dunkel (LCD -> kein Einbrennen)
     }
 
-    /** Backlight zurück (Systemhelligkeit), Overlay weg. */
+    /** Backlight zurück (Systemhelligkeit oder Nachtmodus), Overlay weg. */
     private fun exitScreensaver() {
         if (saverOn) {
             saverOn = false
             saver.visibility = View.GONE
         }
-        setBrightness(-1f)
+        setBrightness(helligkeit)
     }
 
     private fun setBrightness(b: Float) {
         val lp = window.attributes
         lp.screenBrightness = b
         window.attributes = lp
+    }
+
+    /** Eingestellte Systemhelligkeit als Anteil 0..1, null bei automatischer
+     *  Helligkeit (dann ist die tatsächliche Helligkeit unbekannt). Lesen
+     *  braucht keine Berechtigung. */
+    private fun systemHelligkeit(): Float? = try {
+        val cr = contentResolver
+        if (Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS_MODE) ==
+            Settings.System.SCREEN_BRIGHTNESS_MODE_AUTOMATIC
+        ) null
+        else Helligkeit.anteil(Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS), helligkeitMax())
+    } catch (e: Settings.SettingNotFoundException) {
+        null
+    }
+
+    /** Höchstwert der Helligkeitseinstellung des Geräts (AOSP: 255). */
+    @SuppressLint("DiscouragedApi")
+    private fun helligkeitMax(): Int {
+        val res = Resources.getSystem()
+        val id = res.getIdentifier("config_screenBrightnessSettingMaximum", "integer", "android")
+        return try {
+            if (id != 0) res.getInteger(id) else Helligkeit.MAX_STANDARD
+        } catch (e: Resources.NotFoundException) {
+            Helligkeit.MAX_STANDARD
+        }
     }
 
     @Suppress("DEPRECATION")
