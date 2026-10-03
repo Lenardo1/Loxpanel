@@ -33,7 +33,7 @@ android {
         // WICHTIG: Für ein echtes ARM-Tablet reicht arm64-v8a. x86_64 nur für den
         // Emulator. Mehr ABIs = längerer Build + größeres APK.
         ndk {
-            abiFilters += listOf("arm64-v8a", "x86_64")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
         }
     }
 
