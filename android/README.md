@@ -41,6 +41,12 @@ Die App übernimmt die Release-Version des Projekts aus
 Repo-Checkout, nicht eine Kopie des Ordners. Der Workflow prüft, dass ein
 Release-Tag zur Version passt (`v0.6.0` ↔ `VERSION=0.6.0`).
 
+Welcher Stand in einer APK steckt, schreibt `syncLoxpanelAssets` nach
+`bin/version.json` (Version, Commit, Bauzeit); der Konfigurator zeigt es in der
+Seitenleiste, Android unter App-Info (`versionName` „0.6.0 (abc1234)“). Den
+Commit nimmt der Build aus `LOXPANEL_COMMIT` oder, wenn die fehlt, aus Git. Wer
+aus einem Export ohne `.git` baut (`git archive`), setzt `LOXPANEL_COMMIT`.
+
 Release-APKs tragen immer denselben Schlüssel. Nur dann installiert Android ein
 Update über die vorhandene App. Mit einem anderen Schlüssel müsste man sie erst
 deinstallieren, und das löscht ihre Konfiguration samt Miniserver-Zugang.

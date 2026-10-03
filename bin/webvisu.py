@@ -69,8 +69,11 @@ from audioserver_events import AudioEventClient  # noqa: E402
 import front_info  # noqa: E402  # Kalender (iCal-Abos) + Wetter (Open-Meteo) fuer die Front
 import loxone_weather  # noqa: E402  # Wetter vom Loxone-Wetterserver (Vorrang vor Open-Meteo)
 import theme_colors  # noqa: E402  # Panel-Theme aus einer Grundfarbe herleiten
+import version_info  # noqa: E402  # Version, Commit und Bauzeit (bin/version.json)
 
 log = logging.getLogger("loxpanel.webvisu")
+# Welcher Stand laeuft (Seitenleiste des Konfigurators); einmal beim Start gelesen
+VERSION = version_info.lesen()
 _WEB = Path(__file__).resolve().parent.parent / "webfrontend" / "html"
 HTML = _WEB / "panel.html"
 CONFIG_HTML = _WEB / "config.html"
@@ -6984,6 +6987,7 @@ async def api_settings(request: web.Request) -> web.Response:
                   "options": app.night_control_options()},
         "connected": app.client is not None,
         "nControls": len(app.controls),
+        "version": VERSION,
         # Ohne Struktur fuehrt der Konfigurator zuerst zum Miniserver
         "einrichtung": app._einrichtung_info(),
     })

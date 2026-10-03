@@ -470,6 +470,9 @@
       'Nicht übernommen:': 'Not kept by the server:',
       'verbunden': 'connected',
       'nicht verbunden': 'not connected',
+      // Version in der Seitenleiste
+      'Version unbekannt': 'Version unknown',
+      'gebaut': 'built',
 
       // ---- Betriebsmodus-Automatik (/settings) ----
       'Betriebsmodus-Automatik': 'Operating-mode automation',

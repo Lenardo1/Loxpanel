@@ -21,6 +21,9 @@ deploy/loxpanel-kiosk.conf
 # Docker-Umgebungsdatei mit Zugangsdaten
 .env
 
+# Beim Bauen geschrieben (bin/version_info.py): Version, Commit, Bauzeit
+bin/version.json
+
 # Python
 *.pyc
 __pycache__/

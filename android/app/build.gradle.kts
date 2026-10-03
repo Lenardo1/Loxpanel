@@ -1,3 +1,8 @@
+// Bauzeit fuer bin/version.json. Importiert, weil "java" im Skript die
+// Java-Erweiterung des Projekts meint, nicht das Paket java.time.
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -19,6 +24,20 @@ val projektVersion: List<Int> = run {
     teile
 }
 
+// Commit des Stands, aus dem gebaut wird (bin/version.json, Versionsname der
+// App): LOXPANEL_COMMIT, etwa beim Bau aus einem Export ohne .git, sonst
+// git rev-parse HEAD im Repo; leer, wenn beides fehlt. Nur eine Hex-Kennung.
+val loxCommit: String = run {
+    val hex = Regex("[0-9a-fA-F]{7,40}")
+    System.getenv("LOXPANEL_COMMIT")?.trim()?.takeIf { hex.matches(it) }
+        ?: runCatching {
+            val p = ProcessBuilder("git", "rev-parse", "HEAD")
+                .directory(rootProject.projectDir.parentFile).redirectErrorStream(true).start()
+            val aus = p.inputStream.bufferedReader().readText().trim()
+            if (p.waitFor() == 0 && hex.matches(aus)) aus else ""
+        }.getOrDefault("")
+}
+
 android {
     namespace = "com.loxpanel.spike"
     compileSdk = 34
@@ -28,7 +47,8 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = projektVersion[0] * 10000 + projektVersion[1] * 100 + projektVersion[2]
-        versionName = projektVersion.joinToString(".")
+        // Mit Commit, damit „App-Info“ in Android zeigt, welcher Stand installiert ist
+        versionName = projektVersion.joinToString(".") + (if (loxCommit.isNotEmpty()) " (${loxCommit.take(7)})" else "")
 
         // WICHTIG: Für ein echtes ARM-Tablet reicht arm64-v8a. x86_64 nur für den
         // Emulator. Mehr ABIs = längerer Build + größeres APK.
@@ -106,6 +126,15 @@ tasks.register<Copy>("syncLoxpanelAssets") {
         into("config")
         exclude("loxpanel.cfg", "panels.json", "theme.json")   // keine echten Daten/Layouts
     }
+    // Welcher Stand in der App steckt: bin/version.json, gelesen von
+    // bin/version_info.py (Anzeige im Konfigurator). Die App packt bin/ bei
+    // jedem Update neu aus, die Datei kommt also immer mit dem Code.
+    doLast {
+        val gebaut = Instant.now().truncatedTo(ChronoUnit.SECONDS)
+        dest.resolve("bin/version.json").writeText(
+            "{\"version\": \"${projektVersion.joinToString(".")}\", \"commit\": \"$loxCommit\", \"gebaut\": \"$gebaut\"}\n")
+    }
+    outputs.upToDateWhen { false }          // Bauzeit und Commit gehoeren zu jedem Build
     // Ausserhalb des Repos gebaut -> nicht synchronisieren (vorhandene Assets gelten).
     onlyIf { loxRepoRoot.resolve("bin/webvisu.py").exists() }
 }

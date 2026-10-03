@@ -47,6 +47,7 @@
   .navbtn:hover .nbarrow{color:var(--accent);}
   .conn{font-size:13px;color:var(--muted);}
   .conn b.ok{color:var(--good);} .conn b.bad{color:var(--crit);}
+  .ver{font-size:12px;color:var(--muted);overflow-wrap:anywhere;}
   .card b.ok{color:var(--good);} .card b.bad{color:var(--crit);}
   /* ---------- Main: Rubriken + Reiter + Inhalt + Speicherleiste ---------- */
   .main{display:flex;flex-direction:column;height:100vh;min-width:0;}
@@ -552,6 +553,8 @@
     </div>
     <div class="hint">Auf jedem Wandpanel die Visu mit <code>?panel=&lt;id&gt;</code> öffnen.</div>
     <div class="conn" id="conn">…</div>
+    <!-- Welcher Stand laeuft: Version, Commit, Bauzeit (/api/settings -> version) -->
+    <div class="ver" id="lpver"></div>
     <div class="langrow" data-langsel style="margin-top:2px"></div>
   </aside>
 
@@ -2981,6 +2984,17 @@ window.addEventListener('beforeunload',e=>{ if(dirty){ e.preventDefault(); e.ret
 let SET=null;
 function flash(el,msg,ok){ if(!el)return; el.textContent=msg; el.className='toast show '+(ok?'ok':'err'); setTimeout(()=>el.classList.remove('show'),4000); }
 
+// Version, Commit (kurz, ganz im Tooltip) und Bauzeit in der Ortszeit des Browsers
+function versionZeigen(v){
+  const el=$('#lpver'); if(!el) return;
+  const teile=[v.version?'LoxPanel '+v.version:T('Version unbekannt')];
+  if(v.commit) teile.push(v.commit.slice(0,7));
+  const d=v.gebaut?new Date(v.gebaut):null;
+  if(d&&!isNaN(d)) teile.push(T('gebaut')+' '+d.toLocaleString(undefined,
+    {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}));
+  el.textContent=teile.join(' · ');
+  el.title=v.commit||'';
+}
 async function loadSettings(){
   const r=await fetch('/api/settings'); SET=await r.json();
   const m=SET.miniserver||{};
@@ -2990,6 +3004,7 @@ async function loadSettings(){
   const c=$('#conn');
   if(c){ if(SET.connected){ c.innerHTML=T('Status:')+' <b class="ok">'+T('verbunden')+'</b> · '+SET.nControls+' Controls'; }
     else { c.innerHTML=T('Status:')+' <b class="bad">'+T('nicht verbunden')+'</b>'; } }
+  versionZeigen(SET.version||{});
   const box=$('#ic_list');
   if(box){
     if(!(SET.intercoms||[]).length){ box.innerHTML='<div class="muted">'+T('Keine Intercom-Bausteine gefunden (Miniserver verbunden?).')+'</div>'; }
