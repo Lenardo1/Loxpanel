@@ -125,9 +125,22 @@
      fielen Diagramme mit flex-basis 0 auf 0px zusammen. */
   .screen.split #frontpane .fp-page.solo.cpage,
   .screen.widgettab #frontpane .fp-page.solo.cpage{overflow:hidden;gap:8px;display:flex;flex-direction:column;}
-  #frontpane .fp-page.solo.cpage .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .cpbody{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .cpsec{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
   #frontpane .fp-page.solo.cpage .chbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
-  #frontpane .fp-page.solo.cpage .chbody>svg{flex:1 1 auto;min-height:0;width:100%;height:100%;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .chbody>svg{flex:1 1 auto;min-height:0;width:100%;height:100%;}
+  /* Gestapelter Verlauf (mehrere Bausteine): die Zeitraum-Leiste klebt als fester
+     Kopf oben, NUR die Bausteine (.cpbody) scrollen - jeder in natuerlicher Hoehe
+     (Seitenverhaeltnis 440:150) mit Kopf (Name+Wert). Die Pane selbst scrollt nicht
+     (overflow:hidden oben), damit der Kopf stehen bleibt und alles im Rahmen bleibt. */
+  #frontpane .fp-page.solo.cpage.stack .cpr{flex:0 0 auto;margin:0 0 8px;}
+  #frontpane .fp-page.solo.cpage.stack .cpbody{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;display:block;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec{display:block;margin-bottom:12px;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec:last-child{margin-bottom:0;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec .chart+.chart{margin-top:6px;}
+  #frontpane .fp-page.solo.cpage.stack .chbody{display:block;}
+  #frontpane .fp-page.solo.cpage.stack .chbody>svg{display:block;width:100%;height:auto;}
   /* Uhr-Seite: dort im Seitenverhaeltnis der Zeichnung (440:150), solange der
      Kasten reicht. Reicht er nicht (quer feste Hoehe, hochkant die Restflaeche
      unter Uhr und Wetter), schrumpfen die Diagramme, statt unten abgeschnitten
@@ -1280,8 +1293,9 @@ function paintChart(box,b){
 }
 // Rahmen eines Diagramms (Detailseite und Verlaufs-Pane); die Zeitraum-Knoepfe
 // traegt nur das erste Diagramm einer Seite (b.ranges).
-function chartBoxHtml(b){
-  return '<div class="chart" data-chart>'+(b.ranges?'<div class="chrng">'+
+function chartBoxHtml(b,withRange){
+  if(withRange===undefined) withRange=true;   // Stapel-Pane zeigt die Knoepfe nur einmal oben
+  return '<div class="chart" data-chart>'+((withRange&&b.ranges)?'<div class="chrng">'+
     b.ranges.map(r=>'<button type="button" class="chip" data-rng="'+esc(r[0])+'">'+esc(r[1])+'</button>').join('')+
     '</div>':'')+'<div class="chbody"></div></div>';
 }
@@ -1291,26 +1305,46 @@ function chartBoxHtml(b){
 // dem Server neu (setchart), statt wie auf der Detailseite die Route zu ersetzen:
 // links bleibt die Kachelseite stehen.
 function renderChartPane(elc){ if(!elc) return;
-  // Quelle des Verlaufs: eine Widget-Seite bringt den Baustein direkt mit
-  // (view.widget), sonst der beim Server abonnierte (curChartKey), sonst die
-  // Pane des Tabs. Die Widget-Seite zuerst, damit auch nach Weg-und-Zurueck der
-  // richtige Baustein steht (curChartKey ist da noch der alte/leere Stand).
-  const wraw=(view && view.widget) || '';
-  const uuid=(wraw.indexOf('chart:')===0) ? wraw.slice(6)
-           : (curChartKey ? curChartKey.split('|')[0] : (paneForTab(activeTab())||'').slice(6));
-  const d=(chartData && chartData.control===uuid) ? chartData : null;
-  const blocks=d ? (d.blocks||[]) : [];
-  const sig=uuid+'|'+(d?blocks.map(b=>b.kind+(b.ranges?'r':'')).join(','):'-');
+  // Verlaufs-Pane zeigt einen oder mehrere Bausteine gestapelt (Server:
+  // {t:'chart', charts:[{control,name,value,blocks}], range, ranges}). Welche
+  // Bausteine, meldet applyPane() dem Server per setchart; der Push landet in
+  // chartData. Ab zwei Bausteinen scrollt die Pane (.stack), sonst "fit" wie bisher.
+  const d=(chartData && Array.isArray(chartData.charts)) ? chartData : null;
+  const charts=d ? d.charts : [];
+  const multi=charts.length>1;
+  const sig=(d?d.controls.join(','):'-')+'|'+(d?d.range:'')+'|'+
+            charts.map(c=>(c.blocks||[]).length).join('.');
   let page=elc.querySelector('.fp-page.cpage');
   if(!page || page.dataset.sig!==sig){
-    elc.innerHTML='<div class="fp-page cpage solo"><div class="cphead"><div class="cpname"></div><div class="cpval"></div></div>'+
-      (d ? blocks.map(chartBoxHtml).join('') : '<div class="chmsg">Verlauf wird geladen …</div>')+'</div>';
+    const rngRow=(d && d.ranges && d.ranges.length)
+      ? '<div class="chrng cpr">'+d.ranges.map(r=>'<button type="button" class="chip'+
+          (r[0]===d.range?' on':'')+'" data-rng="'+esc(r[0])+'">'+esc(r[1])+'</button>').join('')+'</div>'
+      : '';
+    const body=!d
+      ? '<div class="chmsg">Verlauf wird geladen …</div>'
+      : (charts.length
+        ? charts.map(c=>'<div class="cpsec"><div class="cphead"><div class="cpname"></div>'+
+            '<div class="cpval"></div></div>'+
+            (c.blocks||[]).map(b=>chartBoxHtml(b,false)).join('')+'</div>').join('')
+        : '<div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div>');
+    elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+body+'</div></div>';
     page=elc.querySelector('.fp-page.cpage'); page.dataset.sig=sig;
-    page.querySelectorAll('.chrng [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
+    page.querySelectorAll('.cpr [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
       chartRange=btn.dataset.rng; applyPane(); }));
   }
-  if(d){ page.querySelector('.cpname').textContent=d.name||''; page.querySelector('.cpval').textContent=d.value||'';
-    paintCharts(page,blocks); }
+  if(d){
+    const secs=page.querySelectorAll('.cpsec');
+    charts.forEach((c,i)=>{ const s=secs[i]; if(!s) return;
+      const nm=s.querySelector('.cpname'), vl=s.querySelector('.cpval');
+      if(nm) nm.textContent=c.name||''; if(vl) vl.textContent=c.value||''; });
+    paintChartStack(page,charts);
+  }
+}
+// Alle Diagramme des Stapels in DOM-Reihenfolge zeichnen (ein [data-chart]-Kasten
+// je Block, Bloecke je Baustein hintereinander - wie chartBoxHtml sie ausgibt).
+function paintChartStack(page,charts){
+  const els=[...page.querySelectorAll('[data-chart]')]; let i=0;
+  charts.forEach(c=>(c.blocks||[]).forEach(b=>{ if(b.k==='chart'&&els[i]) paintChart(els[i],b); i++; }));
 }
 // Mini-Verlauf in einer Kachel (it.spark, je Kachel im Konfigurator gewaehlt). Drei
 // Stile, gezeichnet in der echten Pixelgroesse der freien Kachelmitte (paintSpark),
@@ -1757,9 +1791,10 @@ function applyPane(){
   // Verlaufs-Pane: Baustein und gewaehlten Zeitraum melden (er pusht dann
   // {t:'chart'}). Wie bei Energie/Kamera zaehlt der Screensaver, wenn er oben
   // liegt (chart als zweite Uhr-Spalte), sonst die Pane des aktiven Tabs.
-  const chuid=qarg(qraw,'chart:');
+  const chuid=qarg(qraw,'chart:');   // ein oder mehrere Bausteine, komma-getrennt
   const chkey=chuid ? chuid+'|'+chartRange : '';
-  if(chkey!==curChartKey){ curChartKey=chkey; try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
+  if(chkey!==curChartKey){ curChartKey=chkey; chartData=null;   // alten Stapel verwerfen, bis der neue Push kommt
+    try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
   // Player-Zone (Audio) kontextabhaengig: liegt der Screensaver oben, seine Zone
   // (Audio als zweite Uhr-Spalte), sonst die Pane 2 des aktiven Tabs. Server
   // pusht {t:'player'} mit Cover/Titel/Transport.

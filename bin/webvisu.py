@@ -392,9 +392,9 @@ def _clean_screen(d) -> dict:
 
 def _clean_tabpane(v) -> str:
     """Split-Pane eines Tabs pruefen: "weather" | "calendar" | "player:<uuid>"
-    | "energy:<uuid>" | "camera:<uuid>" | "chart:<uuid>" (Verlauf eines Bausteins
-    mit Aufzeichnung) | "status:<uuid>,<uuid>,..." (frei gewaehlte Werte, wie auf
-    der Uhr-Seite). "" heisst "kein Widget" — die Visu weitet sich nach rechts aus.
+    | "energy:<uuid>" | "camera:<uuid>" | "chart:<uuid>,<uuid>,..." (ein oder
+    mehrere Verlaufs-Bausteine mit Aufzeichnung, gestapelt) | "status:<uuid>,..."
+    (frei gewaehlte Werte, wie auf der Uhr-Seite). "" heisst "kein Widget".
 
     Derselbe Widget-Katalog wie die Uhr-Seite (_clean_svpane), damit Zusatz und
     Screensaver dieselben Inhalte anbieten. Prueft OHNE strip() am Gesamtwert;
@@ -402,13 +402,14 @@ def _clean_tabpane(v) -> str:
     if v in ("weather", "calendar"):
         return v
     if isinstance(v, str):
-        for kopf in ("player:", "energy:", "camera:", "chart:"):
+        for kopf in ("player:", "energy:", "camera:"):
             if v.startswith(kopf) and len(v) > len(kopf):
                 return v
-        if v.startswith("status:"):
-            uu = [x.strip() for x in v[7:].split(",") if x.strip()][:SV_STATUS_MAX]
-            if uu:
-                return "status:" + ",".join(uu)
+        for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
+            if v.startswith(kopf):
+                uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
+                if uu:
+                    return kopf + ",".join(uu)
     return ""
 
 
@@ -416,8 +417,8 @@ def _clean_svpane(v) -> str:
     """Rechte Spalte der Uhr-Seite (Screensaver) pruefen und normieren.
 
     Erlaubt: "off" (keine zweite Spalte), "calendar", "weather",
-    "player:<zone>", "energy:<uuid>", "camera:<uuid>", "chart:<uuid>" (Verlauf
-    eines Bausteins mit Aufzeichnung) und "status:<uuid>,<uuid>,...".
+    "player:<zone>", "energy:<uuid>", "camera:<uuid>", "chart:<uuid>,..." (ein
+    oder mehrere Verlaufs-Bausteine, gestapelt) und "status:<uuid>,<uuid>,...".
     Alles andere ergibt "" — das ist die Automatik: Termine, wenn welche
     anstehen, sonst die Wetter-Details. Unbekannte Werte wandern damit auf
     die Automatik statt eine leere Spalte zu erzeugen."""
@@ -426,13 +427,14 @@ def _clean_svpane(v) -> str:
     v = v.strip()
     if v in ("off", "calendar", "weather"):
         return v
-    for kopf in ("player:", "energy:", "camera:", "chart:"):
+    for kopf in ("player:", "energy:", "camera:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v
-    if v.startswith("status:"):
-        uu = [x.strip() for x in v[7:].split(",") if x.strip()][:SV_STATUS_MAX]
-        if uu:
-            return "status:" + ",".join(uu)
+    for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
+        if v.startswith(kopf):
+            uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return kopf + ",".join(uu)
     return ""
 
 
@@ -970,7 +972,7 @@ class App:
         self.conn_energy: dict[web.WebSocketResponse, str] = {}   # ws -> EFM/EnergyManager2-UUID der aktiven Energiefluss-Pane (via setenergy)
         self.conn_camera: dict[web.WebSocketResponse, str] = {}   # ws -> Intercom-UUID der aktiven Kamera-Pane (via setcamera)
         self.conn_status: dict[web.WebSocketResponse, tuple] = {}  # ws -> UUIDs der Status-Kacheln auf der Uhr-Seite (via setsvstatus)
-        self.conn_chart: dict[web.WebSocketResponse, tuple[str, str]] = {}   # ws -> (Baustein-UUID, Zeitraum) der Verlaufs-Pane (via setchart)
+        self.conn_chart: dict[web.WebSocketResponse, tuple[tuple[str, ...], str]] = {}   # ws -> (Baustein-UUIDs, Zeitraum) der Verlaufs-Pane (via setchart)
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
@@ -4151,6 +4153,23 @@ class App:
         return {"control": uuid, "name": _clean(c.get("name")), "value": big,
                 "range": rng, "blocks": self._stat_blocks(c, rng)}
 
+    def chart_stack(self, uuids, rng: str | None = None) -> dict:
+        """Mehrere Verlaufs-Bausteine gestapelt fuer die Verlaufs-Pane
+        (panes "chart:<uuid>,<uuid>,..."). Je Baustein Name, aktueller Wert und
+        Diagramme (chart_blocks); der Zeitraum gilt fuer den ganzen Stapel. Die
+        Zeitraum-Knoepfe traegt die Pane nur einmal oben (`ranges`), nicht jeder
+        Baustein — die Visu blendet die Knoepfe der einzelnen Bloecke daher aus.
+        Unbekannte/aufzeichnungslose Bausteine fallen still weg."""
+        rng = rng if rng in STAT_RANGES else STAT_DEFAULT_RANGE
+        charts = []
+        for u in list(uuids or [])[:SV_STATUS_MAX]:
+            cb = self.chart_blocks(u, rng)
+            if cb is not None:
+                charts.append(cb)
+        return {"controls": [c["control"] for c in charts], "range": rng,
+                "ranges": [[k, v[0]] for k, v in STAT_RANGES.items()],
+                "charts": charts}
+
     def _stat_primary(self, c: dict) -> tuple | None:
         """Die Reihe, die eine Kachel zeigt: die erste Linie, sonst die erste Reihe."""
         defs = self._stat_series_defs(c)
@@ -5719,10 +5738,9 @@ class App:
                 _chart = self.conn_chart.get(ws)
                 if _chart:
                     try:
-                        cb = self.chart_blocks(*_chart)
-                        chart_msg = {"t": "chart", **cb} if cb is not None else None
+                        chart_msg = {"t": "chart", **self.chart_stack(*_chart)}
                     except Exception:
-                        log.exception("chart_blocks fehlgeschlagen (%s)", _chart)
+                        log.exception("chart_stack fehlgeschlagen (%s)", _chart)
                 # Split-Layout: Kamera-Pane (Intercom-Vollansicht) des aktiven Tabs
                 # mitrendern (kommt vom Client via setcamera -> conn_camera).
                 camera_msg = None
@@ -7753,20 +7771,19 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 else:
                     app.conn_status.pop(ws, None)
             elif data.get("t") == "setchart":
-                # Client meldet den Baustein der aktiven Verlaufs-Pane und den
-                # dort gewaehlten Zeitraum (oder uuid "" = keine Pane).
-                cuid = str(data.get("uuid") or "").strip()
+                # Client meldet die Bausteine der aktiven Verlaufs-Pane (ein oder
+                # mehrere, gestapelt) und den dort gewaehlten Zeitraum. "" = keine Pane.
+                _cuu = tuple(x.strip() for x in str(data.get("uuid") or "").split(",")
+                             if x.strip())[:SV_STATUS_MAX]
                 rng = data.get("range") if data.get("range") in STAT_RANGES else STAT_DEFAULT_RANGE
-                if cuid:
-                    app.conn_chart[ws] = (cuid, rng)
+                if _cuu:
+                    app.conn_chart[ws] = (_cuu, rng)
                     try:
-                        cb = app.chart_blocks(cuid, rng)
-                        if cb is not None:
-                            _cm = {"t": "chart", **cb}
-                            await ws.send_json(_cm)
-                            app._last_sent.setdefault(ws, {})["chart"] = _cm
+                        _cm = {"t": "chart", **app.chart_stack(_cuu, rng)}
+                        await ws.send_json(_cm)
+                        app._last_sent.setdefault(ws, {})["chart"] = _cm
                     except Exception:
-                        log.exception("chart_blocks (setchart) fehlgeschlagen (%s)", cuid)
+                        log.exception("chart_stack (setchart) fehlgeschlagen (%s)", _cuu)
                 else:
                     app.conn_chart.pop(ws, None)
             elif data.get("t") == "setcamera":

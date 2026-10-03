@@ -1598,6 +1598,9 @@ function chartControlOptions(sel){
   return statControls()
     .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
 }
+function chartAddOptions(){   // Dropdown zum Hinzufuegen: nur Bausteine mit Aufzeichnung
+  return '<option value="">'+T('＋ hinzufügen …')+'</option>'+chartControlOptions('');
+}
 function firstChartControl(){ const z=statControls()[0]; return z?z.uuid:''; }
 function firstEnergyControl(){
   // Standard = Energieflussmonitor (EFM, mit Verbraucher-Leistungen). Der
@@ -1674,8 +1677,9 @@ function renderPanes(p){
     const label=meta?meta.label:tk;
     const v=panes[tk]||'';
     const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0, isV=v.indexOf('chart:')===0, isS=v.indexOf('status:')===0;
-    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':v)))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'', vuid=isV?v.slice(6):'';
+    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':v)))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'';
     const suu=isS?v.slice(7).split(',').filter(Boolean):[];
+    const vuu=isV?v.slice(6).split(',').filter(Boolean):[];   // Verlauf: ein oder mehrere Bausteine, gestapelt
     let row='<div class="ccrow"><span class="ccnm">'+esc(label)+'</span>'+
       '<select data-pane="'+esc(tk)+'">'+
         '<option value=""'+(kind===''?' selected':'')+'>'+T('Kein Widget (Screen füllen)')+'</option>'+
@@ -1692,7 +1696,6 @@ function renderPanes(p){
     if(isP) row+='<select data-panez="'+esc(tk)+'">'+audioZoneOptions(zone)+'</select>';
     if(isE) row+='<select data-panee="'+esc(tk)+'">'+energyControlOptions(euid)+'</select>';
     if(isC) row+='<select data-panec="'+esc(tk)+'">'+cameraOptions(camu)+'</select>';
-    if(isV) row+='<select data-panev="'+esc(tk)+'">'+chartControlOptions(vuid)+'</select>';
     row+='</div>';
     if(isS){   // Werte = mehrere Bausteine, wie auf der Uhr-Seite
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
@@ -1701,6 +1704,16 @@ function renderPanes(p){
         '<div class="picked" style="margin:6px 0 2px">'+(suu.length
           ? suu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
               return '<span class="chip on" data-pk="'+esc(tk)+'" data-su="'+esc(u)+'">'+esc(c?c.name:u)+
+                '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+    }
+    if(isV){   // Verlauf = ein oder mehrere Bausteine, gestapelt (wie Werte)
+      row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
+        '<select class="pchart-add" data-pk="'+esc(tk)+'">'+chartAddOptions()+'</select>'+
+        ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
+        '<div class="picked" style="margin:6px 0 2px">'+(vuu.length
+          ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+              return '<span class="chip on" data-pk="'+esc(tk)+'" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
           : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
     }
@@ -1731,6 +1744,13 @@ function renderPanes(p){
   box.querySelectorAll('.chip[data-su][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
     const rest=paneStatUu(tk).filter(x=>x!==n.dataset.su);
     setPane(tk, rest.length?('status:'+rest.join(',')):'status:'); renderPanes(p); });
+  const paneChartUu=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('chart:')===0?cur.slice(6).split(',').filter(Boolean):[]; };
+  box.querySelectorAll('.pchart-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
+    const uu=paneChartUu(tk); if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
+    setPane(tk,'chart:'+uu.concat([u]).join(',')); renderPanes(p); });
+  box.querySelectorAll('.chip[data-cu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
+    const rest=paneChartUu(tk).filter(x=>x!==n.dataset.cu);
+    setPane(tk, rest.length?('chart:'+rest.join(',')):'chart:'); renderPanes(p); });
   box.querySelectorAll('select[data-panez]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panez,'player:'+s.value);
   });
@@ -1739,9 +1759,6 @@ function renderPanes(p){
   });
   box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panec,'camera:'+s.value);
-  });
-  box.querySelectorAll('select[data-panev]').forEach(s=>s.onchange=()=>{
-    setPane(s.dataset.panev,'chart:'+s.value);
   });
 }
 // Screensaver: rechte Spalte. Gleiche Werte-Grammatik wie die Tab-Panes, damit
@@ -1778,17 +1795,17 @@ function renderSvPane(p){
       '<option value="status"'+(k==='status'?' selected':'')+'>Werte</option>'+
       '<option value="off"'+(k==='off'?' selected':'')+'>Nichts (Uhr über volle Breite)</option>'+
     '</select>';
-  if(k==='player'||k==='energy'||k==='camera'||k==='chart'){
-    const opt=(k==='player')?audioZoneOptions(arg):(k==='energy')?energyControlOptions(arg):(k==='camera')?cameraOptions(arg):chartControlOptions(arg);
+  if(k==='player'||k==='energy'||k==='camera'){
+    const opt=(k==='player')?audioZoneOptions(arg):(k==='energy')?energyControlOptions(arg):cameraOptions(arg);
     h+= opt ? '<select id="fSvArg">'+opt+'</select>'
       : '<span class="ccmut">'+(k==='player'
           ? T('Keine Musikzone in der Anlage.')
           : k==='energy' ? T('Kein Energieflussmonitor in der Anlage.')
-          : k==='camera' ? T('Kein Intercom-Baustein in der Anlage.')
-          : T('Kein Baustein mit Aufzeichnung in der Anlage.'))+'</span>';
+          : T('Kein Intercom-Baustein in der Anlage.'))+'</span>';
   }
   h+='</div>';
   const uu=(k==='status'&&arg)?arg.split(','):[];
+  const vuu=(k==='chart'&&arg)?arg.split(','):[];   // Verlauf gestapelt (wie Werte)
   if(k==='status'){
     h+='<div class="ccrow" style="margin-top:8px"><span class="ccnm">'+T('Bausteine')+'</span>'+
        '<select id="fSvAdd"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -1796,6 +1813,17 @@ function renderSvPane(p){
     h+='<div class="picked" id="svStatChips" style="margin-top:8px">'+(uu.length
       ? uu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
           return '<span class="chip on" data-su="'+esc(u)+'">'+esc(c?c.name:u)+
+            '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+      : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+  }
+  if(k==='chart'){
+    h+='<div class="ccrow" style="margin-top:8px"><span class="ccnm">'+T('Bausteine')+'</span>'+
+       '<select id="fSvChartAdd">'+chartAddOptions()+'</select>'+
+       ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':
+         (statControls().length?'':'<span class="ccmut">'+T('Kein Baustein mit Aufzeichnung in der Anlage.')+'</span>'))+'</div>';
+    h+='<div class="picked" style="margin-top:8px">'+(vuu.length
+      ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+          return '<span class="chip on" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
             '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
       : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
   }
@@ -1827,6 +1855,14 @@ function renderSvPane(p){
   box.querySelectorAll('.chip[data-su]').forEach(n=>n.onclick=()=>{
     const rest=uu.filter(x=>x!==n.dataset.su);
     setSv(rest.length?('status:'+rest.join(',')):'');
+  });
+  const cadd=$('#fSvChartAdd');
+  if(cadd) cadd.onchange=()=>{ const u=cadd.value; cadd.value='';
+    if(!u || vuu.indexOf(u)>-1 || (svMax()&&vuu.length>=svMax())) return;
+    setSv('chart:'+vuu.concat([u]).join(',')); };
+  box.querySelectorAll('.chip[data-cu]').forEach(n=>n.onclick=()=>{
+    const rest=vuu.filter(x=>x!==n.dataset.cu);
+    setSv(rest.length?('chart:'+rest.join(',')):'');
   });
   if(window.I18N && I18N.applyChrome) I18N.applyChrome(box);
 }
@@ -2251,7 +2287,16 @@ function pickContentHtml(p){
   if(k==='player') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Musikzone')+'</label><select id="pickWArg">'+audioZoneOptions(arg)+'</select></div>';
   else if(k==='energy') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+energyControlOptions(arg)+'</select></div>';
   else if(k==='camera') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+cameraOptions(arg)+'</select></div>';
-  else if(k==='chart') h+='<div class="field" style="max-width:280px"><label class="lbl">'+T('Baustein')+'</label><select id="pickWArg">'+chartControlOptions(arg)+'</select></div>';
+  else if(k==='chart'){ const vuu=arg?arg.split(',').filter(Boolean):[];   // Verlauf gestapelt (wie Werte)
+    h+='<div class="ccrow" style="margin:4px 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
+       '<select id="pickWChartAdd">'+chartAddOptions()+'</select>'+
+       ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
+       '<div class="picked" style="margin:6px 0 2px">'+(vuu.length
+         ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+             return '<span class="chip on" data-wcu="'+esc(u)+'">'+esc(c?c.name:u)+
+               '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+         : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+  }
   else if(k==='status'){ const suu=arg?arg.split(',').filter(Boolean):[];
     h+='<div class="ccrow" style="margin:4px 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
        '<select id="pickWStatAdd"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -2356,6 +2401,13 @@ function bindPick(p){
   $('#tabPick').querySelectorAll('.chip[data-wsu]').forEach(n=>n.onclick=()=>{ const e=curPT(p);
       const rest=(wKind(e.widget||'')==='status'?wArg(e.widget).split(',').filter(Boolean):[]).filter(x=>x!==n.dataset.wsu);
       e.widget=rest.length?('status:'+rest.join(',')):'status:'; markDirty(); renderPick(p); });
+  { const wcAdd=$('#pickWChartAdd'); if(wcAdd) wcAdd.onchange=()=>{ const e=curPT(p), u=wcAdd.value; wcAdd.value='';
+      const uu=(wKind(e.widget||'')==='chart'?wArg(e.widget).split(',').filter(Boolean):[]);
+      if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
+      e.widget='chart:'+uu.concat([u]).join(','); markDirty(); renderPick(p); }; }
+  $('#tabPick').querySelectorAll('.chip[data-wcu]').forEach(n=>n.onclick=()=>{ const e=curPT(p);
+      const rest=(wKind(e.widget||'')==='chart'?wArg(e.widget).split(',').filter(Boolean):[]).filter(x=>x!==n.dataset.wcu);
+      e.widget=rest.length?('chart:'+rest.join(',')):'chart:'; markDirty(); renderPick(p); });
   const psr=$('#pickSearch');
   if(psr) psr.oninput=()=>{ pickQ=psr.value; renderPickList(); };
   const prm=$('#pickRoom');
