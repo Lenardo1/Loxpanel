@@ -3574,7 +3574,7 @@ function mzRender(){
     // Verbundene Geraete ohne Kennung gleich hier benennen: vorher hiess es nur
     // "Noch kein Gerät bekannt", obwohl eines verbunden war, und man sass fest.
     const anon=ANON_DEVICES.map(a=>'<div class="mzanon" data-mzanon="'+esc(a.ip)+'"><span class="agip">'+esc(a.ip)+' · '+
-      esc(TYPE_LABEL[a.kiosk]||T('Browser'))+'</span><input class="mzname" placeholder="'+T('Gerätename')+'">'+
+      esc(TYPE_LABEL[a.kiosk]||T('Browser'))+'</span><input type="text" class="mzname" placeholder="'+T('Gerätename')+'">'+
       '<button class="wzbtn" data-mzname>'+T('Namen vergeben')+'</button></div>').join('');
     b.innerHTML='<p class="wzq">'+T('Für welche Geräte?')+'</p>'+
       (names.length? '<div class="mzchips">'+names.map(n=>'<button class="chip'+(MZ.devices.indexOf(n)>=0?' on':'')+'" data-mzdev="'+esc(n)+'">'+esc(n)+'</button>').join('')+'</div>'

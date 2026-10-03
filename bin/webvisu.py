@@ -2485,7 +2485,7 @@ class App:
                        "dpmsOff", "reloadHours", "nightDim", "nightWake",
                        "cols", "rows", "fill", "baseColor",
                        "overlay", "textColor", "bold", "lang", "player", "panes", "split",
-                       "svPane", "scale")}
+                       "svPane", "scale", "catFilter")}
         # Split-Pane je Tab: nur gueltige Tab-Kennung und gueltiger Pane-Wert.
         if isinstance(ui.get("panes"), dict):
             ui["panes"] = {str(k): v for k, v in ui["panes"].items()
@@ -3480,10 +3480,14 @@ class App:
             it.update(icon="alarm", sublabel=("Alles ok" if ok else "Alarm!"),
                       tone=("good" if ok else "crit"))
         elif t == "Radio":
-            outs = (c.get("details") or {}).get("outputs") or {}
+            det = c.get("details") or {}
+            outs = det.get("outputs") or {}
             aoi = int(self._state(c, "activeOutput") or 0)
+            # Kein Ausgang aktiv: der Text, den Loxone dafuer vergibt (allOff,
+            # etwa "Automatik"), wie in der Detailseite; ohne ihn ein Strich.
+            ruhe = det.get("allOff") or "–"
             it.update(icon="switch", nav={"view": "control", "id": uuid},
-                      sublabel=(outs.get(str(aoi)) or ("–" if aoi == 0 else f"Ausgang {aoi}")))
+                      sublabel=(outs.get(str(aoi)) or (ruhe if aoi == 0 else f"Ausgang {aoi}")))
         elif t == "LightController":
             scenes = self._lc_scenes(c)
             asc = int(self._state(c, "activeScene") or 0)
@@ -3614,12 +3618,13 @@ class App:
             muuids = [m.get("uuid") for m in ((c.get("details") or {}).get("controls") or [])
                       if m.get("uuid") in self.controls]
             n = 0
+            # Einzahl bei genau einem: "Spielt in 1 Raum", nicht "in 1 Räumen"
             if t == "CentralLightController":
                 n = sum(1 for mu in muuids if LIGHT.render(self._with_uuid(mu), self.states)["on"])
-                it["sublabel"] = f"In {n} Räumen aktiv" if n else "Aus"
+                it["sublabel"] = f"In {n} {'Raum' if n == 1 else 'Räumen'} aktiv" if n else "Aus"
             elif t == "CentralAudioZone":
                 n = sum(1 for mu in muuids if self._state(self.controls[mu], "playState") == 2)
-                it["sublabel"] = f"Spielt in {n} Räumen" if n else "Aus"
+                it["sublabel"] = f"Spielt in {n} {'Raum' if n == 1 else 'Räumen'}" if n else "Aus"
             elif t in ("CentralGate", "CentralWindow"):
                 n = sum(1 for mu in muuids if (self._state(self.controls[mu], "position") or 0) > 0)
                 it["sublabel"] = f"{n} offen" if n else "Alle geschlossen"
