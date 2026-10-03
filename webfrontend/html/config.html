@@ -1491,7 +1491,7 @@ function renderEditor(){
          (((p.ui||{}).dpmsOff==null)?'':(p.ui||{}).dpmsOff)+'" placeholder="180"></div>'+
        '<div class="field" style="max-width:180px"><label class="lbl">Auto-Neustart alle (Std.)</label>'+
          '<input type="number" min="0" max="168" step="1" data-ui="reloadHours" value="'+
-         (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="0 = aus"></div>'+
+         (((p.ui||{}).reloadHours==null)?'':(p.ui||{}).reloadHours)+'" placeholder="'+esc(T('nachts um {h} Uhr').replace('{h}',neuladenStunde()))+'"></div>'+
        '<div class="field" style="max-width:180px"><label class="lbl">Nachts abdunkeln (%)</label>'+
          '<input type="number" min="0" max="90" step="5" data-ui="nightDim" value="'+
          (((p.ui||{}).nightDim==null)?'':(p.ui||{}).nightDim)+'" placeholder="0 = aus"></div>'+
@@ -1499,6 +1499,7 @@ function renderEditor(){
          '<input type="number" min="0" max="300" step="5" data-ui="nightWake" value="'+
          (((p.ui||{}).nightWake==null)?'':(p.ui||{}).nightWake)+'" placeholder="20"></div>'+
      '</div>'+
+     '<div class="hint" style="padding-top:4px">'+esc(T('Auto-Neustart gegen Einfrieren: Leer lädt die Visu jede Nacht um {h} Uhr neu, eine Zahl alle so viele Stunden, 0 nie. Neu geladen wird nur, während die Uhr-Seite steht; ein dunkles Display bleibt dabei dunkel. Linux-Panels mit Agent starten stattdessen den Browser neu: nach der Zahl hier, ohne Eintrag nach RELOAD_HOURS in ihrer kiosk.conf.').replace('{h}',neuladenStunde()))+'</div>'+
      '<div class="hint" style="padding-top:4px">'+T('In der LoxPanel-App senkt „Nachts abdunkeln“ die echte Display-Helligkeit, statt das Bild abzudunkeln – mit derselben Wirkung, aber ohne grau leuchtendes Schwarz. Ist am Gerät die automatische Helligkeit an, dunkelt die Visu wie im Browser ab.')+'</div>'+
      '<div class="grph">'+T('Feinjustierung')+'</div>'+
      '<div class="sizes">'+
@@ -1566,6 +1567,9 @@ function renderEditor(){
   if(window.I18N) I18N.autoChrome('h2, h3, label.lbl, .btn, .minibtn, .note, .hint, option, .stab');
 }
 
+// Auto-Neustart ohne Eintrag: Die Visu laedt jede Nacht um diese Stunde neu,
+// sie kommt vom Server (/api/meta reloadAt = NEULADEN_STUNDE).
+function neuladenStunde(){ return (META||{}).reloadAt; }
 function sizeField(label,key,ui){
   const v=(ui||{})[key];
   return '<div class="field"><label class="lbl">'+label+'</label>'+

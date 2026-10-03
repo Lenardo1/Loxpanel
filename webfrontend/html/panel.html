@@ -2913,12 +2913,12 @@ function nightWake(){          // Beruehrung -> kurz voll aufhellen, dann zuruec
 // bei Klingel / Wecker / Notify / Goto wieder an. Erkannt werden Fully Kiosk
 // Browser (window.fully; dort "Enable JavaScript Interface" einschalten) und die
 // LoxPanel-App fuer Android (window.LoxKiosk); beide haben dieselbe Schnittstelle.
-// Auto-Neustart (reloadHours) erledigt die Seite ohne Agent per location.reload().
+// Neu laden gegen Einfrieren erledigt die Seite ohne Agent selbst (s. neuladenFaellig).
 // Hat das Geraet einen Praesenzmelder (Displays -> Display-Steuerung), meldet der
 // Server, solange er jemanden sieht (presence): dann bleibt das Display an, der
 // Leerlauf schaltet nicht ab. Wird der Raum leer, schaltet der Server es aus.
-const DISP = { dpmsOff: 0, reloadHours: 0, agent: false, presence: false };
-let dpmsTimer=null, reloadTimer=null;
+const DISP = { dpmsOff: 0, reloadHours: 0, reloadAt: null, agent: false, presence: false };
+let dpmsTimer=null;
 // Kiosk-Apps: Kennung (meldet die Seite dem Server -> Typ in der Geraeteliste)
 // -> Name ihrer JS-Schnittstelle im window.
 const KIOSK_APPS = { fully: 'fully', loxpanel: 'LoxKiosk' };
@@ -3002,12 +3002,31 @@ function applyDisplayCfg(msg){
   // Native LoxPanel-Kiosk-App: konfigurierte Display-aus-Zeit an ihren Screensaver
   // geben, bei Anwesenheit 0.
   appLeerlauf();
-  DISP.reloadHours = (typeof msg.reloadHours==='number' && msg.reloadHours>0) ? msg.reloadHours : 0;
+  // Neu laden: null = nicht eingestellt (nachts um reloadAt Uhr), sonst Stunden, 0 = aus
+  DISP.reloadHours = (typeof msg.reloadHours==='number') ? Math.max(0, msg.reloadHours) : null;
+  DISP.reloadAt = (typeof msg.reloadAt==='number') ? msg.reloadAt : null;
   DISP.agent = !!msg.agent;
   armDpms();
-  clearTimeout(reloadTimer);
-  if(!DISP.agent && DISP.reloadHours>0) reloadTimer=setTimeout(()=>location.reload(), DISP.reloadHours*3600*1000);
 }
+// Neu laden gegen Einfrieren, nur ohne Agent (der startet den Browser selbst
+// neu). reloadHours nicht eingestellt: einmal je Nacht, sobald es nach dem
+// Laden der Seite reloadAt Uhr geworden ist; eine Zahl: so viele Stunden nach
+// dem Laden; 0: nie. Bis die Einstellungen vom Server da sind, gilt 0. Geladen
+// wird nur, waehrend die Uhr-Seite steht, nie unter den Fingern; ein Display
+// im Schoner bleibt dabei dunkel (die Seite startet mit der Uhr, ohne zu wecken).
+const SEITE_GELADEN = Date.now();
+function neuladenFaellig(jetzt){
+  if(DISP.agent) return false;
+  if(DISP.reloadHours===null){
+    if(DISP.reloadAt===null) return false;
+    const nacht=new Date(SEITE_GELADEN); nacht.setHours(DISP.reloadAt,0,0,0);
+    if(nacht.getTime()<=SEITE_GELADEN) nacht.setDate(nacht.getDate()+1);
+    return jetzt>=nacht.getTime();
+  }
+  return DISP.reloadHours>0 && jetzt-SEITE_GELADEN >= DISP.reloadHours*3600*1000;
+}
+function neuladenPruefen(){ if(saverOn() && neuladenFaellig(Date.now())) location.reload(); }
+setInterval(neuladenPruefen, 60*1000);
 // Server-Ereignis, das Aufmerksamkeit braucht: Display an, Uhr weg, Timer neu.
 function wake(){ screenOn(); nightWake(); hideSaver(); resetIdle(); }
 setInterval(tickClock, 1000);

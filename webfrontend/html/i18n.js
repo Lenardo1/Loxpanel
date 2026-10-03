@@ -530,6 +530,9 @@
       'Horiz. Versatz (px)': 'Horiz. offset (px)',
       'Display aus nach (Sek.)': 'Display off after (sec.)',
       'Auto-Neustart alle (Std.)': 'Auto-restart every (hrs.)',
+      'nachts um {h} Uhr': 'at night at {h}:00',
+      'Auto-Neustart gegen Einfrieren: Leer lädt die Visu jede Nacht um {h} Uhr neu, eine Zahl alle so viele Stunden, 0 nie. Neu geladen wird nur, während die Uhr-Seite steht; ein dunkles Display bleibt dabei dunkel. Linux-Panels mit Agent starten stattdessen den Browser neu: nach der Zahl hier, ohne Eintrag nach RELOAD_HOURS in ihrer kiosk.conf.':
+        'Auto-restart against freezing: empty reloads the visu every night at {h}:00, a number every that many hours, 0 never. It only reloads while the clock page is showing; a dark display stays dark. Linux panels with the agent restart the browser instead: per the number here, without an entry per RELOAD_HOURS in their kiosk.conf.',
       'Kacheln pro Zeile': 'Tiles per row',
       'Füllung': 'Fill',
       'Rahmen': 'Border',
