@@ -259,15 +259,19 @@
   .ovgrp{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:.03em;margin-top:6px;}
   .ovgrp .ovgrp-h{font-weight:400;opacity:.75;}
   /* Einstellungen-spezifisch */
-  .soon{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:44px 20px;color:var(--muted);}
-  .soon .ssico{font-size:40px;opacity:.8;}
-  .soon .sstag{display:inline-block;margin-top:4px;padding:5px 13px;border-radius:4px;
-    background:rgba(224,162,77,.14);border:1px solid var(--accent);color:var(--accent);
-    font-size:12.5px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
   .ic{border-top:1px solid var(--line);padding-top:14px;margin-top:6px;}
   .ic:first-child{border-top:none;padding-top:0;margin-top:0;}
   .ic .icname{font-weight:600;margin-bottom:10px;}
   .ic .field{max-width:none;margin-bottom:12px;}
+  /* SIP: Zugang je Intercom aus dem Miniserver, Ergebnis der Pruefung darunter */
+  .sip .sipgeraet{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px;}
+  .sip .sipzug{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0 0 6px;font-size:14px;}
+  .sip .sipzug dt{color:var(--muted);} .sip .sipzug dd{margin:0;overflow-wrap:anywhere;}
+  .sip .sipres{font-size:13.5px;margin-top:10px;overflow-wrap:anywhere;} .sip .sipres:empty{display:none;}
+  .sip .sipres .laeuft,.sip .sipres .sipdet{color:var(--muted);}
+  .sip .sipres .sipdet{font-size:12.5px;margin-top:4px;}
+  .sip .sipfehl{margin:0;font-size:13.5px;}
+  .sip .sipdiag,.sip .siphinweis{margin:6px 0 0;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere;}
   /* Kalenderliste (mehrere iCal-Abos, je eines pro Zeile) */
   .cal{border-top:1px solid var(--line);padding-top:14px;margin-top:14px;}
   .cal:first-child{border-top:none;padding-top:0;margin-top:0;}
@@ -878,15 +882,11 @@
           </div>
         </section>
 
-        <!-- SIP (coming soon) -->
+        <!-- SIP: Zugang der Tuerstation aus den gesicherten Details (/api/sip), Pruefung (/api/sip/pruefen) -->
         <section class="spane" data-sub="sip">
-          <p class="lead" data-i18n>Gegensprechen über die Türstation direkt am Panel (SIP-Audio/-Video statt nur Kamerabild).</p>
+          <p class="lead" data-i18n>SIP-Zugang der Türstation(en), wie ihn der Miniserver für das Gegensprechen nennt. LoxPanel liest ihn verschlüsselt, das Passwort bleibt im Server. „Verbindung prüfen“ fragt die Türstation, ob sie antwortet und die Anmeldung annimmt; ein Anruf entsteht dabei nicht.</p>
           <div class="card">
-            <div class="soon">
-              <div class="ssico">☎</div>
-              <div data-i18n>SIP-Anbindung ist in Arbeit.</div>
-              <div class="sstag" data-i18n>Coming soon</div>
-            </div>
+            <div id="sip_list"><div class="muted">…</div></div>
           </div>
         </section>
 
@@ -1151,6 +1151,7 @@ function showSub(k){
   let found=false;
   panes.forEach(p=>{ const on=p.dataset.sub===k; p.classList.toggle('active',on); if(on)found=true; });
   if(!found&&panes.length){ panes[0].classList.add('active'); }
+  if(rubric==='settings'&&k==='sip') loadSip();
 }
 
 // ---- Aktiv-Overlay (Rahmen/Füllung/Deckkraft) ----
@@ -3167,6 +3168,83 @@ $('#ic_save').onclick=async()=>{
     if(j.ok){ flash($('#ic_toast'),T('✓ Gespeichert'),true); loadSettings(); } else flash($('#ic_toast'),j.error||T('Fehler'),false);
   }catch(e){ flash($('#ic_toast'),'Fehler: '+e,false); }
 };
+
+// ---- SIP: Zugang je Intercom (gesicherte Details des Miniservers) und Pruefung ----
+// Laedt bei jedem Oeffnen des Reiters neu; jede Intercom kostet eine verschluesselte
+// Anfrage an den Miniserver, darum nie zwei Ladevorgaenge gleichzeitig.
+let SIP_LAEUFT=null;
+function loadSip(){
+  if(!SIP_LAEUFT) SIP_LAEUFT=sipLaden().finally(()=>{ SIP_LAEUFT=null; });
+  return SIP_LAEUFT;
+}
+async function sipLaden(){
+  const box=$('#sip_list'); if(!box) return;
+  box.innerHTML='<div class="muted">'+esc(T('Frage den Miniserver …'))+'</div>';
+  let j;
+  try{ j=await (await fetch('/api/sip')).json(); }
+  catch(e){ box.innerHTML='<div class="muted"><b class="bad">'+esc(T('Fehler'))+'</b> '+esc(String(e))+'</div>'; return; }
+  const liste=j.intercoms||[];
+  if(!liste.length){ box.innerHTML='<div class="muted">'+esc(T('Keine Intercom-Bausteine gefunden (Miniserver verbunden?).'))+'</div>'; return; }
+  // details.deviceType laut Strukturdoku (Intercom)
+  const geraet={0:T('Andere oder unbekannte Türstation'),1:'Loxone Intercom',2:'Loxone Intercom XL'};
+  box.innerHTML=liste.map(ic=>{
+    const info=[ic.room,geraet[ic.deviceType]].filter(Boolean).map(esc).join(' · ');
+    const rumpf=ic.sip
+      ? '<dl class="sipzug"><dt>'+esc(T('SIP-Adresse'))+'</dt><dd>'+esc(ic.sip.host)+'</dd>'+
+        '<dt>'+esc(T('Benutzer'))+'</dt><dd>'+(ic.sip.user?esc(ic.sip.user):'–')+'</dd>'+
+        '<dt>'+esc(T('Passwort'))+'</dt><dd>'+esc(ic.sip.hasPass?T('vorhanden'):T('keins'))+'</dd></dl>'+
+        '<div class="actions"><button class="btn ghost sip_pruefen">'+esc(T('Verbindung prüfen'))+'</button></div>'+
+        '<div class="sipres"></div>'
+      : '<p class="sipfehl"><b class="bad">'+esc(T(ic.error||'Fehler'))+'</b></p>'+(ic.felder?sipFelder(ic.felder)+
+        // Details lesbar, aber ohne Audio-Adresse: sagen, wo sie hingehoert (Door Controller, Strukturdoku)
+        '<p class="siphinweis">'+esc(T('Ohne SIP-Adresse gibt es nichts zu prüfen. In Loxone Config beim Baustein dieser Intercom die Adresse für Audio eintragen (bei einer benutzerdefinierten Intercom „Host für Audio (lokal)“), in den Miniserver speichern und diesen Reiter neu öffnen.'))+'</p>':'');
+    return '<div class="ic sip" data-uuid="'+esc(ic.uuid)+'"><div class="icname">'+esc(ic.name)+
+      (info?'<span class="sipgeraet">'+info+'</span>':'')+'</div>'+rumpf+'</div>';
+  }).join('');
+  box.querySelectorAll('.sip_pruefen').forEach(b=>b.onclick=()=>sipPruefen(b));
+}
+// Aufbau der gesicherten Details, wenn kein SIP-Zugang darin steht: nur Feldnamen
+// und ob sie gefuellt sind (Werte schickt der Server nicht)
+function sipFelder(f){
+  const leer=' ('+esc(T('leer'))+')';
+  const teile=Object.keys(f).map(k=>{
+    const v=f[k];
+    if(v&&typeof v==='object'){
+      const n=Object.keys(v);
+      return esc(k)+': '+(n.length?n.map(x=>esc(x)+(v[x]?'':leer)).join(', '):esc(T('leer')));
+    }
+    return esc(k)+(v?'':leer);
+  });
+  return '<p class="sipdiag">'+esc(T('Gesicherte Details vom Miniserver:'))+' '+
+    (teile.length?teile.join(' · '):esc(T('leer')))+'</p>';
+}
+async function sipPruefen(b){
+  const karte=b.closest('.sip'), res=karte.querySelector('.sipres');
+  b.disabled=true; res.innerHTML='<span class="laeuft">'+esc(T('Prüfe …'))+'</span>';
+  try{
+    const r=await fetch('/api/sip/pruefen',{method:'POST',headers:{'Content-Type':'application/json'},
+                                            body:JSON.stringify({uuid:karte.dataset.uuid})});
+    res.innerHTML=sipErgebnis(await r.json());
+  }catch(e){ res.innerHTML='<b class="bad">'+esc(T('Fehler'))+'</b> '+esc(String(e)); }
+  finally{ b.disabled=false; }
+}
+function sipErgebnis(j){
+  if(!j.ok||!j.erreichbar) return '<b class="bad">'+esc(T(j.error||'Fehler'))+'</b>';
+  const text={'angenommen':T('Die Türstation antwortet und nimmt die Anmeldung an.'),
+              'nicht verlangt':T('Die Türstation antwortet und verlangt keine Anmeldung.'),
+              'abgelehnt':T('Die Türstation lehnt die Anmeldung ab.'),
+              'kein Passwort':T('Die Türstation verlangt eine Anmeldung, der Miniserver nennt aber kein Passwort.'),
+              'unbekanntes Verfahren':T('Die Türstation verlangt ein Anmeldeverfahren, das LoxPanel nicht kennt.')}[j.anmeldung];
+  const gut=j.anmeldung==='angenommen'||j.anmeldung==='nicht verlangt';
+  const d=[];
+  if(text&&j.error) d.push(esc(T(j.error)));        // etwa welches Verfahren
+  if(j.antwort) d.push(esc(T('Antwort:'))+' '+esc(j.antwort)+(j.ms!=null?' ('+esc(String(j.ms))+' ms)':''));
+  if(j.gegenstelle) d.push(esc(T('Gegenstelle:'))+' '+esc(j.gegenstelle));
+  if((j.codecs||[]).length) d.push(esc(T('Codecs:'))+' '+esc(j.codecs.join(', ')));
+  if((j.methoden||[]).length) d.push(esc(T('Methoden:'))+' '+esc(j.methoden.join(', ')));
+  return '<b class="'+(gut?'ok':'bad')+'">'+(gut?'✓ ':'')+esc(text||T(j.error||'Fehler'))+'</b>'+
+    (d.length?'<div class="sipdet">'+d.join(' · ')+'</div>':'');
+}
 
 $('#nt_save').onclick=async()=>{
   const body={control:$('#nt_control').value||''};

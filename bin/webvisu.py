@@ -68,6 +68,8 @@ from audioserver import make_backend, AudioBackend  # noqa: E402
 from audioserver_events import AudioEventClient  # noqa: E402
 import front_info  # noqa: E402  # Kalender (iCal-Abos) + Wetter (Open-Meteo) fuer die Front
 import loxone_weather  # noqa: E402  # Wetter vom Loxone-Wetterserver (Vorrang vor Open-Meteo)
+import loxone_secure  # noqa: E402  # verschluesselte Befehle (gesicherte Details der Intercom)
+import sip_probe  # noqa: E402  # SIP-Pruefung der Tuerstation (OPTIONS mit Anmeldung)
 import theme_colors  # noqa: E402  # Panel-Theme aus einer Grundfarbe herleiten
 
 log = logging.getLogger("loxpanel.webvisu")
@@ -921,6 +923,33 @@ def load_devices() -> dict:
     return {}
 
 
+class ZugangFehler(Exception):
+    """Gesicherte Details (Zugangsdaten) nicht zu bekommen; der Text nennt den
+    Grund so, dass ihn der Konfigurator anzeigen kann."""
+
+
+KEIN_SIP = "Die Intercom nennt keinen SIP-Zugang"
+
+
+def _sip_zugang(details: dict) -> dict | None:
+    """SIP-Zugang aus den gesicherten Details einer Intercom (audioInfo: host,
+    user und bei Loxone-Intercoms pass; Strukturdoku 16.0, Intercom).
+    -> {"host", "user", "pass"}; None, wenn kein host darin steht."""
+    ai = details.get("audioInfo")
+    host = str(ai.get("host") or "").strip() if isinstance(ai, dict) else ""
+    if not host:
+        return None
+    return {"host": host, "user": str(ai.get("user") or "").strip(), "pass": str(ai.get("pass") or "")}
+
+
+def _gesichert_felder(details: dict) -> dict:
+    """Aufbau gesicherter Details ohne Werte: je Abschnitt die Felder und ob sie
+    gefuellt sind, etwa {"videoInfo": {"streamUrl": True}, "audioInfo": {}}.
+    Fuer die Diagnose im Reiter SIP; Werte und Passwoerter bleiben im Server."""
+    return {k: ({f: bool(w) for f, w in v.items()} if isinstance(v, dict) else bool(v))
+            for k, v in details.items()}
+
+
 class App:
     def __init__(self, ms: dict, audio: dict | None = None,
                  audiometa: dict | None = None):
@@ -989,6 +1018,7 @@ class App:
         self._last_sent: dict = {}
         self.jwt: str | None = None
         self.alg: str = "SHA1"
+        self._ms_pubkey = None           # RSA-Schluessel des Miniservers fuer verschluesselte Befehle
         self._auth_gen = 0               # zaehlt jede Anmeldung (-> _renew_token)
         self._auth_at = 0.0              # monotonic der letzten Anmeldung
         self._auth_lock = asyncio.Lock()
@@ -1240,6 +1270,7 @@ class App:
             await self.client.__aenter__()
             self.alg = (await self.client.getkey2()).hashAlg
             self._set_token(await self.client.authenticate())
+            self._ms_pubkey = None
             st = await self.client.load_structure()
             # Reconnect nach Miniserver-Reboot (z.B. Loxone-Config hochgeladen):
             # hat sich die Struktur geaendert, Panels neu laden lassen. Beim
@@ -1293,6 +1324,7 @@ class App:
         old_client, self.client = self.client, newc
         self.alg = alg
         self._set_token(jwt)
+        self._ms_pubkey = None
         # Anderer/geaenderter Miniserver -> Struktur evtl. anders, dann Panels neu laden.
         if self._adopt_structure(st):
             self._pending_reload = True
@@ -1378,6 +1410,77 @@ class App:
             ll = {}
         code = ll.get("Code") or ll.get("code")
         return (str(code) if code is not None else str(status)), ll.get("value")
+
+    async def secured_details(self, uuid: str) -> dict:
+        """Gesicherte Details eines Bausteins (securedDetails), etwa Kamera- und
+        SIP-Zugang einer Intercom. Der Miniserver gibt sie nur auf einen
+        verschluesselten Befehl heraus (loxone_secure), die Anmeldung steckt im
+        Befehl. Lehnt er ab (HTTP 401: Schluessel nicht mehr gueltig, oder LL-Code
+        401: Token abgelaufen), einmal mit frischem Schluessel und Token.
+        -> dict; wirft ZugangFehler mit einem Grund fuer den Konfigurator."""
+        if not loxone_secure.HAVE_CRYPTO:
+            raise ZugangFehler("Paket 'cryptography' fehlt")
+        for versuch in range(2):
+            if self.icon_session is None or not self.jwt:
+                raise ZugangFehler("Keine Verbindung zum Miniserver")
+            gen = self._auth_gen
+            try:
+                if self._ms_pubkey is None:
+                    code, wert = await self._ms_jdev("sys/getPublicKey")
+                    self._ms_pubkey = loxone_secure.public_key_from_pem(wert)
+                    if self._ms_pubkey is None:
+                        raise ZugangFehler(f"Der Miniserver liefert keinen Schlüssel (Code {code})")
+                code, key_hex = await self._ms_jdev("sys/getkey")
+                if code != "200" or not isinstance(key_hex, str):
+                    raise ZugangFehler(f"Der Miniserver liefert keinen Anmeldeschlüssel (Code {code})")
+                cmd = (f"jdev/sps/io/{uuid}/securedDetails?autht="
+                       f"{loxone_secure.token_hash(key_hex, self.jwt, self.alg)}&user={quote(self.user or '', safe='')}")
+                enc = loxone_secure.encrypt_command(cmd, self._ms_pubkey)
+                status, body, _ = await self._ms_http(enc.pfad, MS_CMD_TIMEOUT, renew=False)
+            except ZugangFehler:
+                raise
+            except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError, ValueError) as err:
+                raise ZugangFehler(f"Miniserver nicht erreichbar ({err or type(err).__name__})") from err
+            if status == 401:
+                self._ms_pubkey = None
+                if versuch == 0:
+                    await self._renew_token(gen)
+                    continue
+                raise ZugangFehler("Der Miniserver lehnt die verschlüsselte Anfrage ab")
+            if status != 200:
+                raise ZugangFehler(f"Der Miniserver antwortet mit HTTP {status}")
+            try:
+                ll = json.loads(loxone_secure.decrypt_response(body, enc.key, enc.iv).lstrip("\ufeff")).get("LL") or {}
+            except (ValueError, AttributeError) as err:
+                raise ZugangFehler("Die Antwort des Miniservers lässt sich nicht entschlüsseln") from err
+            code = str(ll.get("Code") or ll.get("code") or "")
+            if code == "401" and versuch == 0 and await self._renew_token(gen):
+                continue
+            if code == "401":
+                raise ZugangFehler("Der Miniserver lehnt die Anmeldung von LoxPanel ab (Code 401)")
+            if code == "403":
+                raise ZugangFehler("Der Benutzer von LoxPanel darf diese Zugangsdaten nicht lesen "
+                                   "(Rechte in Loxone Config)")
+            if code != "200":
+                raise ZugangFehler(f"Der Miniserver antwortet mit Code {code or '?'}")
+            wert = ll.get("value")
+            if isinstance(wert, str):
+                try:
+                    wert = json.loads(wert)
+                except ValueError as err:
+                    raise ZugangFehler("Die gesicherten Details sind kein JSON") from err
+            if not isinstance(wert, dict):
+                raise ZugangFehler("Der Baustein hat keine gesicherten Details")
+            return wert
+        raise ZugangFehler("Der Miniserver lehnt die verschlüsselte Anfrage ab")
+
+    async def intercom_sip(self, uuid: str) -> dict:
+        """SIP-Zugang einer Intercom aus ihren gesicherten Details (_sip_zugang).
+        -> {"host", "user", "pass"}; ZugangFehler, wenn sie keinen nennt."""
+        sip = _sip_zugang(await self.secured_details(uuid))
+        if sip is None:
+            raise ZugangFehler(KEIN_SIP)
+        return sip
 
     # ---- Zustands-Helfer ----
     def _state(self, control: dict, name: str):
@@ -7139,6 +7242,62 @@ async def api_settings_intercom(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def api_sip(request: web.Request) -> web.Response:
+    """Settings -> SIP: die Intercoms der Anlage mit ihrem SIP-Zugang aus den
+    gesicherten Details. Das Passwort verlaesst den Server nie, die Routen haben
+    keine Anmeldung; es heisst nur, ob es eines gibt (hasPass wie bei
+    /api/settings). Nennt eine Intercom keinen, steht unter felder, welche
+    Felder ihre gesicherten Details haben und ob sie gefuellt sind, ohne Werte.
+    Laedt erst, wenn der Konfigurator den Reiter oeffnet: jede Intercom kostet
+    eine verschluesselte Anfrage an den Miniserver.
+    deviceType wie im Baustein: 0 andere oder unbekannte Tuerstation, 1 Loxone
+    Intercom, 2 Loxone Intercom XL (Strukturdoku 16.0, Intercom)."""
+    app: App = request.app["app"]
+    liste = []
+    for uuid, c in app.controls.items():
+        if c.get("type") != "Intercom":
+            continue
+        e = {"uuid": uuid, "name": _clean(c.get("name")),
+             "room": _clean((app.rooms.get(c.get("room")) or {}).get("name")),
+             "deviceType": (c.get("details") or {}).get("deviceType")}
+        try:
+            details = await app.secured_details(uuid)
+        except ZugangFehler as err:
+            e["error"] = str(err)
+        else:
+            sip = _sip_zugang(details)
+            if sip:
+                e["sip"] = {"host": sip["host"], "user": sip["user"], "hasPass": bool(sip["pass"])}
+            else:
+                e.update(error=KEIN_SIP, felder=_gesichert_felder(details))
+        liste.append(e)
+    liste.sort(key=lambda e: (e["name"].lower(), e["room"].lower()))
+    return web.json_response({"connected": app.client is not None, "intercoms": liste})
+
+
+async def api_sip_pruefen(request: web.Request) -> web.Response:
+    """Settings -> SIP -> "Verbindung prüfen": OPTIONS an die Tuerstation mit
+    dem SIP-Zugang aus den gesicherten Details (sip_probe). Body {"uuid"}. Die
+    Adresse kommt vom Miniserver, nie aus der Anfrage: so schickt die Route die
+    Anmeldung nur an die Tuerstation. Die Antwort sagt, ob sie angenommen
+    wurde, das Passwort steht nicht darin."""
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    uuid = str(data.get("uuid") or "") if isinstance(data, dict) else ""
+    if (app.controls.get(uuid) or {}).get("type") != "Intercom":
+        return web.json_response({"ok": False, "error": "Unbekannte Intercom"}, status=404)
+    try:
+        sip = await app.intercom_sip(uuid)
+    except ZugangFehler as err:
+        return web.json_response({"ok": False, "error": str(err)})
+    erg = await sip_probe.pruefen(sip["host"], sip["user"], sip["pass"])
+    log.info("SIP-Prüfung %s: %s", erg.get("ziel"), erg.get("anmeldung") or erg.get("error"))
+    return web.json_response({"ok": True, **erg})
+
+
 async def api_settings_calendar(request: web.Request) -> web.Response:
     """Kalender (iCal-Abos) + Wetter (Open-Meteo-Koordinaten) fuer die Front."""
     app: App = request.app["app"]
@@ -7838,6 +7997,8 @@ def main() -> None:
     a.router.add_get("/api/types", api_types)
     a.router.add_post("/api/settings/miniserver", api_settings_ms)
     a.router.add_post("/api/settings/intercom", api_settings_intercom)
+    a.router.add_get("/api/sip", api_sip)
+    a.router.add_post("/api/sip/pruefen", api_sip_pruefen)
     a.router.add_post("/api/settings/night", api_settings_night)
     a.router.add_post("/api/settings/audiometa", api_settings_audiometa)
     a.router.add_post("/api/settings/calendar", api_settings_calendar)
