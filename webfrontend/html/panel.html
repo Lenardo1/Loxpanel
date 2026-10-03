@@ -424,8 +424,14 @@
   /* anchor:bottom (IRR/Klima): Anzeige oben zentriert, Bedienung unten fixiert.
      Aufklappende Auswahl steht im .panbot VOR den festen Zeilen -> waechst nach oben. */
   .grid.panel.anchorbot{justify-content:flex-start;gap:0;}
-  .grid.panel.anchorbot .pantop{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+  .grid.panel.anchorbot .pantop{flex:1 0 auto;min-height:0;display:flex;flex-direction:column;
     justify-content:center;align-items:stretch;gap:10px;}
+  /* Hoeher als der Schirm (480x480 mit vielen Zeilen, panelEinpassen): Deko-Kreis
+     weg, grosser Wert kleiner wie bei Diagrammen. Reicht das nicht, scrollt die
+     Seite - .pantop schrumpft nicht unter seinen Inhalt, sonst ueberlappte er
+     die Bedienung darunter. */
+  .grid.panel.eng .hero{display:none;}
+  .grid.panel.eng .pbig{font-size:clamp(40px,10vw,56px);padding:2px 8px;}
   .grid.panel.anchorbot .panbot{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding-top:8px;}
   .brow{display:flex;gap:10px;}
   .btn{flex:1;background:var(--tile);border:1px solid var(--line);border-radius:12px;
@@ -1130,9 +1136,14 @@ function sldFill(sld){ if(!sld)return;
   const min=+sld.min||0, max=(sld.max!==''?+sld.max:100);
   const p=max>min?((+sld.value-min)/(max-min))*100:0;
   sld.style.setProperty('--p', Math.max(0,Math.min(100,p))+'%'); }
+// Nachkommastellen einer Zahl (0.5 -> 1, 5 -> 0)
+function stellen(x){ const s=String(Math.abs(+x)), i=s.indexOf('.'); return i<0?0:s.length-i-1; }
+// Auf die Stellen der Schrittweite runden: 0,5er-Schritte bleiben 0,5er-Schritte
+// (frueher Math.round: 20 + 0,5 ergab 21), Rechenreste wie 20.000000000000004
+// fallen weg.
 function nudgeSld(sld,delta,valEl){ if(!sld)return;
   const min=+sld.min||0, max=(sld.max!==''?+sld.max:100);
-  let v=Math.round((+sld.value||0)+delta); v=Math.max(min,Math.min(max,v));
+  let v=+((+sld.value||0)+delta).toFixed(stellen(delta)); v=Math.max(min,Math.min(max,v));
   if(v===(+sld.value)) return;
   sld.value=v; sldFill(sld); if(valEl) valEl.textContent=v;
   if(sld._uuid&&sld._tmpl) send({t:'cmd',uuid:sld._uuid,cmd:sld._tmpl.replace('{v}',v)}); }
@@ -1193,7 +1204,7 @@ function blockSig(blocks){
   return blocks.filter(b=>b.k!=='more').map(b=>
     b.k==='row' ? 'row'+b.cells.length+(b.hidden?'h':'')
     : b.k==='favs' ? 'favs'+(b.items?b.items.length:0)
-    : b.k==='alarmlist' ? 'alarm'+((b.entries&&b.entries.length)?1:0)
+    : b.k==='alarmlist' ? 'alarm'+JSON.stringify(b.entries||[])
     : b.k==='astat' ? 'astat'+(b.sub?1:0)
     : b.k).join('|');
 }
@@ -1525,6 +1536,12 @@ function renderPanel(blocks){
     n.addEventListener('click',()=>{ if(f.cmd){ send({t:'cmd',uuid:f.cmd.uuid,cmd:f.cmd.cmd}); back(); } }); }); }
   g.dataset.bsig=blockSig(blocks);   // Grundlage fuer den In-place-Abgleich in updatePanel
   renderTabs();
+  panelEinpassen();
+}
+function panelEinpassen(){
+  const g=el('grid'); if(!g.classList.contains('panel')) return;
+  g.classList.remove('eng');
+  if(g.scrollHeight>g.clientHeight+1) g.classList.add('eng');
 }
 function updatePanel(blocks){
   const g=el('grid');
@@ -2082,6 +2099,7 @@ window.addEventListener('resize',()=>{
   // 2x2 statt in der Startmessung 4x2 haengenzubleiben.
   if(view && !el('grid').classList.contains('scheme')
      && rasterKey(_lastWidget) !== _lastRaster) render();
+  panelEinpassen();
 });
 
 // Wisch nach rechts = zurueck (vertikales Scrollen bleibt unberuehrt)
