@@ -144,7 +144,15 @@
   /* Uhr-Seite: dort im Seitenverhaeltnis der Zeichnung (440:150), solange der
      Kasten reicht. Reicht er nicht (quer feste Hoehe, hochkant die Restflaeche
      unter Uhr und Wetter), schrumpfen die Diagramme, statt unten abgeschnitten
-     zu werden - etwa bei drei Diagrammen eines Zaehlers. */
+     zu werden - etwa bei drei Diagrammen eines Zaehlers. Die Huellen um die
+     Diagramme (.cpbody, je Baustein .cpsec) schrumpfen mit; mehrere Bausteine
+     teilen sich den Kasten, denn auf dem Bildschirmschoner scrollt niemand.
+     Unter der Zeitraum-Leiste nur ihr eigener Abstand (.chrng), wie vor #77 im
+     ersten Diagramm; mit dem Abstand der Seite dazu schrumpften zwei Diagramme
+     bei 960x480 schon ohne Not. */
+  .saver .sv-box .fp-page.solo.cpage{gap:0;}
+  .saver .sv-box .fp-page.solo.cpage .cpbody,
+  .saver .sv-box .fp-page.solo.cpage .cpsec{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;}
   .saver .sv-box .fp-page.solo.cpage .chart{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;}
   .saver .sv-box .fp-page.solo.cpage .chbody{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;}
   .saver .sv-box .fp-page.solo.cpage .chbody>svg{flex:0 1 auto;min-height:0;}
@@ -2219,7 +2227,12 @@ function connect(){
     if(msg.t==='svstatus'){ svStatusData=Array.isArray(msg.items)?msg.items:[];
       if(saverOn()){ renderFront(); return; }   // Uhr-Seite oben -> dort
       const fp=el('frontpane'); if(fp && !svSideOn() && paneKind(paneRawNow())==='status') renderSvStatus(fp); return; }   // sonst Werte als Pane 2
-    if(msg.t==='chart'){ chartData=msg;   // Verlaufs-Pane
+    if(msg.t==='chart'){   // Verlaufs-Pane
+      // Nur Daten des zuletzt angefragten Stapels: ein Push, der beim Wechsel
+      // schon unterwegs war, nennt Bausteine, die die Pane nicht mehr zeigt.
+      const want=curChartKey.split('|')[0].split(',').map(u=>u.trim());
+      if(!(msg.controls||[]).every(u=>want.indexOf(u)>-1)) return;
+      chartData=msg;
       if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> als zweite Uhr-Spalte zeichnen
       const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='chart') renderChartPane(fp); return; }
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
