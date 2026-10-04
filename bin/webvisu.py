@@ -5783,7 +5783,11 @@ class App:
                     else:
                         self._last_sent.pop(ws, None)
                         continue
-                if chart_msg is not None and chart_msg != last.get("chart"):
+                # Hat das Panel waehrend der Sendungen oben einen anderen Stapel
+                # gewaehlt, hat setchart den neuen schon geschickt; chart_msg ist
+                # dann veraltet und wuerde ihn in der Pane wieder ersetzen.
+                if (chart_msg is not None and chart_msg != last.get("chart")
+                        and self.conn_chart.get(ws) == _chart):
                     if await self._send_or_drop(ws, chart_msg):
                         last["chart"] = chart_msg
                     else:
