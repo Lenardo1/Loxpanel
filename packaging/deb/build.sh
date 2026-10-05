@@ -96,5 +96,9 @@ cp "$HERE/browser.conf"     "$PKG/etc/loxpanel/browser.conf"
 cp "$HERE/display.conf"     "$PKG/etc/loxpanel/display.conf"
 
 OUT="$REPO/loxpanel-server_${VERSION}_all.deb"
-dpkg-deb --root-owner-group --build "$PKG" "$OUT"
+# -Zgzip erzwingen: neuere dpkg-deb (Ubuntu/Debian 12) komprimieren sonst mit
+# zstd, das aeltere Ziel-dpkg (Debian 11 bullseye = dpkg 1.20, kein zst) nicht
+# installieren koennen ("unknown compression for member 'control.tar.zst'").
+# gzip ist auf allen unterstuetzten Panels lesbar.
+dpkg-deb -Zgzip --root-owner-group --build "$PKG" "$OUT"
 echo "Fertig: $OUT"
