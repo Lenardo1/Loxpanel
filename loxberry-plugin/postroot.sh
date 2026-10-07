@@ -9,13 +9,36 @@ chmod +x "$BINDIR/loxpanel-ctl.sh" 2>/dev/null
 
 # Vor dem Start die in preroot.sh gesicherte Panel-Konfiguration zurueckspielen
 # (als root -> keine Rechteprobleme). Muss VOR dem Container-Start passieren.
-LPBK="/tmp/loxpanel-upgrade-backup"
+# Die Zwischenkopie verschwindet erst, wenn sie ganz zurueckgespielt ist;
+# sonst exit 1 am Ende (LoxBerry meldet es) und sie bleibt fuer einen
+# zweiten Versuch liegen. Pfade wie in preroot.sh.
+LPTMP="${LOXPANEL_UPGRADE_TMP:-/tmp}"
+LPBK="$LPTMP/loxpanel-upgrade-backup"
+LPARCH="$LPTMP/loxpanel-upgrade-archive"
 DATADIR="$ARGV5/data/plugins/$ARGV3"
+RC=0
 if [ -d "$LPBK" ] && [ -n "$(ls -A "$LPBK" 2>/dev/null)" ]; then
 	mkdir -p "$DATADIR/config"
-	cp -a "$LPBK/." "$DATADIR/config/" 2>/dev/null
-	rm -rf "$LPBK"
-	echo "<OK> Panel-Konfiguration wiederhergestellt (Update-sicher)."
+	if cp -a "$LPBK/." "$DATADIR/config/"; then
+		rm -rf "$LPBK"
+		echo "<OK> Panel-Konfiguration wiederhergestellt (Update-sicher)."
+	else
+		echo "<ERROR> Panel-Konfiguration nicht vollständig zurückgespielt – die Kopie liegt in $LPBK."
+		RC=1
+	fi
+fi
+# Archive aus dem Widget zurueck; backups/ muss loxberry gehoeren (Loeschen im
+# Widget und Rotation in loxpanel-ctl.sh laufen als loxberry).
+if [ -d "$LPARCH" ] && [ -n "$(ls -A "$LPARCH" 2>/dev/null)" ]; then
+	mkdir -p "$DATADIR/backups"
+	if cp -a "$LPARCH/." "$DATADIR/backups/"; then
+		rm -rf "$LPARCH"
+		echo "<OK> Sicherungen (Archive) wiederhergestellt (Update-sicher)."
+	else
+		echo "<ERROR> Sicherungen nicht vollständig zurückgespielt – die Kopie liegt in $LPARCH."
+		RC=1
+	fi
+	chown loxberry:loxberry "$DATADIR/backups" 2>/dev/null
 fi
 
 # Reste eines alten Containers entfernen (Daten liegen im Volume -> verlustfrei).
@@ -32,4 +55,4 @@ else
 	echo "<INFO> Docker wird beim Neustart installiert – LoxPanel startet danach automatisch."
 fi
 
-exit 0
+exit $RC

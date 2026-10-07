@@ -2,7 +2,9 @@
 # das echte Datenverzeichnis ersetzt (/opt/loxberry/data/plugins/loxpanel).
 # Der Miniserver-Zugang wird NICHT hier gesetzt, sondern zur Laufzeit ueber die
 # Weboberflaeche (http://<loxberry>:8099/config -> Settings) und in
-# config/loxpanel.cfg im gemounteten Volume gespeichert.
+# config/loxpanel.cfg im gemounteten Volume gespeichert. Die Zeitzone des
+# LoxBerry kommt aus docker-compose.zeitzone.yml, die loxpanel-ctl.sh start
+# daneben schreibt.
 services:
   loxpanel:
     container_name: loxpanel

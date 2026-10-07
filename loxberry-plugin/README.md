@@ -11,7 +11,9 @@ und hält ihn am Laufen. Die gesamte App (Server + Weboberfläche) steckt im Ima
 - startet `ghcr.io/lenardo1/loxpanel:latest` per `docker compose` (Port **8099**)
 - startet das Panel beim **Boot** (`daemon`) und prüft alle **5 Minuten**, ob der
   Container läuft (`cron.05min` → `loxpanel-ctl.sh check`)
-- sichert die Nutzerdaten bei Updates (`pre-/postupgrade.sh`)
+- nimmt Konfiguration und Sicherungen über Plugin-Updates mit (`preroot.sh`/`postroot.sh`);
+  lässt sich die Konfiguration nicht sichern, bricht das Update ab, bevor LoxBerry
+  etwas löscht, fehlen nur die Sicherungen, warnt es und läuft weiter
 - entfernt Container + Image beim Deinstallieren
 
 ## Bedienung
@@ -25,6 +27,19 @@ Nach der Installation (und einem Reboot, falls Docker frisch installiert wurde):
 Der Miniserver-Zugang wird **nicht** im Plugin gesetzt, sondern über die
 Einstellungen-Seite und in `data/plugins/loxpanel/config/loxpanel.cfg`
 (Docker-Volume) gespeichert.
+
+## Zeitzone
+
+Der Container übernimmt die Zeitzone des LoxBerry: `loxpanel-ctl.sh start` legt
+`docker-compose.zeitzone.yml` neben die Compose-Datei. Sie bindet
+`/etc/localtime` des LoxBerry nur lesend als `/run/loxberry-localtime` ein und
+setzt `TZ=":/run/loxberry-localtime"`; eine Zone steht nirgends fest. Fehlt
+`/etc/localtime` oder zeigt der Symlink ins Leere, startet LoxPanel ohne sie in
+UTC und schreibt eine Warnung in den Verlauf.
+
+Nach einer Änderung der Zeitzone im LoxBerry LoxPanel neu starten (Widget:
+**„Jetzt updaten / Neu starten"**); ein Neustart des LoxBerry übernimmt sie
+ebenfalls.
 
 ## Voraussetzungen
 

@@ -20,7 +20,7 @@ my $version = LoxBerry::System::pluginversion() // "";
 my $api     = "http://localhost:8099";
 my $ctl     = "REPLACELBPBINDIR/loxpanel-ctl.sh";
 my $log     = "REPLACELBPDATADIR/last_action.log";   # Verlauf der letzten Container-Aktion
-my $bdir    = "REPLACELBPDATADIR/backups";           # Konfig-Sicherungen (ueberleben Plugin-Updates)
+my $bdir    = "REPLACELBPDATADIR/backups";           # Konfig-Sicherungen (pre-/postroot.sh nehmen sie ueber Plugin-Updates mit)
 my $lbhost  = LoxBerry::System::get_localip() // "localhost";
 
 sub h { my $s = shift; $s = "" unless defined $s; $s =~ s/&/&amp;/g; $s =~ s/</&lt;/g; $s =~ s/>/&gt;/g; $s =~ s/"/&quot;/g; return $s; }
@@ -226,6 +226,14 @@ for my $b (@backups) {
           . "<button class='lpbtn lpgrey' style='padding:5px 10px;font-size:13px' type='submit'>&#215;</button></form>"
         . "</td></tr>";
 }
+# Wie viele Sicherungen behalten werden, legt nur loxpanel-ctl.sh fest (KEEP).
+my $keep = '';
+if (-x $ctl && open(my $kf, '-|', $ctl, 'keep')) {
+    $keep = <$kf> // '';
+    close $kf;
+    chomp $keep;
+}
+my $keep_html = $keep =~ /^\d+$/ ? " Behalten werden die letzten $keep." : "";
 my $backups_html = $blist
     ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>"
       . "<tr style='text-align:left;color:#999;font-size:12px'><th style='padding:4px 8px'>Datei</th>"
@@ -298,7 +306,7 @@ print <<"HTML";
 <div class="panel panel-default">
   <div class="panel-heading">Panels sichern &amp; wiederherstellen</div>
   <div class="panel-body">
-    <p style="color:#777;margin-top:0">Sichert die komplette Konfiguration (Panels, Kacheln, Theme &amp; Miniserver-Zugang) als Archiv unter <code>$bdir</code>. Diese Sicherungen bleiben auch bei Plugin-Updates erhalten; nur die letzten 20 werden behalten.</p>
+    <p style="color:#777;margin-top:0">Sichert die komplette Konfiguration (Panels, Kacheln, Theme &amp; Miniserver-Zugang) als Archiv unter <code>$bdir</code>. Plugin-Updates nehmen diese Sicherungen mit; gelingt das nicht, meldet LoxBerry es beim Update.$keep_html</p>
     <form method="post" style="margin-bottom:12px"><input type="hidden" name="action" value="backup"><button class="lpbtn lpgreen" type="submit">Backup jetzt erstellen</button></form>
     $backups_html
   </div>

@@ -272,6 +272,10 @@ Details: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 3. Das Plugin installiert bei Bedarf Docker und startet den LoxPanel-Container
    automatisch. Danach erreichst du alles über das Plugin-Widget in LoxBerry.
 
+LoxPanel übernimmt die Zeitzone des LoxBerry. Änderst du sie dort, LoxPanel
+danach neu starten (Widget: **„Jetzt updaten / Neu starten"**, ein Neustart des
+LoxBerry tut es auch).
+
 ## Konfiguration
 
 **1. Miniserver verbinden** – im Plugin-Widget IP, Benutzer, Passwort und Port
@@ -306,9 +310,12 @@ Zustandsfarben. Ohne Profil verhält sich ein Panel wie `default` (alles sichtba
 Im Plugin-Widget unter **„Panels sichern & wiederherstellen"** legst du jederzeit
 ein Backup der kompletten Konfiguration (Panels, Kacheln, Theme, Miniserver-Zugang)
 an. Die Archive liegen auf dem LoxBerry unter
-`data/plugins/loxpanel/backups/` und **überleben Plugin-Updates**. Aus der Liste
-lässt sich ein Stand mit einem Klick wiederherstellen (der aktuelle Stand wird
-vorher automatisch gesichert).
+`data/plugins/loxpanel/backups/`; Plugin-Updates nehmen sie mit (gelingt das
+nicht, meldet LoxBerry es beim Update, die Konfiguration selbst bleibt erhalten).
+Ältere Archive räumt das Plugin selbst weg, wie viele es behält, steht im
+Widget. Aus der Liste lässt sich ein Stand mit einem Klick wiederherstellen (der
+aktuelle Stand wird vorher automatisch gesichert). Ein beschädigtes oder fremdes
+Archiv lehnt die Wiederherstellung ab, ohne etwas zu ändern.
 
 Ohne LoxBerry (Docker, Android-App) geht es im Konfigurator unter
 **Settings → Sicherung**, auf dem LoxBerry ebenso: **„Einstellungen
