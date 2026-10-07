@@ -222,6 +222,7 @@
       "Display-Steuerung": "Display control",
       "keine (nur über die Seite)": "none (only via the page)",
       "Passwort (Fully)": "Password (Fully)",
+      "Display-Kennwort nicht übernommen, weil Host oder Treiber geändert:": "Display password not kept because host or driver changed:",
       "Noch kein Panel bekannt. Sobald ein Panel die Visu mit Kennung öffnet oder ein Agent läuft, erscheint es hier.": "No panel known yet. As soon as a panel opens the view with an identifier or an agent runs, it appears here.",
       "Für welche Geräte?": "For which devices?",
       "Noch kein Gerät bekannt. Ein Panel muss die Visu einmal mit ?device=<name> öffnen oder einen Agent haben.": "No device known yet. A panel must open the view once with ?device=<name> or have an agent.",
