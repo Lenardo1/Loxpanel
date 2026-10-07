@@ -4,6 +4,7 @@ Die Builds legen bin/version.json neben den Code (die App packt bei jedem
 Update genau bin/, webfrontend/ und deploy/ aus):
   - APK: Gradle-Task syncLoxpanelAssets (android/app/build.gradle.kts)
   - Docker: Dockerfile ueber `python bin/version_info.py schreiben [commit]`
+  - .deb: packaging/deb/build.sh schreibt die Datei selbst (ohne Python)
 Ohne die Datei, also beim Start aus einem Git-Checkout, kommt die Version aus
 loxberry-plugin/plugin.cfg (VERSION=x.y.z, dieselbe Quelle wie versionCode der
 App) und der Commit aus Git. Nur Standardbibliothek.

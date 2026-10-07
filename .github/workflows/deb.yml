@@ -3,6 +3,7 @@ name: Debian Package
 # Baut das LoxPanel-Server .deb bei jedem v*-Tag (und manuell) und haengt es an
 # den GitHub-Release. Das Paket ist Architecture: all — Python 3.12 + venv werden
 # beim Installieren per uv eingerichtet, daher kein Cross-Compile noetig.
+# Die Version kommt aus loxberry-plugin/plugin.cfg (wie bei der APK).
 
 on:
   push:
@@ -15,7 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Tag passt zur Projektversion
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          v=$(sed -n 's/^VERSION=//p' loxberry-plugin/plugin.cfg | tr -d '\r')
+          if [ "v$v" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME passt nicht zu loxberry-plugin/plugin.cfg (VERSION=$v)"
+            exit 1
+          fi
+
       - name: .deb bauen
+        env:
+          # Commit fuer bin/version.json (Anzeige im Konfigurator)
+          LOXPANEL_COMMIT: ${{ github.sha }}
         run: sh packaging/deb/build.sh
 
       - name: An den Release haengen
