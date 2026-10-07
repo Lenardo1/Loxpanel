@@ -8,6 +8,8 @@ Startseite (Screensaver) zeigt Wetter oben und die naechsten Termine unten an.
 Kalender: laedt die .ics (`webcal://` -> `https://`), parst die VEVENTs, loest
 Serientermine (RRULE, abzueglich abgesagter EXDATE) auf, verteilt mehrtaegige
 Termine (Ferien, Urlaub) auf JEDEN ihrer Tage und liefert die naechsten Tage.
+Einzeln verschobene, geaenderte oder abgesagte Termine einer Serie (eigenes
+VEVENT mit RECURRENCE-ID) ersetzen ihr urspruengliches Auftreten.
 Mehrere Abos (Apple, Google, Muellabfuhr, Geburtstage, ...) werden parallel
 geladen und zu EINER nach Tag und Uhrzeit sortierten Liste zusammengefuehrt;
 jeder Termin traegt Name und Farbe seiner Quelle mit.
@@ -40,6 +42,7 @@ except ImportError:
 
 try:
     from dateutil.rrule import rrulestr
+    from dateutil.tz import tzlocal
     HAVE_RRULE = True
 except ImportError:
     HAVE_RRULE = False
@@ -321,7 +324,8 @@ def _occurrences(component, range_start: date, range_end: date,
     `date`, sonst ein naives `datetime` in ORTSZEIT (die Wanduhrzeit, die das
     Panel anzeigt). Ein mehrtaegiger Termin, der VOR dem Zeitraum begonnen hat
     und noch laeuft, kommt mit — sonst fehlen laufende Ferien ab Tag zwei.
-    `extra_ex` sind zusaetzlich abgesagte Zeitpunkte (s. _cancelled_single()).
+    `extra_ex` sind zusaetzlich auszulassende Zeitpunkte: abgesagte oder
+    einzeln geaenderte Termine der Serie (s. _cancelled_single()).
     """
     dtstart_prop = component.get("dtstart")
     if not dtstart_prop:
@@ -330,6 +334,11 @@ def _occurrences(component, range_start: date, range_end: date,
     all_day = not isinstance(dtstart, datetime)
     dauer = _event_span(component, dtstart, all_day)
     rrule = component.get("rrule")
+    if rrule and _recurrence_id(component) is not None:
+        # Eine Ausnahme ersetzt genau EIN Auftreten. RANGE=THISANDFUTURE (eine
+        # eigene RRULE an der Ausnahme) wird bewusst nicht aufgeloest, sonst
+        # stuende die Serie ab dort doppelt da: einmal alt, einmal neu.
+        rrule = None
     rrule_txt = rrule.to_ical().decode() if rrule else ""
 
     if all_day:
@@ -340,10 +349,12 @@ def _occurrences(component, range_start: date, range_end: date,
         base = dtstart
         # Google-Feeds schreiben oft DTSTART ohne Zeitzone, das UNTIL der RRULE
         # aber mit 'Z'. dateutil verweigert diese Mischung mit einem ValueError,
-        # und ohne das hier fiele die GANZE Serie aus. Den Start in die Ortszeit
-        # heben bringt beide Seiten in dieselbe Welt.
-        if base.tzinfo is None and re.search(r"UNTIL=[^;]*Z", rrule_txt, re.I):
-            base = base.astimezone()
+        # und ohne das hier fiele die GANZE Serie aus. Den Start als Ortszeit
+        # kennzeichnen bringt beide Seiten in dieselbe Welt. tzlocal() statt
+        # astimezone(): das setzte einen FESTEN Versatz (+02:00 im Sommer), und
+        # nach der Zeitumstellung stand jedes Auftreten eine Stunde daneben.
+        if HAVE_RRULE and base.tzinfo is None and re.search(r"UNTIL=[^;]*Z", rrule_txt, re.I):
+            base = base.replace(tzinfo=tzlocal())
 
     # Um die Dauer nach hinten erweitert suchen: ein am 1.7. begonnener
     # Ferientermin muss am 21.9. noch gefunden werden.
@@ -385,28 +396,48 @@ def _occurrences(component, range_start: date, range_end: date,
                 yield (lokal, False, dauer)
 
 
+def _recurrence_id(component):
+    """RECURRENCE-ID eines VEVENT, vergleichbar mit den Auftreten der Serie.
+
+    Zeitpunkte wie in _occurrences() als naive ORTSZEIT (eine RECURRENCE-ID in
+    UTC trifft so dasselbe Auftreten wie eine mit TZID), ganztaegige als `date`.
+    None, wenn keine da ist oder der Feed sie kaputt liefert (mehrere Zeilen
+    ergeben eine Liste ohne `dt`, einen unlesbaren Wert verwirft icalendar,
+    ein Wert am Rand des Kalenders laesst sich nicht in Ortszeit umrechnen):
+    Der Termin gilt dann wie bisher als eigenstaendig, statt die ganze Quelle
+    abzuwerfen.
+    """
+    v = getattr(component.get("recurrence-id"), "dt", None)
+    if isinstance(v, datetime):
+        try:
+            return _local_naive(v)
+        except (OverflowError, ValueError, OSError):    # z. B. 99991231T235959Z
+            return None
+    return v if isinstance(v, date) else None
+
+
 def _cancelled_single(cal) -> dict:
-    """Abgesagte EINZELtermine einer Serie: {UID -> Menge der Zeitpunkte}.
+    """Abgesagte oder geaenderte EINZELtermine einer Serie: {UID -> Zeitpunkte}.
 
     Google und Apple sagen einen einzelnen Serientermin nicht per EXDATE ab,
     sondern schicken ein ZUSAETZLICHES VEVENT mit derselben UID, einer
     RECURRENCE-ID auf den betroffenen Termin und STATUS:CANCELLED. Dieses
     VEVENT zu ueberspringen genuegt nicht — die Serie erzeugt das Auftreten ja
     trotzdem. Also erst einsammeln, dann beim Aufloesen der Serie ausschliessen.
+    Ein verschobener oder umbenannter Einzeltermin kommt genauso, nur ohne
+    STATUS:CANCELLED; er steht dann mit seinen neuen Daten statt des Originals.
     """
     raus: dict = {}
     for comp in cal.walk():
         if comp.name != "VEVENT":
             continue
-        if str(comp.get("status", "")).strip().upper() != "CANCELLED":
+        uid = str(comp.get("uid", ""))
+        v = _recurrence_id(comp)
+        # Ohne UID gehoert die Ausnahme zu keiner Serie; sonst traefe sie eine
+        # fremde Serie, die ebenfalls keine UID hat.
+        if not uid or v is None:
             continue
-        rid = comp.get("recurrence-id")
-        v = getattr(rid, "dt", None) if rid is not None else None
-        if isinstance(v, datetime):
-            v = _local_naive(v)
-        elif not isinstance(v, date):
-            continue
-        raus.setdefault(str(comp.get("uid", "")), set()).add(v)
+        raus.setdefault(uid, set()).add(v)
     return raus
 
 
@@ -436,8 +467,13 @@ def _parse_events(ics_bytes: bytes, days: int, quelle: dict | None = None) -> li
             continue
         title = str(comp.get("summary", "Termin")).strip() or "Termin"
         uid = str(comp.get("uid", ""))
-        for occ, all_day, dauer in _occurrences(comp, today, range_end,
-                                                abgesagt_einzeln.get(uid)):
+        # Eine Ausnahme steht mit ihrem eigenen DTSTART da und darf sich nicht
+        # ueber ihre RECURRENCE-ID selbst ausschliessen (gleiche Uhrzeit, nur
+        # der Titel geaendert).
+        rid = _recurrence_id(comp)
+        rid_txt = "" if rid is None else rid.isoformat()
+        ex = None if rid is not None else abgesagt_einzeln.get(uid)
+        for occ, all_day, dauer in _occurrences(comp, today, range_end, ex):
             erster = occ if not isinstance(occ, datetime) else occ.date()
             letzter = erster + timedelta(days=dauer - 1)
             for n in range(dauer):
@@ -453,8 +489,10 @@ def _parse_events(ics_bytes: bytes, days: int, quelle: dict | None = None) -> li
                     note = ""
                 # Schluessel MIT Uhrzeit: eine Serie kann mehrmals am selben
                 # Tag auftreten (alle 12 Stunden, zweimal taeglich ...). Nur
-                # nach Tag entdoppelt faellt jedes weitere Auftreten weg.
-                schl = f"{q_key}_{uid}_{d.isoformat()}_{'' if t is None else t.isoformat()}"
+                # nach Tag entdoppelt faellt jedes weitere Auftreten weg. Die
+                # RECURRENCE-ID gehoert dazu: Eine Ausnahme, die auf die Zeit
+                # eines anderen Auftretens verlegt wurde, steht neben diesem.
+                schl = f"{q_key}_{uid}_{rid_txt}_{d.isoformat()}_{'' if t is None else t.isoformat()}"
                 raw.append((schl, d, t, title, note))
 
     seen = set()
