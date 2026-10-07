@@ -350,6 +350,19 @@
       'Keine Verbindung zu {host}:': 'No connection to {host}:',
       'Host fehlt': 'Host missing',
       'Passwort fehlt': 'Password missing',
+      'Benutzer fehlt': 'User missing',
+      'Port ungültig': 'Invalid port',
+      'Neuer Host oder Benutzer: bitte das Passwort eingeben.': 'New host or user: please enter the password.',
+      'Anmeldung am Miniserver gescheitert. Der Zugang wurde nicht gespeichert.':
+        'Login to the Miniserver failed. The access was not saved.',
+      'Miniserver nicht erreichbar. Der Zugang ist trotzdem gespeichert: Die bestehende Verbindung bleibt, der neue Zugang gilt ab dem nächsten Verbindungsaufbau.':
+        'Miniserver not reachable. The access was saved anyway: the existing connection stays, the new access applies from the next time the connection is set up.',
+      'Miniserver nicht erreichbar. Der Zugang ist trotzdem gespeichert, LoxPanel versucht es damit weiter.':
+        'Miniserver not reachable. The access was saved anyway, LoxPanel keeps trying with it.',
+      'Miniserver nicht erreichbar, und der Zugang ließ sich nicht speichern. Es bleibt beim bisherigen.':
+        'Miniserver not reachable, and the access could not be saved. Everything stays as before.',
+      'Verbunden, aber der Zugang ließ sich nicht speichern. Nach einem Neustart gilt er nicht mehr.':
+        'Connected, but the access could not be saved. After a restart it no longer applies.',
       'Mit dem Miniserver verbunden': 'Connected to the Miniserver',
       'Bausteine geladen: {n}. Alle Bereiche sind jetzt offen.': 'Blocks loaded: {n}. All sections are open now.',
       'Panel einrichten': 'Set up a panel',

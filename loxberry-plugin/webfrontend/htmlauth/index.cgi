@@ -8,6 +8,7 @@
 use strict;
 use warnings;
 use CGI;
+use Encode qw(encode_utf8);
 use JSON qw(encode_json decode_json);
 use LWP::UserAgent;
 use POSIX qw(strftime);
@@ -49,18 +50,30 @@ sub _lox_cred {
 }
 
 # Miniserver-Zugang an den Container weiterreichen und Ergebnis-HTML liefern.
+# Antwort von /api/settings/miniserver: "error" ist ein fester Text, der Fehler
+# des Miniservers steht getrennt in "fehler". "gespeichert" = Miniserver nicht
+# erreichbar, Zugang trotzdem gespeichert -> Warnung statt Fehler. Fehlende
+# Eingaben kommen als 400 mit JSON: der Container laeuft also.
+# decode_json liefert Zeichen, die Seite geht aber ohne Kodierungsschicht als
+# UTF-8-Bytes hinaus (der Text unten steht als Bytes im Skript, lbheader setzt
+# nur charset=utf-8): die Texte des Servers deshalb selbst nach UTF-8, sonst
+# kommt "Port ungueltig" als Latin-1 an.
 sub apply_miniserver {
     my ($data) = @_;
     my $ua = LWP::UserAgent->new(timeout => 25);
     my $r  = $ua->post("$api/api/settings/miniserver",
         'Content-Type' => 'application/json', Content => encode_json($data));
-    if ($r->is_success) {
-        my $j = eval { decode_json($r->decoded_content) };
-        return "<div class='alert alert-success'>Verbunden &ndash; " . ($j->{nControls} // 0) . " Controls geladen.</div>"
-            if $j && $j->{ok};
-        return "<div class='alert alert-danger'>Fehler: " . h($j ? ($j->{error} // 'unbekannt') : 'ungueltige Antwort') . "</div>";
+    my $j = eval { decode_json($r->decoded_content) };
+    if (ref($j) ne 'HASH') {
+        return "<div class='alert alert-danger'>Fehler: ung&uuml;ltige Antwort</div>" if $r->is_success;
+        return "<div class='alert alert-danger'>Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)</div>";
     }
-    return "<div class='alert alert-danger'>Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)</div>";
+    return "<div class='alert alert-success'>Verbunden &ndash; " . ($j->{nControls} // 0) . " Controls geladen.</div>"
+        if $j->{ok};
+    my $text = h(encode_utf8($j->{error} // 'unbekannt'));
+    $text .= "<br><small>" . h(encode_utf8($j->{fehler})) . "</small>" if defined $j->{fehler} && $j->{fehler} ne '';
+    return $j->{gespeichert} ? "<div class='alert alert-warning'>$text</div>"
+                             : "<div class='alert alert-danger'>Fehler: $text</div>";
 }
 
 # ---- POST verarbeiten (vor jeder Ausgabe) ----

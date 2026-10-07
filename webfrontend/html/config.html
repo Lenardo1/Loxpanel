@@ -3158,12 +3158,22 @@ $('#ms_save').onclick=async()=>{
     port:parseInt($('#ms_port').value)||443,verify_tls:$('#ms_tls').checked};
   const pw=$('#ms_pass').value; if(pw) body.pass=pw;
   $('#ms_save').disabled=true;
-  EINR_VERSUCH='';
+  EINR_VERSUCH=''; $('#ms_toast').className='toast';
   try{
     const r=await fetch('/api/settings/miniserver',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const j=await r.json();
     if(j.ok){ flash($('#ms_toast'),'✓ Verbunden — '+j.nControls+' Controls',true); $('#ms_pass').value=''; loadSettings(); }
-    else { EINR_VERSUCH=T(j.error||'Fehler'); flash($('#ms_toast'),EINR_VERSUCH,false); }
+    else {
+      // Fester Text (uebersetzt), der Fehler des Miniservers getrennt dahinter
+      EINR_VERSUCH=T(j.error||'Fehler')+(j.fehler?' ('+j.fehler+')':'');
+      if(j.gespeichert||j.connected){
+        // Gespeichert, aber nicht geprueft (oder verbunden, aber nicht
+        // gespeichert): Die Warnung bleibt bis zum naechsten Versuch stehen.
+        const t=$('#ms_toast'); t.textContent=EINR_VERSUCH; t.className='toast show warn';
+        if(j.gespeichert) $('#ms_pass').value='';
+        loadSettings();
+      } else flash($('#ms_toast'),EINR_VERSUCH,false);
+    }
   }catch(e){ EINR_VERSUCH=T('Fehler:')+' '+e; flash($('#ms_toast'),EINR_VERSUCH,false); }
   einrichtungStand();
   $('#ms_save').disabled=false;
