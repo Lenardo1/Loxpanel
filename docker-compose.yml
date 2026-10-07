@@ -12,7 +12,8 @@ services:
     ports:
       - "8099:8099"
     environment:
-      # Miniserver-Zugang (aus .env). Alternativ per config/loxpanel.cfg im Volume.
+      # Miniserver-Zugang (aus .env). Ein unter Settings -> Miniserver gespeicherter
+      # Zugang (config/loxpanel.cfg im Volume) hat Vorrang vor diesen Variablen.
       LOXPANEL_MS_HOST: "${LOXPANEL_MS_HOST}"
       LOXPANEL_MS_USER: "${LOXPANEL_MS_USER}"
       LOXPANEL_MS_PASS: "${LOXPANEL_MS_PASS}"
@@ -20,5 +21,5 @@ services:
       LOXPANEL_MS_VERIFY_TLS: "${LOXPANEL_MS_VERIFY_TLS:-false}"
     volumes:
       # Persistiert panels.json (von /config geschrieben), theme.json und
-      # optional loxpanel.cfg (Intercom/T25-Login). Host-Ordner ./config.
+      # loxpanel.cfg (von Settings geschrieben). Host-Ordner ./config.
       - ./config:/app/config

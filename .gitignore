@@ -27,6 +27,8 @@ bin/version.json
 # Python
 *.pyc
 __pycache__/
+# venv aus der Standalone-Anleitung im README
+.venv/
 
 # Lokal gebautes Overlay-Test-Plugin (Build-Artefakt, gehoert nicht ins Repo)
 loxpanel-plugin-test.zip

@@ -31,14 +31,35 @@ sudo mkdir -p /opt/loxpanel
 ```bash
 sudo apt update
 sudo apt install -y python3-pip chromium unclutter fonts-inter fonts-roboto
-sudo pip3 install --break-system-packages loxone-api    # zieht aiohttp mit
+# nur 32-bit-ARM-System (dpkg --print-architecture: armhf, auch wenn uname -m
+# bei 64-bit-Kernel aarch64 zeigt): fuer cffi gibt es dort kein fertiges Paket,
+# pip baut es (wie im Dockerfile) und braucht dazu:
+sudo apt install -y gcc libc6-dev libffi-dev python3-dev
+sudo pip3 install --break-system-packages -r /opt/loxpanel/requirements.txt
 ```
+Die Paketliste steht nur in `requirements.txt`: Kalender und die Anmeldung am
+Audioserver brauchen mehr als `loxone-api`. Fehlt eins der Pakete dafuer, startet
+der Server trotzdem und nennt es beim Start im Log; ohne `loxone-api` (und das
+damit installierte `aiohttp`) startet er nicht.
+
+`--break-system-packages` kennt pip erst ab Version 23 (Debian 12); auf
+aelteren Systemen die Option weglassen. Auf 32-bit-ARM bekommt pip
+`cryptography` nur fertig, wenn glibc (`ldd --version`) und pip neu genug sind;
+die Grenze kann sich mit jeder neuen cryptography-Version verschieben. Baut pip
+es selbst (Meldung `Building wheel for cryptography`), braucht es zusaetzlich
+`libssl-dev`, `pkg-config` und Rust in der Mindestversion aus der
+[Installationsanleitung von cryptography](https://cryptography.io/en/latest/installation/);
+das `cargo` aus apt ist dafuer auf aelteren Systemen zu alt, dann Rust ueber
+rustup installieren (dessen `cargo` muss auch fuer `sudo pip3` im `PATH` liegen).
 
 ## 3) Miniserver-Zugang
-```bash
-cp /opt/loxpanel/config/loxpanel.cfg.example /opt/loxpanel/config/loxpanel.cfg
-nano /opt/loxpanel/config/loxpanel.cfg      # host/user/pass/verify_tls eintragen
-```
+Nach Schritt 4 im Browser `http://<px30-ip>:8099/config` oeffnen und den Zugang
+unter **Settings → Miniserver** eintragen. Der Server legt `config/loxpanel.cfg`
+selbst an und verbindet sich; bis dahin wartet er und zeigt jedem Panel, wo der
+Konfigurator zu oeffnen ist. Alternativ in der `.service` unter `[Service]` je
+eine Zeile `Environment=LOXPANEL_MS_HOST=<ip>` (ebenso `_USER`, `_PASS`, `_PORT`,
+`_VERIFY_TLS`); ein unter Settings gespeicherter Zugang hat Vorrang vor diesen
+Variablen.
 
 ## 4) Server als Dienst
 ```bash

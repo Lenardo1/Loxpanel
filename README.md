@@ -358,7 +358,8 @@ volumes:
 ```
 
 Danach: Visu `http://<host>:8099`, Konfig `…/config`, Einstellungen `…/settings`.
-Zugangsdaten per Env **oder** leer lassen und in `/settings` eintragen.
+Zugangsdaten per Env **oder** leer lassen und in `/settings` eintragen; ein unter
+*Settings → Miniserver* gespeicherter Zugang hat Vorrang vor den Env-Variablen.
 Bis der Server zum ersten Mal mit dem Miniserver verbunden ist, zeigt jedes
 Panel, unter welcher Adresse der Konfigurator zu öffnen ist – auf einem Panel
 mit der Android-App dessen WLAN-Adresse. Der Konfigurator öffnet dann direkt
@@ -368,10 +369,13 @@ steht.
 **Für Entwickler (Standalone):**
 
 ```bash
-pip install loxone-api            # zieht aiohttp mit
-cp config/loxpanel.cfg.example config/loxpanel.cfg   # Miniserver eintragen (gitignored)
-python bin/webvisu.py             # -> http://localhost:8099
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python bin/webvisu.py   # -> http://localhost:8099
 ```
+
+Den Miniserver-Zugang unter *Settings → Miniserver* eintragen (der Server legt
+`config/loxpanel.cfg` dann selbst an) oder vor dem Start per
+`LOXPANEL_MS_HOST/USER/PASS` setzen.
 
 Details: [`deploy/DOCKER.md`](deploy/DOCKER.md) / [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 

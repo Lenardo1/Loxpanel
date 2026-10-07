@@ -66,6 +66,7 @@ def _make_client(host, user, password, port, verify_tls) -> LoxoneClient:
 from adapters import JalousieAdapter, LightControllerV2Adapter  # noqa: E402
 from audioserver import make_backend, AudioBackend  # noqa: E402
 from audioserver_events import AudioEventClient  # noqa: E402
+import audioserver_auth  # noqa: E402  # Audioserver-Anmeldung; hier nur HAVE_CRYPTO (_fehlende_pakete_melden)
 import front_info  # noqa: E402  # Kalender (iCal-Abos) + Wetter (Open-Meteo) fuer die Front
 import loxone_weather  # noqa: E402  # Wetter vom Loxone-Wetterserver (Vorrang vor Open-Meteo)
 import theme_colors  # noqa: E402  # Panel-Theme aus einer Grundfarbe herleiten
@@ -8041,8 +8042,24 @@ async def on_cleanup(a: web.Application) -> None:
     await a["app"].close()
 
 
+def _fehlende_pakete_melden() -> None:
+    """Einmal beim Start: welche optionalen Pakete aus requirements.txt fehlen
+    und was dadurch nicht geht. Ohne sie laeuft der Server weiter und meldet
+    sich gesund; auffallen wuerde es sonst erst am Kalender oder am
+    Audioserver."""
+    fehlt = [f"ohne {paket}: {funktion}" for da, paket, funktion in (
+        (front_info.HAVE_ICAL, "icalendar", "Kalender der Front"),
+        (front_info.HAVE_RRULE, "python-dateutil", "Serientermine im Kalender"),
+        (audioserver_auth.HAVE_CRYPTO, "cryptography", "Anmeldung am Audioserver (Favoriten, Steuerung)"),
+    ) if not da]
+    if fehlt:
+        log.warning("Pakete aus requirements.txt fehlen (pip install -r requirements.txt) - %s",
+                    "; ".join(fehlt))
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    _fehlende_pakete_melden()
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=int(os.environ.get("LOXPANEL_PORT", "8099")))
     args = p.parse_args()
