@@ -2931,7 +2931,18 @@ function nachRuhe(){ katFilter=null; goTab(tabsCfg[0]||'favoriten'); showSaver()
 function resetIdle(){ clearTimeout(idleTimer);
   idleTimer=setTimeout(nachRuhe, SAVER_IDLE_MS);
   armDpms(); }
-el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); nightWake(); hideSaver(); resetIdle(); });
+// Der Finger, der die Uhr-Seite wegtippt, darf darunter nichts ausloesen. Sie
+// verschwindet schon beim Aufsetzen; Loslassen, click und Langdruck derselben
+// Beruehrung landen sonst auf der Kachel, die jetzt unter dem Finger liegt
+// (Safari laesst den click durch, sobald der Finger kurz liegen bleibt). Die
+// Beruehrung endet nicht an einer festen Zeit, darum gilt die Sperre bis zur
+// naechsten: deren pointerdown (Capture, vor allen anderen) hebt sie auf.
+let saverGeste=false;
+window.addEventListener('pointerdown', ()=>{ saverGeste=false; }, true);
+window.addEventListener('keydown', ()=>{ saverGeste=false; }, true);
+['pointerup','click','dblclick','contextmenu'].forEach(ev=>window.addEventListener(ev, e=>{
+  if(!saverGeste) return; e.preventDefault(); e.stopImmediatePropagation(); }, true));
+el('saver').addEventListener('pointerdown', e=>{ e.preventDefault(); e.stopPropagation(); saverGeste=true; nightWake(); hideSaver(); resetIdle(); });
 ['pointerdown','keydown','wheel'].forEach(ev=>document.addEventListener(ev, ()=>{ nightWake(); if(!saverOn()) resetIdle(); }, {passive:true}));
 // ---- Nachtmodus: Panel abdunkeln ----
 // Tag/Nacht meldet der Server ({t:"night"}), Staerke und Aufhelldauer kommen je
