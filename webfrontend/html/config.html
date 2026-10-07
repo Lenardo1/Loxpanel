@@ -3912,7 +3912,7 @@ loadSettings().catch(e=>{ const c=$('#conn'); if(c) c.innerHTML='Konnte Einstell
 { const mh=$('#mode_host'); if(mh) mh.textContent=location.host; }
 loadPanelIds().then(()=>{ fillNewPanel(); fillAudioPanels(); renderDevices(); pollDevices(); setInterval(pollDevices,6000); });
 
-if(window.I18N) I18N.autoChrome('h2, h3, label.lbl, .btn, .minibtn, .addbtn, .navbtn .nbt, .navbtn .nbs, .brand small, .itab, .cclbl, .ccmut, .empty, .muted, .note, .lead, .hint, .rub, .stab, .sectlbl, option, [data-i18n]');
+if(window.I18N) I18N.autoChrome('h2, h3, h4, label.lbl, .btn, .minibtn, .addbtn, .navbtn .nbt, .navbtn .nbs, .brand small, .itab, .cclbl, .ccmut, .empty, .muted, .note, .lead, .hint, .rub, .stab, .sectlbl, option, figcaption, .nm, .spec, .desc, .badge, .ovbox b, .ovbox span, .as-lead, .as-desc, .as-of, .as-chip, .as-def .tag, .as-def b, .as-def p, .as-start, [data-i18n]');
 </script>
 <div id="wzOv" class="wzov" hidden>
   <div class="wzbox">
