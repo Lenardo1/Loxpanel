@@ -860,6 +860,19 @@ def _audiometa_config() -> dict:
     return cfg if isinstance(cfg, dict) else {}
 
 
+def _audiometa_sekunden(am: dict, schluessel: str, standard: float) -> float:
+    """Eine Zeit (s) des Audioserver-Ereignis-Clients aus loxpanel.cfg
+    audiometa.<schluessel> (retry_interval, response_timeout). Ohne gueltigen
+    Wert `standard` (AudioEventClient.NEU_VERSUCH_S bzw. PRUEF_ZEITLIMIT_S,
+    begruendet in audioserver_events.py)."""
+    wert = am.get(schluessel) if isinstance(am, dict) else None
+    if isinstance(wert, (int, float)) and not isinstance(wert, bool) and math.isfinite(wert) and wert > 0:
+        return float(wert)
+    if wert is not None:
+        log.warning("loxpanel.cfg: audiometa.%s %r ungueltig, es gelten %s s", schluessel, wert, standard)
+    return float(standard)
+
+
 def _intercom_config() -> dict:
     base = Path(__file__).resolve().parent.parent / "config"
     f = base / "loxpanel.cfg"
@@ -1708,11 +1721,12 @@ class App:
         # (Ergebnis kommt async -> _dirty). Der Loxone-sourceList-State ist bei
         # vielen Setups leer, deshalb ist das der zuverlaessige Weg.
         cl, pid = self._audio_client_for(c)
-        if cl is not None and pid is not None and (not cl.paired or cl.authed):
+        if cl is not None and pid is not None and (cl.paired is False or cl.authed):
             await cl.request_favs(pid)
             return
-        # Fallback ohne Event-Client (z.B. MS4H ohne 7091) oder bei gekoppeltem
-        # Audioserver ohne Anmeldung: Favoriten ueber den Miniserver holen.
+        # Fallback ohne Event-Client (z.B. MS4H ohne 7091), bei gekoppeltem
+        # Audioserver ohne Anmeldung oder unklarer Kopplung (paired None):
+        # Favoriten ueber den Miniserver holen.
         ua = c.get("uuidAction")
         if ua:
             await self.command(ua, "roomfav/get/0/20")
@@ -4052,10 +4066,11 @@ class App:
         # Abspiel-Index (`play`) beruecksichtigt, dass Musikserver per `slot` und
         # Sonn per Item-`id` adressiert (siehe AudioEventClient._apply_favs).
         # Nur wenn der Kanal die Favoriten auch liefern darf: ein gekoppelter
-        # Audioserver ohne geglueckte Anmeldung schickt keine (dieselbe Bedingung
-        # wie beim Anfordern in prime_favs) -> dann die des Miniservers.
+        # Audioserver ohne geglueckte Anmeldung (oder unklare Kopplung) schickt
+        # keine (dieselbe Bedingung wie beim Anfordern in prime_favs) -> dann
+        # die des Miniservers.
         _cl, _pid = self._audio_client_for(c) if c.get("type") in ("AudioZone", "AudioZoneV2") else (None, None)
-        if _cl is not None and _pid is not None and (not _cl.paired or _cl.authed):
+        if _cl is not None and _pid is not None and (_cl.paired is False or _cl.authed):
             favs = _cl.favs.get(_pid, [])
             items = [{"label": f["name"],
                       "cmd": {"uuid": ua, "cmd": f"roomfav/play/{f.get('play', f['slot'])}"},
@@ -5441,8 +5456,13 @@ class App:
                         want.add(host)
             for host in want:
                 if host not in self.audio_clients:
+                    am = self.audiometa_cfg or {}
                     cl = AudioEventClient(host, 7091, user=self.user,
-                                          token_provider=lambda: self.jwt)
+                                          token_provider=lambda: self.jwt,
+                                          neu_versuch_s=_audiometa_sekunden(
+                                              am, "retry_interval", AudioEventClient.NEU_VERSUCH_S),
+                                          pruef_zeitlimit_s=_audiometa_sekunden(
+                                              am, "response_timeout", AudioEventClient.PRUEF_ZEITLIMIT_S))
                     self.audio_clients[host] = cl
                     asyncio.create_task(self._run_audio_client(host, cl))
                     log.info("Audioserver-Event-Client gestartet: %s", host)

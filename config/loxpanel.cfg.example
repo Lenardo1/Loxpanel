@@ -44,6 +44,13 @@
     "enabled": true
   },
 
+  "audiometa": {
+    "_comment": "Audioserver-Live-Daten (Cover/Titel/Favoriten ueber Port 7091, Adressen aus der Struktur). enabled:false schaltet sie ab (auch unter Settings -> Audio). Vor jedem Verbinden prueft LoxPanel, ob der Audioserver mit dem Miniserver gekoppelt ist, bis er als gekoppelt erkannt ist; das bleibt dann bis zum naechsten Start des Clients. retry_interval: Sekunden Pause vor dem naechsten Verbindungsversuch und, solange diese Pruefung kein Ergebnis hat (etwa 503 beim Hochfahren), vor der naechsten Pruefung; Standard 5 = Cover/Titel sind nach einem Neustart des Audioservers bald wieder da, ohne ihn mit Anfragen zu belasten. response_timeout: Sekunden, die der Audioserver fuer die Antwort auf die Pruefung bekommt; Standard 6 = viel Luft fuer ein Geraet im LAN, ohne den Verbindungsaufbau laenger aufzuhalten als der WebSocket-Aufbau (8 s). Beide gelten ab dem naechsten Start des Clients (Neustart oder Live-Daten aus und wieder ein).",
+    "enabled": true,
+    "retry_interval": 5,
+    "response_timeout": 6
+  },
+
   "calendar": {
     "_comment": "Front (Screensaver): Termine aus iCal-Abos und Wetter (Open-Meteo). sources: bis zu 8 Abos (Familie, Muellabfuhr, Geburtstage, Ferien, ...), jeweils webcal:// oder https:// Abo-Link (Apple/iCloud, Google, ...) mit Name und Farbe; alle werden zu einer Liste zusammengefuehrt. ical_url: alte Einzel-URL, wird als erste Quelle mitgelesen. holiday_url: zweiter iCal nur fuer Feiertage (rote Tage im Monatsraster). name: Ueberschrift am Panel. colors: false zeigt die Termine schlicht ohne Kalenderfarben. sv_events: wie viele Termine auf die Uhr-Seite passen (1-10). lat/lon: Standort in Dezimalgrad fuer das Wetter (leer/null = kein Wetter, kein API-Key noetig). days: Termine der naechsten n Tage; fore_days: Wetter-Vorschautage (1-7). Pflegbar unter /config -> Settings -> Kalender & Wetter.",
     "sources": [],

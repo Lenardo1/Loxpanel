@@ -46,17 +46,35 @@ class AudioEventClient:
     """
 
     PAIRED_ERROR = "not allowed when paired"
+    # s: Pause vor dem naechsten Verbindungsversuch und, solange die Kopplung
+    # unklar ist, vor der naechsten Pruefung. 5 s war schon immer die Pause
+    # beim Neuverbinden: Cover und Titel sind nach einem Neustart des
+    # Audioservers bald wieder da, und eine kleine HTTP-Anfrage alle 5 s
+    # belastet ihn nicht. loxpanel.cfg: audiometa.retry_interval.
+    NEU_VERSUCH_S = 5
+    # s: Zeitlimit der Kopplungspruefung (HTTP audio/cfg/all), der bisherige
+    # Wert. Im LAN antwortet der Audioserver in Millisekunden; 6 s lassen einem
+    # ausgelasteten Geraet Luft und halten den Verbindungsaufbau nicht laenger
+    # auf als der WebSocket-Aufbau selbst (8 s). audiometa.response_timeout.
+    PRUEF_ZEITLIMIT_S = 6
+    # HTTP-Status, die nur "gerade nicht" heissen (dazu 5xx): sagen nichts
+    # ueber die Kopplung.
+    STATUS_UNKLAR = (408, 429)
 
-    def __init__(self, host: str, port: int = 7091, user: str = "", token_provider=None):
+    def __init__(self, host: str, port: int = 7091, user: str = "", token_provider=None,
+                 neu_versuch_s: float | None = None, pruef_zeitlimit_s: float | None = None):
         self.host = host
         self.port = port
+        self.neu_versuch_s = self.NEU_VERSUCH_S if neu_versuch_s is None else neu_versuch_s
+        self.pruef_zeitlimit_s = self.PRUEF_ZEITLIMIT_S if pruef_zeitlimit_s is None else pruef_zeitlimit_s
         # user + token_provider (async oder sync, liefert das aktuelle Miniserver-
         # JWT) erlauben die Anmeldung am gekoppelten Audioserver wie die Loxone-App.
         self.user = user
         self._token_provider = token_provider
         self.now: dict[int, dict] = {}
         self.favs: dict[int, list] = {}
-        # None = noch nicht geprueft; True = gekoppelter Loxone-Audioserver, der
+        # None = unklar (noch nicht oder ohne Ergebnis geprueft), gilt wie
+        # gekoppelt ohne Anmeldung; True = gekoppelter Loxone-Audioserver, der
         # unangemeldete Befehle ablehnt und die Verbindung schliesst; False =
         # Nachbau (Sonn/AudioServer4Home), Befehle ohne Anmeldung ok.
         self.paired: bool | None = None
@@ -66,6 +84,8 @@ class AudioEventClient:
         self._session: aiohttp.ClientSession | None = None
         self._on_change = None
         self._stop = False
+        self._unklar_gemeldet = False
+        self._sofort_neu = False     # Verbindung absichtlich geschlossen: ohne Pause neu
 
     @property
     def url(self) -> str:
@@ -136,13 +156,19 @@ class AudioEventClient:
             return self._apply_favs(msg.get("getroomfavs_result"))
         return False
 
-    async def _send(self, cmd: str) -> None:
+    async def _send(self, cmd: str) -> bool:
+        """-> gesendet? Ohne offene Verbindung oder bei einem Fehler False (nur
+        debug; ob das eine Meldung wert ist, entscheidet der Aufrufer)."""
         ws = self._ws
-        if ws is not None and not ws.closed:
-            try:
-                await ws.send_str(cmd)
-            except Exception as err:
-                log.debug("audioevents send %s: %s", cmd, err)
+        if ws is None or ws.closed:
+            log.debug("audioevents send %s: keine Verbindung", cmd)
+            return False
+        try:
+            await ws.send_str(cmd)
+        except Exception as err:
+            log.debug("audioevents send %s: %s", cmd, err)
+            return False
+        return True
 
     async def request_favs(self, playerid: int) -> None:
         """Raumfavoriten einer Zone anfordern (Ergebnis kommt async im Reader).
@@ -150,40 +176,116 @@ class AudioEventClient:
         Die Range-Form `.../<start>/<count>` ist zwingend: ohne sie liefert der
         Server die Favoriten mit `slot: null` (nicht abspielbar). Mit Range
         kommen echte Slot-Nummern (1..N) fuer roomfav/play/<slot>.
+
+        Bei einem gekoppelten Loxone-Audioserver ohne Anmeldung (und solange
+        die Kopplung unklar ist) wird nichts gesendet: jeder Befehl auf dem
+        Kanal beendet dort die Verbindung, und die Ereignisse (Cover/Titel)
+        waeren weg.
         """
         if playerid is None:
             return
-        if self.paired and not self.authed:
+        if not (self.paired is False or self.authed):
             return
         await self._send(f"audio/cfg/getroomfavs/{int(playerid)}/0/50")
+
+    async def _favs_anfordern(self) -> None:
+        """Favoriten aller bekannten Zonen anfordern, sobald der Kanal sie
+        liefern darf; eine schon offene Musikauswahl bekaeme sie sonst erst
+        beim naechsten Oeffnen."""
+        for pid in list(self.now):
+            await self.request_favs(pid)
 
     async def play_roomfav(self, playerid: int, favid) -> bool:
         """Einen Raumfavoriten abspielen (Feld `play`/`id` des Favoriten, siehe
         _apply_favs). Bei einem gekoppelten Audioserver nur ueber eine angemeldete
-        Verbindung; sonst wuerde er die Verbindung schliessen."""
-        if playerid is None or (self.paired and not self.authed):
+        Verbindung; sonst wuerde er die Verbindung schliessen. -> gesendet?"""
+        if playerid is None or not (self.paired is False or self.authed):
             return False
-        await self._send(f"audio/{int(playerid)}/roomfav/play/{favid}")
-        return True
+        ok = await self._send(f"audio/{int(playerid)}/roomfav/play/{favid}")
+        if not ok:
+            log.warning("Audioserver %s: Raumfavorit %s fuer Zone %s nicht gesendet (Verbindung weg)",
+                        self.host, favid, playerid)
+        return ok
+
+    def _kopplung_unklar(self, grund: str) -> None:
+        """Pruefung ohne Ergebnis, der bisherige Wert bleibt. Ist die Kopplung
+        noch unbekannt, einmal als Info melden, danach debug: die Pruefung
+        wiederholt sich alle neu_versuch_s Sekunden."""
+        if self.paired is None and not self._unklar_gemeldet:
+            self._unklar_gemeldet = True
+            log.info("Audioserver %s: Kopplung unklar (%s), Befehle ueber den Miniserver; "
+                     "neue Pruefung alle %s s", self.host, grund, self.neu_versuch_s)
+        else:
+            log.debug("Audioserver %s: audio/cfg/all %s", self.host, grund)
 
     async def _check_paired(self) -> None:
-        """Einmal per HTTP pruefen, ob der Audioserver Befehle ohne Anmeldung
-        annimmt. Gekoppelte Loxone-Audioserver antworten mit
-        "command not allowed when paired"; Nachbauten liefern die Zonenliste."""
-        if self.paired is not None:
+        """Per HTTP pruefen, ob der Audioserver Befehle ohne Anmeldung annimmt.
+        Laeuft vor jedem Verbinden, solange er nicht als gekoppelt erkannt ist;
+        so heilt ein falsches "nicht gekoppelt" (ein gekoppelter Server schliesst
+        den Kanal beim ersten Befehl ohne Anmeldung). Ein erkanntes "gekoppelt"
+        bleibt fuer die Lebensdauer des Clients: Es entsteht nur aus dem
+        Kopplungstext, und eine Antwort beim Hochfahren des Audioservers (404,
+        leer) wuerde es sonst kippen, Befehle gingen dann ohne Anmeldung an 7091.
+          - Antwort mit "command not allowed when paired" -> gekoppelt (True),
+            egal mit welchem HTTP-Status (der der echten Ablehnung ist nicht
+            dokumentiert).
+          - 5xx, 408, 429, Zeitlimit, Verbindungsfehler heissen nur "gerade
+            nicht" -> der bisherige Wert bleibt (None = unklar, run() prueft
+            spaeter erneut).
+          - Jede andere Antwort -> nicht gekoppelt (False). Nachbauten und
+            Musikserver Gen 1 antworten nicht einheitlich (auch 404, leer,
+            mit BOM), deshalb kein strengeres Kriterium."""
+        if self.paired is True:
             return
         try:
             async with self._session.get(f"http://{self.host}:{self.port}/audio/cfg/all",
-                                         timeout=aiohttp.ClientTimeout(total=6)) as r:
-                text = await r.text()
+                                         timeout=aiohttp.ClientTimeout(total=self.pruef_zeitlimit_s)) as r:
+                status, text = r.status, await r.text(errors="replace")
         except Exception as err:
-            log.debug("Audioserver %s: audio/cfg/all nicht abfragbar: %s", self.host, err)
+            self._kopplung_unklar(f"nicht abfragbar: {str(err) or type(err).__name__}")
             return
-        self.paired = self.PAIRED_ERROR in text
-        log.info("Audioserver %s: %s", self.host,
-                 "mit dem Miniserver gekoppelt, Kanal nur zum Hoeren (Cover/Titel); "
-                 "Favoriten/Befehle ueber Port 7091 nur nach Anmeldung"
-                 if self.paired else "nimmt Befehle auf Port 7091 an (Favoriten moeglich)")
+        if self.PAIRED_ERROR in text:
+            paired = True
+        elif status >= 500 or status in self.STATUS_UNKLAR:
+            self._kopplung_unklar(f"HTTP {status}")
+            return
+        else:
+            paired = False
+        self._unklar_gemeldet = False
+        if paired == self.paired:
+            return
+        self.paired = paired
+        if paired:
+            log.info("Audioserver %s: mit dem Miniserver gekoppelt, Kanal nur zum Hoeren (Cover/Titel); "
+                     "Favoriten/Befehle ueber Port 7091 nur nach Anmeldung", self.host)
+            return
+        # Nur zur Diagnose: JSON oder nicht (BOM und NUL wie beim Miniserver weg)
+        try:
+            json.loads(text.lstrip("\ufeff").strip("\x00"))
+            art = "JSON"
+        except ValueError:
+            art = "kein JSON"
+        log.info("Audioserver %s: nimmt Befehle auf Port 7091 an (Favoriten moeglich; "
+                 "audio/cfg/all: HTTP %s, %s)", self.host, status, art)
+
+    async def _kopplung_nachholen(self, ws) -> None:
+        """Kopplung beim Verbinden unklar: Die Verbindung dient nur zum Hoeren,
+        die Pruefung wiederholt sich alle neu_versuch_s Sekunden. Gekoppelt ->
+        Verbindung schliessen, run() verbindet ohne Pause neu und meldet sich
+        an (die Anmeldung liest selbst und darf nicht neben dem Leser laufen).
+        Nicht gekoppelt -> Favoriten anfordern und neu zeichnen."""
+        while self.paired is None and not ws.closed and not self._stop:
+            await asyncio.sleep(self.neu_versuch_s)
+            await self._check_paired()
+        if ws.closed or self._stop:
+            return
+        if self.paired:
+            self._sofort_neu = True
+            await ws.close()
+        else:
+            await self._favs_anfordern()
+            if self._on_change:
+                self._on_change()
 
     async def _get_jwt(self) -> str:
         """Aktuelles Miniserver-JWT vom Server holen (fuer die Anmeldung)."""
@@ -260,6 +362,7 @@ class AudioEventClient:
         jeder Zustandsaenderung aufgerufen (setzt im Server _dirty)."""
         self._on_change = on_change
         while not self._stop:
+            nachholen = None
             try:
                 if self._session is None or self._session.closed:
                     self._session = aiohttp.ClientSession()
@@ -278,8 +381,13 @@ class AudioEventClient:
                     # getroomfavs/roomfav-play auf dieser Verbindung moeglich.
                     if self.paired:
                         await self._authenticate(ws)
-                        if self.authed and self._on_change:
-                            self._on_change()   # Ansicht ggf. mit Favoriten neu rendern
+                        if self.authed:
+                            await self._favs_anfordern()
+                            if self._on_change:
+                                self._on_change()   # Ansicht ggf. mit Favoriten neu rendern
+                    elif self.paired is None:
+                        # Kopplung unklar: nur hoeren, Pruefung nachholen
+                        nachholen = asyncio.create_task(self._kopplung_nachholen(ws))
                     async for m in ws:
                         if m.type == aiohttp.WSMsgType.TEXT:
                             if self._handle(m.data) and self._on_change:
@@ -289,11 +397,17 @@ class AudioEventClient:
                             break
             except Exception as err:
                 log.debug("Audioserver-Events (%s): %s", self.url, err)
+            finally:
+                if nachholen is not None:
+                    nachholen.cancel()
             self._ws = None
             self.authed = False
             if self._stop:
                 break
-            await asyncio.sleep(5)
+            if self._sofort_neu:
+                self._sofort_neu = False
+                continue
+            await asyncio.sleep(self.neu_versuch_s)
 
     async def close(self) -> None:
         self._stop = True
