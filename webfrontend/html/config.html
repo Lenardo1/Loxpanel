@@ -3463,7 +3463,7 @@ async function deviceAction(act, name, ip, panel){
   try{
     let j;
     if(act==='start'||act==='reload'||act==='stop') j=await postJson('/api/agent/command',{ip,action:act,panel});
-    else if(act==='switch') j=await postJson('/api/device/switch',{device:name,panel});
+    else if(act==='switch') j=await postJson('/api/device/switch',{device:name,ip,panel});   // ip: Agent dieser Zeile
     else if(act==='wsreload') j=await postJson('/api/reload',{device:name});
     else if(act==='dispoff') j=await postJson('/api/display',{device:name,on:false});
     else if(act==='dispon') j=await postJson('/api/display',{device:name,on:true});

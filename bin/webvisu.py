@@ -215,6 +215,19 @@ DISPLAY_DRIVERS = {"fully": 2323, "wallpanel": 2971}
 # Kiosk-Apps, die die Visu beim Verbinden meldet (?kiosk=): Fully Kiosk und die
 # LoxPanel-App. Beide schalten das Display aus der Seite heraus (JS-Schnittstelle).
 KIOSK_APPS = ("fully", "loxpanel")
+# Panel-Agent (agent/loxpanel-agent.py): meldet sich alle AGENT_MELDETAKT s
+# (time.sleep in announce_loop). Online heisst hoechstens drei Meldungen in
+# Folge verpasst: eine verlorene Meldung (WLAN, Server kurz beschaeftigt) macht
+# ein Panel nicht offline. Nur einem Agenten, der online ist, gilt ein Wechsel.
+AGENT_MELDETAKT = 15
+AGENT_ONLINE = 4 * AGENT_MELDETAKT
+# s: Zeitlimit fuer Befehle an den Agenten (/start, /reload, /stop). Er wartet in
+# stop_kiosk bis zu 5 s auf das alte Chromium, bevor er es abschiesst und das
+# neue startet; 3 s Reserve dafuer und fuer die Antwort auf einem langsamen PX30.
+AGENT_BEFEHL_TIMEOUT = 8
+# Faehigkeit im Announce (features): der Agent uebernimmt "panel" aus der
+# Antwort ohne Chromium-Neustart. Aeltere Agenten bekommen stattdessen /start.
+AGENT_KANN_PANEL = "panel"
 # Nachtmodus: Rueckfall-Fenster, wenn keine Sonnenzeiten vorliegen (kein Wetter
 # konfiguriert). Sobald Sonnenauf-/-untergang bekannt sind, gelten die.
 NIGHT_FROM, NIGHT_TO = "22:00", "06:00"
@@ -1038,6 +1051,9 @@ class App:
         self.panels = load_panels()
         self.devices = load_devices()   # Agent-Name -> {auto, modes:{modus:profil}}
         self.last_mode = ""             # zuletzt gesetzter Betriebsmodus (fuer Nachziehen beim Verbinden)
+        # Geraete, deren Ansicht unter Displays ausdruecklich gewaehlt wurde: der
+        # Betriebsmodus zieht sie beim Verbinden nicht um, bis er neu wechselt.
+        self.ansicht_gewaehlt: set[str] = set()
         self._struct_sig: str | None = None   # Signatur der Loxone-Struktur (erkennt Config-Aenderungen)
         self._pending_reload = False          # -> Panels beim naechsten Tick neu laden ({t:"reload"})
         self.global_states: dict = {}   # globale States der Anlage (Name -> UUID), s. _apply_structure
@@ -1134,6 +1150,9 @@ class App:
         self._pending_presence: list[dict] = []
         self._presence_quelle: tuple = (None, None)   # (devices, controls) hinter presence_map
         self.agents: dict[str, dict] = {}   # ip -> Panel-Agent (Fernstart)
+        # ip -> Profil, das ein Agent mit seiner naechsten Meldung uebernehmen
+        # soll (Displays, Betriebsmodus); faellt weg, sobald er es meldet
+        self.agent_wunsch: dict[str, str] = {}
         self.bg_tasks: set = set()          # laufende Hintergrund-Tasks (z.B. Favs anfordern)
         # Dynamisches Song-Cover (iTunes) fuer Zonen, die nur ein Sender-Logo
         # liefern (z.B. Sonn/Audioserver): "artist\ntitle" -> (url|None, expiry).
@@ -2326,6 +2345,18 @@ class App:
         return any(a.get("name") == name and (now - a.get("ts", 0)) < 600
                    for a in self.agents.values())
 
+    def _agenten_der_visu(self, dev: str, ip: str) -> list[dict]:
+        """Agenten mit AGENT_KANN_PANEL hinter einer Visu, die als Geraet `dev`
+        von `ip` verbindet. Vorrang hat der Agent mit dieser IP, auch wenn
+        seine letzte Meldung aelter ist: Sein Chromium verbindet gerade, das
+        Panel lebt (etwa gleich nach dem Booten). Meldet er eine andere Adresse
+        (NAT), gelten alle mit dem Namen, die online sind, wie in switch_mode."""
+        now = time.time()
+        gleich = [a for a in self.agents.values() if a["name"] == dev]
+        gleich = ([a for a in gleich if a["ip"] == ip]
+                  or [a for a in gleich if now - a["ts"] < AGENT_ONLINE])
+        return [a for a in gleich if AGENT_KANN_PANEL in a.get("features", ())]
+
     def effective_scale(self, prof: dict | None, dev: str) -> str | float:
         """Wirksame Skalierung eines Panels: die des Geraets, falls dort eine
         gesetzt ist, sonst die des Profils (resolve_profile() hat dort schon
@@ -2358,7 +2389,7 @@ class App:
                 continue
             e = entry(a["name"])
             e["agent"] = {"ip": a["ip"], "port": a["port"], "kiosk": a["kiosk"],
-                          "panel": a["panel"], "online": (now - a["ts"]) < 60}
+                          "panel": a["panel"], "online": (now - a["ts"]) < AGENT_ONLINE}
             e["ip"] = a["ip"]
             e["lastSeen"] = max(e["lastSeen"], a["ts"])
             e["online"] = e["online"] or e["agent"]["online"]
@@ -2504,12 +2535,19 @@ class App:
         return res
 
     async def _agent_start(self, agent: dict, profile: str) -> bool:
-        """Startet den Kiosk eines Panel-Agenten mit einem Profil (Fernbefehl)."""
+        """Startet den Kiosk eines Panel-Agenten mit einem Profil (Fernbefehl).
+        Das Profil ersetzt eine offene Wahl. Ein Agent mit AGENT_KANN_PANEL
+        behaelt es als Wahl, bis er es meldet: Scheitert der Befehl (Zeitlimit,
+        Port gesperrt), uebernimmt er es so mit seiner naechsten Meldung."""
+        if AGENT_KANN_PANEL in agent.get("features", ()):
+            self.agent_wunsch[agent["ip"]] = profile
+        else:
+            self.agent_wunsch.pop(agent["ip"], None)
         url = f"http://{agent['ip']}:{agent['port']}/start"
         try:
             async with aiohttp.ClientSession() as s:
                 async with s.post(url, json={"panel": profile},
-                                  timeout=aiohttp.ClientTimeout(total=8)) as r:
+                                  timeout=aiohttp.ClientTimeout(total=AGENT_BEFEHL_TIMEOUT)) as r:
                     return r.status == 200
         except Exception as err:
             log.warning("Agent %s Start(%s) fehlgeschlagen: %s",
@@ -2523,15 +2561,22 @@ class App:
         1. geraeteunabhaengig: offene Browser-Verbindung mit `?device=<name>`
            bekommt per WS ein `{t:'switch'}` -> laedt sich mit neuem Profil neu
            (funktioniert auf jedem Browser/Kiosk, kein Agent noetig);
-        2. Fallback: Linux-Panel-Agent per Fernstart (`?device=` nicht gesetzt).
+        2. Fallback: Linux-Panel-Agent per Fernstart (`?device=` nicht gesetzt),
+           nur wenn er online ist; einen anderen zieht ws_handler beim
+           Verbinden seines Chromium nach.
+        Ein Agent, der das kann (AGENT_KANN_PANEL), uebernimmt das Profil im
+        ersten Fall mit seiner naechsten Meldung (Abschaltzeit, Neustart-
+        intervall, naechster Kiosk-Start). Ausdrueckliche Wahlen unter
+        Displays gelten ab hier nicht mehr.
         """
         mode = (mode or "").strip()
         results: list = []
         if not mode:
             return results
         self.last_mode = mode   # merken -> frisch verbundene Geraete ziehen darauf nach
+        self.ansicht_gewaehlt.clear()
         now = time.time()
-        by_name = {a["name"]: a for a in self.agents.values() if (now - a["ts"]) < 600}
+        by_name = {a["name"]: a for a in self.agents.values() if (now - a["ts"]) < AGENT_ONLINE}
         for name, cfg in self.devices.items():
             if not cfg.get("auto", True):
                 continue
@@ -2547,6 +2592,10 @@ class App:
                         continue
                     if await self._send_or_drop(ws, {"t": "switch", "panel": profile}):
                         sent += 1
+                for a in self.agents.values():
+                    if (a["name"] == name and AGENT_KANN_PANEL in a.get("features", ())
+                            and (now - a["ts"]) < AGENT_ONLINE):
+                        self.agent_wunsch[a["ip"]] = profile
                 results.append({"panel": name, "profile": profile,
                                 "ok": sent > 0, "via": "ws"})
                 continue
@@ -7441,26 +7490,38 @@ async def api_settings_calendar(request: web.Request) -> web.Response:
 
 # ---- Panel-Agenten (Fernstart der Displays) ----
 async def api_agent_announce(request: web.Request) -> web.Response:
-    """Panel-Agent meldet sich periodisch (Auto-Discovery)."""
+    """Panel-Agent meldet sich periodisch (Auto-Discovery). Steht fuer ihn eine
+    Ansicht an (agent_wunsch) und kann er sie uebernehmen, nennt die Antwort
+    sie als `panel`, und die Geraeteeinstellungen gelten schon fuer sie."""
     app: App = request.app["app"]
     try:
         d = await request.json()
     except (ValueError, aiohttp.ContentTypeError):
         d = {}
     ip = str(d.get("ip") or "").strip() or request.remote or "?"
+    feats = d.get("features")
+    feats = [f for f in feats if isinstance(f, str)][:8] if isinstance(feats, list) else []
+    panel = str(d.get("panel") or "")
     app.agents[ip] = {"ip": ip, "name": str(d.get("name") or ip)[:60],
-                      "panel": str(d.get("panel") or ""), "port": int(d.get("port") or 8130),
-                      "kiosk": bool(d.get("kiosk")), "ts": time.time()}
+                      "panel": panel, "port": int(d.get("port") or 8130),
+                      "kiosk": bool(d.get("kiosk")), "ts": time.time(), "features": feats}
+    wunsch = app.agent_wunsch.get(ip)
+    if wunsch is not None and (wunsch == panel or AGENT_KANN_PANEL not in feats):
+        app.agent_wunsch.pop(ip, None)   # gemeldet, also uebernommen
+        wunsch = None
+    pid = panel if wunsch is None else wunsch
     # Panel-spezifische Geraeteeinstellungen an den Agenten zurueckgeben
     # (der wendet sie am Geraet an, z.B. Display-Abschaltung per xset).
-    return web.json_response({"ok": True, "dpmsOff": app.panel_dpms(d.get("panel")),
-                              "reloadHours": app.panel_reload(d.get("panel"))})
+    out = {"ok": True, "dpmsOff": app.panel_dpms(pid), "reloadHours": app.panel_reload(pid)}
+    if wunsch is not None:
+        out["panel"] = wunsch
+    return web.json_response(out)
 
 
 async def api_agents(request: web.Request) -> web.Response:
     app: App = request.app["app"]
     now = time.time()
-    out = [{**a, "online": (now - a["ts"]) < 60}
+    out = [{**a, "online": (now - a["ts"]) < AGENT_ONLINE}
            for a in app.agents.values() if (now - a["ts"]) < 600]
     out.sort(key=lambda a: a["name"])
     return web.json_response({"agents": out})
@@ -7480,13 +7541,29 @@ async def api_agent_command(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "Panel nicht bekannt"}, status=404)
     if action not in ("start", "reload", "stop"):
         return web.json_response({"ok": False, "error": "unbekannte Aktion"}, status=400)
-    url = f"http://{a['ip']}:{a['port']}/{action}"
     payload = {"panel": str(d.get("panel") or "")} if action == "start" else {}
+    # "Start" mit Ansicht ist eine ausdrueckliche Wahl wie "Ansicht wechseln"
+    # (bei gestopptem Kiosk der einzige Weg dazu)
+    wahl = action == "start"
+    if wahl:
+        app.agent_wunsch.pop(ip, None)   # neuer als eine noch offene Wahl
+    elif action == "reload" and ip in app.agent_wunsch:
+        # Wahl noch nicht gemeldet: mit ihr neu starten, sonst oeffnete der
+        # Agent die alte Ansicht und uebernaehme die neue erst danach. Sie
+        # bleibt stehen, bis er sie meldet: scheitert der Befehl, uebernimmt
+        # er sie mit der naechsten Meldung.
+        action, payload = "start", {"panel": app.agent_wunsch[ip]}
+    url = f"http://{a['ip']}:{a['port']}/{action}"
     try:
         async with aiohttp.ClientSession() as s:
-            async with s.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=8)) as r:
+            async with s.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=AGENT_BEFEHL_TIMEOUT)) as r:
                 body = await r.text()
                 log.info("Agent %s %s -> %s", ip, action, r.status)
+                if wahl and r.status == 200:
+                    # hebt den Betriebsmodus fuer das Geraet auf: sonst zoege
+                    # ws_handler die Visu auf dessen Profil, der Agent bliebe
+                    # bei der Wahl
+                    app.ansicht_gewaehlt.add(a["name"])
                 return web.json_response({"ok": r.status == 200, "status": r.status,
                                           "body": body[:200]})
     except Exception as err:
@@ -7553,8 +7630,19 @@ async def api_devices_get(request: web.Request) -> web.Response:
 
 
 async def api_device_switch(request: web.Request) -> web.Response:
-    """Ansicht eines Geraets wechseln: {device, panel}. Zuerst per WebSocket-
-    Push (Browser laedt sich mit neuem Profil neu), sonst ueber den Agenten."""
+    """Ansicht eines Geraets wechseln: {device, panel, ip}. Die offene Visu
+    wechselt per WebSocket-Push (Browser laedt sich mit neuem Profil neu).
+    Hat das Geraet einen Agenten, der online ist, erfaehrt er die Wahl, damit
+    sie Kiosk-Neustarts uebersteht und Abschaltzeit und Neustartintervall des
+    neuen Profils gelten. Zugeordnet ueber `ip` aus der Geraeteliste, nicht
+    ueber den Namen: geklonte Panels melden denselben Hostnamen. Ein Agent mit
+    AGENT_KANN_PANEL uebernimmt sie mit seiner naechsten Meldung ohne
+    Chromium-Neustart (`agent: "announce"`, auch bei gestopptem Kiosk: der
+    startet dann damit). Einen aelteren Agenten, und jeden, dessen Kiosk ohne
+    offene Visu laeuft, startet /start mit dem neuen Profil neu (`agent:
+    "start"`; scheitert das bei einem Agenten mit AGENT_KANN_PANEL, uebernimmt
+    er sie mit der naechsten Meldung: "announce"; "" = der Agent hat die Wahl
+    nicht). Die Wahl hebt den Betriebsmodus fuer das Geraet auf."""
     app: App = request.app["app"]
     try:
         d = await request.json()
@@ -7567,14 +7655,22 @@ async def api_device_switch(request: web.Request) -> web.Response:
     if panel and panel not in app.panels:
         return web.json_response({"ok": False, "error": "unbekanntes Profil"}, status=400)
     n = await _push(app, {"t": "switch", "panel": panel}, "", device)
+    a = app.agents.get(str(d.get("ip") or "").strip())
+    weg, ok = "", False
+    if a and a["name"] == device and time.time() - a["ts"] < AGENT_ONLINE:
+        if AGENT_KANN_PANEL in a.get("features", ()) and (n or not a["kiosk"]):
+            app.agent_wunsch[a["ip"]] = panel
+            weg, ok = "announce", True
+        elif a["kiosk"]:
+            weg, ok = "start", await app._agent_start(a, panel)
+            if not ok and AGENT_KANN_PANEL in a.get("features", ()):
+                weg, ok = "announce", True   # Wahl liegt in agent_wunsch (_agent_start)
+    if n or ok:
+        app.ansicht_gewaehlt.add(device)
     if n:
-        return web.json_response({"ok": True, "sent": n, "via": "ws"})
-    now = time.time()
-    agent = next((a for a in app.agents.values()
-                  if a.get("name") == device and (now - a["ts"]) < 600), None)
-    if agent:
-        ok = await app._agent_start(agent, panel)
-        return web.json_response({"ok": ok, "sent": 1 if ok else 0, "via": "agent"})
+        return web.json_response({"ok": True, "sent": n, "via": "ws", "agent": weg if ok else ""})
+    if ok:
+        return web.json_response({"ok": True, "sent": 1, "via": "agent", "agent": weg})
     return web.json_response({"ok": False, "sent": 0, "error": "Panel nicht online"})
 
 
@@ -7832,15 +7928,26 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     await ws.prepare(request)
     dev = (request.query.get("device", "") or "").strip()[:60]
     pid = request.query.get("panel", "")
+    agenten = app._agenten_der_visu(dev, request.remote or "") if dev else []
+    # Wahl, die der Agent noch nicht gemeldet hat: Chromium startete vorher neu
+    # (Absturz, Auto-Reload, Neustart des Agenten) und fragt nach der alten
+    # Ansicht. Die Visu zeigt schon die, die der Agent gleich uebernimmt.
+    offen = next((app.agent_wunsch[a["ip"]] for a in agenten if a["ip"] in app.agent_wunsch), None)
+    if offen is not None:
+        pid = offen
     # Frisch verbundenes Geraet direkt auf den aktuell laufenden Betriebsmodus
     # setzen (statt der Start-Ansicht aus ?panel=), falls dafuer eine Zuordnung
     # existiert -> ohne Reload-Flackern gleich die richtige Visu.
-    if dev and app.last_mode:
+    if dev and app.last_mode and dev not in app.ansicht_gewaehlt:
         cfg = app.devices.get(dev)
         if cfg and cfg.get("auto", True):
             mapped = (cfg.get("modes") or {}).get(app.last_mode)
             if mapped:
                 pid = mapped
+                # auch dem Agenten, sonst meldete er weiter ?panel= (dessen
+                # Abschaltzeit und Neustartintervall, naechster Kiosk-Start)
+                for a in agenten:
+                    app.agent_wunsch[a["ip"]] = mapped
     prof = app.resolve_profile(pid)
     app.conn_prof[ws] = prof
     app.conn_dev[ws] = dev

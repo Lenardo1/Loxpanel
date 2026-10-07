@@ -42,3 +42,17 @@ AGENT_PORT=8130
 # des Panels). 0 = aus (Default). Besser ueber die Settings-Seite pro Panel
 # setzen (ueberschreibt diesen Wert). Beispiel: alle 12 Stunden neu starten.
 # RELOAD_HOURS=12
+# KIOSK_RESTART_SECS = Pause in Sekunden, bevor der Agent ein unerwartet
+# beendetes Chromium (Absturz, Alt+F4 - alles ausser "Stop" aus Displays) mit
+# derselben Ansicht neu startet. 0 = kein Neustart. Default 5 (wie RestartSec=5
+# der systemd-Dienste).
+# KIOSK_RESTART_SECS=5
+# KIOSK_RESTART_MAX_SECS = stuerzt Chromium immer wieder ab, verdoppelt sich die
+# Pause bis zu diesem Wert. Default 300 (5 min). Ueber DPMS_OFF lassen: jeder
+# Kiosk-Start haelt das Display wach.
+# KIOSK_RESTART_MAX_SECS=300
+# STATE_FILE = wo der Agent die unter Displays gewaehlte Ansicht merkt (ueberlebt
+# einen Neustart). Default $XDG_STATE_HOME/loxpanel/agent-state.json, ohne
+# XDG_STATE_HOME ~/.local/state/loxpanel/agent-state.json des Benutzers, unter
+# dem der Agent laeuft. Aendert sich PANEL oben, gilt wieder PANEL.
+# STATE_FILE=/home/kiosk/.local/state/loxpanel/agent-state.json

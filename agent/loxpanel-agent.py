@@ -14,11 +14,13 @@ Start am Panel aus dem X-Autostart:  python3 loxpanel-agent.py &
 (ersetzt den direkten kiosk.sh-Aufruf — der Agent startet den Kiosk selbst).
 """
 import json
+import math
 import os
 import shutil
 import signal
 import socket
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -105,39 +107,123 @@ PAUSE_ON_BLANK = _cfg("PAUSE_ON_BLANK", "0").lower() not in ("0", "false", "no",
 # Announce-Antwort (reloadHours) ueberschreiben (Settings-Seite). Nur waehrend
 # der Kiosk laeuft; ein bewusst gestoppter Kiosk wird NICHT neu gestartet.
 RELOAD_HOURS = _cfg("RELOAD_HOURS", "0").strip()
+
+
+def _sekunden(key, standard):
+    """Sekundenwert aus Env/Conf; leer, ungueltig, negativ oder nicht endlich
+    (inf, nan: time.sleep im Waechter braeche ab) -> Standard."""
+    try:
+        v = float(_cfg(key, str(standard)))
+    except ValueError:
+        return standard
+    return v if math.isfinite(v) and v >= 0 else standard
+
+
+# KIOSK_RESTART_SECS = Pause, bevor der Agent ein unerwartet beendetes Chromium
+# neu startet (Absturz, OOM-Kill, Alt+F4 - jedes Ende ausser /stop). 0 = aus.
+# Standard 5 s wie RestartSec=5 der Dienstdateien (agent/loxpanel-agent.service):
+# das Panel bleibt kaum dunkel, ein Absturz flutet die CPU nicht mit Neustarts.
+KIOSK_RESTART_SECS = _sekunden("KIOSK_RESTART_SECS", 5)
+# KIOSK_RESTART_MAX_SECS = Obergrenze, bis zu der sich die Pause verdoppelt,
+# wenn Chromium immer wieder abstuerzt (kaputtes Profil, Speicher voll). Standard
+# 300 s wie Kubernetes bei CrashLoopBackOff: Das Panel erholt sich spaetestens
+# 5 min, nachdem die Ursache weg ist. Muss ueber DPMS_OFF liegen: jeder
+# Kiosk-Start setzt per xset den Leerlaufzaehler zurueck, eine Schleife mit
+# kuerzeren Abstaenden hielte das Display dauerhaft an.
+KIOSK_RESTART_MAX_SECS = max(KIOSK_RESTART_SECS, _sekunden("KIOSK_RESTART_MAX_SECS", 300))
+
+
+def _state_standard():
+    """Ablage nach XDG Base Directory: $XDG_STATE_HOME, wenn gesetzt und absolut,
+    sonst ~/.local/state. Gehoert dem Benutzer, unter dem der Agent laeuft
+    (Login-Benutzer aus ~/.xsession); /etc/loxpanel legt der Installer als
+    root an, dort scheiterte das Speichern."""
+    basis = os.environ.get("XDG_STATE_HOME", "")
+    if not os.path.isabs(basis):
+        basis = os.path.join(os.path.expanduser("~"), ".local", "state")
+    return os.path.join(basis, "loxpanel", "agent-state.json")
+
+
 # STATE_FILE = persistente Merkdatei fuer die zuletzt (per Settings-Seite/Agent)
 # gewaehlte Panel-ID. Liegt bewusst NICHT im fluechtigen PROFILE_DIR (/tmp),
-# sondern neben der kiosk.conf (bzw. beim Agent-Skript), damit die Wahl einen
-# Reboot ueberlebt. Ueber die conf per STATE_FILE=<pfad> ueberschreibbar.
-STATE_FILE = _cfg("STATE_FILE", "") or os.path.join(
-    os.path.dirname(CONF_FILE) if CONF_FILE else _HERE, "loxpanel-agent-state.json")
+# damit die Wahl einen Reboot ueberlebt. Ueber die conf per STATE_FILE=<pfad>
+# ueberschreibbar. Bis hierher lag sie neben der kiosk.conf (_STATE_ALT); eine
+# Datei von dort wird beim Start einmal uebernommen.
+STATE_FILE = _cfg("STATE_FILE", "") or _state_standard()
+_STATE_ALT = os.path.join(os.path.dirname(CONF_FILE) if CONF_FILE else _HERE,
+                          "loxpanel-agent-state.json")
+
+
+def _read_state(pfad):
+    """State-Datei lesen -> dict mit "panel" (str) oder None (fehlt/ungueltig)."""
+    try:
+        with open(pfad, encoding="utf-8") as fh:
+            d = json.load(fh)
+    except Exception:
+        return None
+    return d if isinstance(d, dict) and isinstance(d.get("panel"), str) else None
 
 
 def _load_panel_state():
-    """Zuletzt gewaehlte Panel-ID aus der State-Datei lesen (leer bei Fehler)."""
-    try:
-        with open(STATE_FILE, encoding="utf-8") as fh:
-            return (json.load(fh) or {}).get("panel", "") or ""
-    except Exception:
-        return ""
+    """Gemerkte Panel-ID: "" ist die Standardansicht, None heisst nichts gemerkt.
+    Die Datei haelt auch PANEL der kiosk.conf beim Merken ("conf"): Steht dort
+    inzwischen etwas anderes (Installer neu gelaufen, von Hand geaendert), gilt
+    die kiosk.conf und die alte Wahl wird verworfen."""
+    d = _read_state(STATE_FILE)
+    if d is None and not _cfg("STATE_FILE") and _STATE_ALT != STATE_FILE:
+        d = _read_state(_STATE_ALT)
+        if d is not None:
+            print("Panel-Wahl uebernommen: %s -> %s" % (_STATE_ALT, STATE_FILE))
+            if _save_panel_state(d["panel"]):
+                # Nur einmal: bliebe die alte Datei liegen, kaeme ihre Wahl
+                # zurueck, sobald jemand die neue loescht (Weg zurueck auf PANEL).
+                try:
+                    os.remove(_STATE_ALT)
+                except OSError as e:
+                    print("Alte Panel-Wahl nicht geloescht, bitte von Hand entfernen: %s" % e)
+    if d is None:
+        return None
+    conf = CFG.get("PANEL", "")
+    if d.get("conf", conf) != conf:
+        print("PANEL in der kiosk.conf geaendert (%r -> %r): gilt statt der gemerkten Wahl %r"
+              % (d["conf"], conf, d["panel"]))
+        _save_panel_state(conf)
+        return None
+    return d["panel"]
 
 
 def _save_panel_state(panel):
-    """Gewaehlte Panel-ID persistieren, damit sie einen Reboot ueberlebt."""
+    """Gewaehlte Panel-ID persistieren, damit sie einen Reboot ueberlebt
+    (atomar: tmp-Datei + rename). Schlaegt das fehl, laut melden. True = gespeichert."""
     try:
-        with open(STATE_FILE, "w", encoding="utf-8") as fh:
-            json.dump({"panel": panel}, fh)
+        if os.path.dirname(STATE_FILE):   # ohne Ordner: im Arbeitsordner
+            os.makedirs(os.path.dirname(STATE_FILE), exist_ok=True)
+        tmp = STATE_FILE + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"panel": panel, "conf": CFG.get("PANEL", "")}, fh)
+        os.replace(tmp, STATE_FILE)
+        return True
     except Exception as e:
-        print("Panel-Wahl speichern fehlgeschlagen:", e)
+        print("FEHLER: Panel-Wahl NICHT gespeichert, gilt nur bis zum Neustart des Agenten: %s"
+              " (Agent laeuft als uid %d; anderen Ort per STATE_FILE=<pfad> in %s setzen)"
+              % (e, os.getuid(), CONF_FILE or "der kiosk.conf"))
+        return False
 
 
 _proc = None
 # Panel-Auswahl mit Prioritaet: Env-Override > gemerkte Laufzeit-Wahl (State-
-# Datei) > kiosk.conf > leer (=Default-Visu). Die gemerkte Wahl entsteht, sobald
-# das Panel per Settings-Seite/Agent auf ein Profil (z.B. "pool") gestellt wird,
-# und ueberlebt so Reboots — statt wieder auf die Default-Visu zurueckzufallen.
-_cur_panel = os.environ.get("LOXPANEL_PANEL") or _load_panel_state() or CFG.get("PANEL", "")
-_lock = threading.Lock()
+# Datei, auch "" = Standardansicht) > kiosk.conf > leer (=Default-Visu). Die
+# gemerkte Wahl entsteht, sobald das Panel per Settings-Seite/Agent auf ein
+# Profil (z.B. "pool") gestellt wird, und ueberlebt so Reboots.
+_gemerkt = _load_panel_state()
+if os.environ.get("LOXPANEL_PANEL"):
+    _cur_panel, _PANEL_QUELLE = os.environ["LOXPANEL_PANEL"], "LOXPANEL_PANEL"
+elif _gemerkt is not None:
+    _cur_panel, _PANEL_QUELLE = _gemerkt, STATE_FILE
+else:
+    _cur_panel, _PANEL_QUELLE = CFG.get("PANEL", ""), CONF_FILE or "Standard"
+# RLock: start_kiosk haelt sie ganz und ruft darin stop_kiosk, das sie auch nimmt.
+_lock = threading.RLock()
 
 
 def local_ip():
@@ -160,7 +246,7 @@ MY_IP = local_ip()
 def kiosk_url(panel):
     q = []
     if panel:
-        q.append("panel=%s" % panel)
+        q.append("panel=%s" % quote(panel))
     if NUDGE_X:
         q.append("x=%s" % NUDGE_X)
     # Geraetekennung mitgeben: so ordnet der Server die WebSocket-Verbindung
@@ -453,14 +539,29 @@ def stop_kiosk():
                 _proc.wait(timeout=5)
             except Exception:
                 _proc.kill()
-        _proc = None
+        _proc = None   # ab hier gilt das Ende des alten Prozesses nicht als Absturz
 
 
 def start_kiosk(panel=None):
-    global _proc, _cur_panel, _last_reload, _kiosk_paused
-    if panel is not None and panel != _cur_panel:
-        _cur_panel = panel
-        _save_panel_state(panel)   # Wahl merken -> ueberlebt Reboot
+    # Ganz unter der Sperre: Absturz-Waechter, Auto-Reload und HTTP-/start
+    # duerfen nicht gleichzeitig zwei Chromium starten.
+    with _lock:
+        return _start_kiosk(panel)
+
+
+def _panel_merken(panel):
+    """Ansicht fuer alle kuenftigen Kiosk-Starts setzen und speichern."""
+    global _cur_panel
+    with _lock:
+        if panel != _cur_panel:
+            _cur_panel = panel
+            _save_panel_state(panel)   # Wahl merken -> ueberlebt Reboot
+
+
+def _start_kiosk(panel):
+    global _proc, _last_reload, _kiosk_paused
+    if panel is not None:
+        _panel_merken(panel)
     stop_kiosk()
     chrome = shutil.which("chromium") or shutil.which("chromium-browser")
     if not chrome:
@@ -480,6 +581,8 @@ def start_kiosk(panel=None):
            kiosk_url(_cur_panel)]
     with _lock:
         _proc = subprocess.Popen(cmd, env=env)
+        if KIOSK_RESTART_SECS > 0:
+            threading.Thread(target=_kiosk_waechter, args=(_proc, time.monotonic()), daemon=True).start()
     _kiosk_paused = False        # frisch gestarteter Kiosk laeuft (nicht eingefroren)
     _last_reload = time.time()   # Auto-Reload-Timer bei jedem Start zuruecksetzen
     # force: Chromium-(Neu)Start setzt DPMS auf den X-Default (600) zurueck —
@@ -493,17 +596,80 @@ def running():
     return _proc is not None and _proc.poll() is None
 
 
+_absturz_pause = 0.0   # zuletzt gewartete Pause nach einem Absturz (0 = keine Schleife)
+
+
+def _pause_nach_absturz(laufzeit):
+    """Pause bis zum Neustart nach einem Absturz nach `laufzeit` Sekunden Lauf.
+    Stuerzt Chromium wieder ab, bevor es stabil lief, verdoppelt sie sich bis
+    KIOSK_RESTART_MAX_SECS, sonst gilt wieder KIOSK_RESTART_SECS. Stabil heisst:
+    laenger gelaufen als die doppelte Obergrenze. In einer Schleife liegen
+    zwischen zwei Abstuerzen hoechstens Pause plus kurzer Lauf; wer doppelt so
+    lange durchhaelt wie die laengste Pause, ist aus ihr heraus (dieselbe Regel
+    wie Kubernetes: Obergrenze 5 min, zurueckgesetzt nach 10 min Lauf)."""
+    global _absturz_pause
+    if _absturz_pause and laufzeit < 2 * KIOSK_RESTART_MAX_SECS:
+        _absturz_pause = min(_absturz_pause * 2, KIOSK_RESTART_MAX_SECS)
+    else:
+        _absturz_pause = KIOSK_RESTART_SECS
+    return _absturz_pause
+
+
+def _absturz_vergessen():
+    """Befehl von Hand (/start, /reload, /stop): Eine fruehere Absturzschleife
+    zaehlt nicht mehr, der naechste Absturz wartet wieder KIOSK_RESTART_SECS
+    statt bis zu KIOSK_RESTART_MAX_SECS. Ebenso der Auto-Reload: Der Kiosk lief
+    bis dahin RELOAD_HOURS ohne Absturz. Nur der Waechter laesst sie stehen."""
+    global _absturz_pause
+    with _lock:
+        _absturz_pause = 0.0
+
+
+def _kiosk_waechter(p, gestartet):
+    """Absturz-Waechter fuer genau einen Chromium-Prozess `p` (eigener Thread je
+    Start). Endet p, ohne dass stop_kiosk() es beendet hat (dann waere _proc
+    nicht mehr p), startet er den Kiosk nach der Pause mit derselben Ansicht
+    neu. Gebunden an p: Hat in der Pause jemand neu gestartet oder gestoppt,
+    bleibt es dabei. Die Pause laeuft ohne Sperre, /start und /stop warten
+    nicht auf sie. Braucht keinen Server (anders als der Auto-Reload)."""
+    code = p.wait()
+    with _lock:
+        if _proc is not p:
+            return
+        # monotonic: Panels ohne RTC stellen die Uhr beim Booten per NTP
+        laufzeit = time.monotonic() - gestartet
+        pause = _pause_nach_absturz(laufzeit)
+    print("Kiosk unerwartet beendet (Code %s nach %ds), Neustart in %gs" % (code, laufzeit, pause))
+    time.sleep(pause)
+    with _lock:
+        if _proc is p:
+            try:
+                start_kiosk()
+            except Exception as e:
+                print("Kiosk-Neustart fehlgeschlagen:", e)
+
+
 def announce_loop():
     url = "http://%s/api/agent/announce" % SERVER
     while True:
         try:
+            # features: "panel" = kann eine Ansicht aus der Antwort uebernehmen
             data = json.dumps({"name": NAME, "panel": _cur_panel, "ip": MY_IP,
-                               "port": PORT, "kiosk": running()}).encode()
+                               "port": PORT, "kiosk": running(), "features": ["panel"]}).encode()
             req = urlreq.Request(url, data=data, headers={"Content-Type": "application/json"})
             resp = urlreq.urlopen(req, timeout=6).read()
             # Server kann Geraeteeinstellungen zurueckgeben (z.B. Display-Abschaltung)
             try:
                 r = json.loads(resp or b"{}")
+                # Ansicht, die der Server fuer dieses Panel vorsieht (Displays
+                # "Ansicht wechseln", Betriebsmodus): Die Visu hat schon per
+                # WebSocket gewechselt, also ohne Chromium-Neustart uebernehmen.
+                # Gilt fuer jeden weiteren Kiosk-Start und ab der naechsten
+                # Meldung; dpmsOff/reloadHours dieser Antwort gehoeren schon dazu.
+                neu = r.get("panel")
+                if isinstance(neu, str) and neu != _cur_panel:
+                    _panel_merken(neu)
+                    print("Ansicht vom Server uebernommen:", neu or "(default)")
                 if running():
                     # DPMS nur korrigieren, wenn der aktuelle X-Wert abweicht
                     # (z.B. weil Chromium den Timer beim Start auf den X-Default
@@ -520,7 +686,9 @@ def announce_loop():
                         apply_dpms(want, force=True)
                 # Periodischer Kiosk-Neustart gegen Einfrieren. reloadHours vom
                 # Server (Settings) oder kiosk.conf-Default. 0 = aus. Nur wenn der
-                # Kiosk laeuft (bewusst gestoppten NICHT wieder starten).
+                # Kiosk laeuft (bewusst gestoppten NICHT wieder starten; einen
+                # abgestuerzten startet _kiosk_waechter). Bewusst nur mit Antwort
+                # des Servers: ohne ihn zeigte der neue Kiosk nur eine Fehlerseite.
                 rh = r.get("reloadHours")
                 try:
                     hours = _reload_default() if rh is None else float(rh)
@@ -528,6 +696,7 @@ def announce_loop():
                     hours = _reload_default()
                 if hours > 0 and running() and (time.time() - _last_reload) >= hours * 3600:
                     print("Auto-Reload nach %gh (gegen Einfrieren)" % hours)
+                    _absturz_vergessen()
                     start_kiosk()
             except Exception:
                 pass
@@ -562,8 +731,10 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             body = {}
         p = self.path.rstrip("/") or "/"
+        if p in ("/start", "/reload", "/stop"):
+            _absturz_vergessen()
         if p == "/start":
-            ok = start_kiosk(body.get("panel") if body.get("panel") is not None else _cur_panel)
+            ok = start_kiosk(body.get("panel") if isinstance(body.get("panel"), str) else _cur_panel)
             self._send(200 if ok else 500, {"ok": ok})
         elif p == "/reload":
             ok = start_kiosk()
@@ -576,6 +747,12 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def main():
+    # Zeilenweise ausgeben: ~/.xsession-errors bekommt Meldungen (Absturz,
+    # Speicherfehler) sofort und nicht erst blockweise.
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except Exception:
+        pass
     if _BL_PATHS or PAUSE_ON_BLANK:
         threading.Thread(target=backlight_loop, daemon=True).start()
     if _BL_PATHS:
@@ -588,8 +765,8 @@ def main():
         start_kiosk(_cur_panel)
     threading.Thread(target=announce_loop, daemon=True).start()
     srv = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    print("LoxPanel-Agent auf :%d, Server=%s, Panel=%s, Autostart=%s"
-          % (PORT, SERVER, _cur_panel or "(default)", "an" if AUTOSTART else "aus"))
+    print("LoxPanel-Agent auf :%d, Server=%s, Panel=%s (aus %s), Autostart=%s"
+          % (PORT, SERVER, _cur_panel or "(default)", _PANEL_QUELLE, "an" if AUTOSTART else "aus"))
     srv.serve_forever()
 
 

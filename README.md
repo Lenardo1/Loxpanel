@@ -225,6 +225,15 @@ Chromium-Kiosk – kann ein Container auf dem LoxBerry aber nicht steuern. Genau
   falls der Browser mal hängt.
 - **Robuster Neustart:** bereinigt nach einem Stromausfall den „Wiederherstellen?"-
   Dialog von Chromium, damit der Kiosk ohne Eingriff wieder hochkommt.
+- **Neustart nach Absturz:** Endet Chromium, ohne dass es jemand über **Stop**
+  beendet hat, startet der Agent es nach einer kurzen Pause mit derselben Ansicht
+  neu. Stürzt es immer wieder ab, wartet er jedes Mal doppelt so lange.
+- **Ansicht merken:** Die unter **Displays** gewählte Ansicht und die eines
+  Betriebsmodus merkt sich der Agent, bei „Ansicht wechseln“ und beim
+  Betriebsmodus ohne Neustart des Browsers. Sie übersteht einen Neustart des
+  Panels. Sie liegt beim Login-Benutzer in
+  `~/.local/state/loxpanel/agent-state.json`; Datei löschen oder `PANEL` in der
+  kiosk.conf ändern, dann gilt wieder `PANEL`.
 
 **Installation (per SSH auf dem Panel):** ein Skript richtet Agent + Autostart ein:
 
@@ -242,6 +251,9 @@ Einstellungen danach in `/etc/loxpanel/kiosk.conf` – u. a.:
 | `BL_ON` | Helligkeit im Ein-Zustand (0…max; leer = voll) |
 | `PAUSE_ON_BLANK` | Chromium bei dunklem Display einfrieren (Standard 0 = aus; 1 spart CPU/Wärme, verzögert aber das Reagieren nach dem Aufwachen um ~30 s) |
 | `AUTOSTART` | Kiosk beim Booten starten (1) oder nur auf Fernstart warten (0) |
+| `KIOSK_RESTART_SECS` | Pause vor dem Neustart nach einem Chromium-Absturz (Standard 5 s, 0 = kein Neustart) |
+| `KIOSK_RESTART_MAX_SECS` | Obergrenze, bis zu der sich die Pause bei wiederholten Abstürzen verdoppelt (Standard 300 s; über `DPMS_OFF` lassen, sonst bleibt das Display an) |
+| `STATE_FILE` | Ablage der gewählten Ansicht (Standard `$XDG_STATE_HOME/loxpanel/agent-state.json`, sonst `~/.local/state/…`) |
 
 Details: [`deploy/DEPLOY.md`](deploy/DEPLOY.md).
 
