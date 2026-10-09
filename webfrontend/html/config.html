@@ -1627,6 +1627,9 @@ function firstCamera(){
   const z=(META.controls||[]).find(c=>c.type==='Intercom');
   return z?z.uuid:'';
 }
+function cameraAddOptions(){   // Dropdown zum Hinzufuegen weiterer Kameras (Blaettern)
+  return '<option value="">'+T('＋ hinzufügen …')+'</option>'+cameraOptions('');
+}
 
 // ---- Skalierung (Profil und Geraet) ----
 // Welche Werte zulaessig sind, entscheidet allein der Server (/api/meta
@@ -1684,9 +1687,13 @@ function renderPanes(p){
     const label=meta?meta.label:tk;
     const v=panes[tk]||'';
     const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0, isV=v.indexOf('chart:')===0, isS=v.indexOf('status:')===0;
-    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':v)))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'', camu=isC?v.slice(7):'';
+    const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':v)))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'';
+    const cuu=isC?v.slice(7).split(',').filter(Boolean):[];   // Kamera: eine oder mehrere (Blaettern)
     const suu=isS?v.slice(7).split(',').filter(Boolean):[];
-    const vuu=isV?v.slice(6).split(',').filter(Boolean):[];   // Verlauf: ein oder mehrere Bausteine, gestapelt
+    // Verlauf: ein oder mehrere Bausteine. Modus 'page:'/'stack:' optional vorangestellt.
+    let vArg=isV?v.slice(6):''; let vMode='stack';
+    const vm=vArg.match(/^(page|stack):([\s\S]*)$/); if(vm){ vMode=vm[1]; vArg=vm[2]; }
+    const vuu=vArg.split(',').filter(Boolean);
     let row='<div class="ccrow"><span class="ccnm">'+esc(label)+'</span>'+
       '<select data-pane="'+esc(tk)+'">'+
         '<option value=""'+(kind===''?' selected':'')+'>'+T('Kein Widget (Screen füllen)')+'</option>'+
@@ -1702,8 +1709,16 @@ function renderPanes(p){
       '</select>';
     if(isP) row+='<select data-panez="'+esc(tk)+'">'+audioZoneOptions(zone)+'</select>';
     if(isE) row+='<select data-panee="'+esc(tk)+'">'+energyControlOptions(euid)+'</select>';
-    if(isC) row+='<select data-panec="'+esc(tk)+'">'+cameraOptions(camu)+'</select>';
     row+='</div>';
+    if(isC){   // Kamera = eine oder mehrere (mehrere -> blaetterbare Seiten mit Punkten)
+      row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Kameras')+'</span>'+
+        '<select class="pcam-add" data-pk="'+esc(tk)+'">'+cameraAddOptions()+'</select></div>'+
+        '<div class="picked" style="margin:6px 0 2px">'+(cuu.length
+          ? cuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+              return '<span class="chip on" data-pk="'+esc(tk)+'" data-camu="'+esc(u)+'">'+esc(c?c.name:u)+
+                '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+    }
     if(isS){   // Werte = mehrere Bausteine, wie auf der Uhr-Seite
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
         '<select class="pstat-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -1714,7 +1729,7 @@ function renderPanes(p){
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
           : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
     }
-    if(isV){   // Verlauf = ein oder mehrere Bausteine, gestapelt (wie Werte)
+    if(isV){   // Verlauf = ein oder mehrere Bausteine; Darstellung stapeln ODER blaettern
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
         '<select class="pchart-add" data-pk="'+esc(tk)+'">'+chartAddOptions()+'</select>'+
         ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
@@ -1722,7 +1737,14 @@ function renderPanes(p){
           ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
               return '<span class="chip on" data-pk="'+esc(tk)+'" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
-          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>'+
+        (vuu.length>=2
+          ? '<div class="ccrow" style="margin:4px 0 0 0"><span class="ccnm">'+T('Darstellung')+'</span>'+
+            '<select class="pchart-mode" data-pk="'+esc(tk)+'">'+
+              '<option value="stack"'+(vMode==='stack'?' selected':'')+'>'+T('Gestapelt (scrollen)')+'</option>'+
+              '<option value="page"'+(vMode==='page'?' selected':'')+'>'+T('Blättern (Punkte)')+'</option>'+
+            '</select></div>'
+          : '');
     }
     return row;
   }).join('') || '<div class="ccmut">Keine Tabs.</div>';
@@ -1751,21 +1773,32 @@ function renderPanes(p){
   box.querySelectorAll('.chip[data-su][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
     const rest=paneStatUu(tk).filter(x=>x!==n.dataset.su);
     setPane(tk, rest.length?('status:'+rest.join(',')):'status:'); renderPanes(p); });
-  const paneChartUu=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('chart:')===0?cur.slice(6).split(',').filter(Boolean):[]; };
+  // Verlauf-Wert zerlegen: Modus ('stack'|'page') + Bausteine. 'chart:a,b' =
+  // stack (Vorgabe), 'chart:page:a,b' = blaettern. Schreiben: Modus nur bei page.
+  const paneChartRaw=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('chart:')===0?cur.slice(6):''; };
+  const paneChartParse=tk=>{ let a=paneChartRaw(tk), m='stack'; const mm=a.match(/^(page|stack):([\s\S]*)$/); if(mm){ m=mm[1]; a=mm[2]; } return {mode:m, uu:a.split(',').filter(Boolean)}; };
+  const chartVal=(uu,mode)=> 'chart:'+(mode==='page'?'page:':'')+uu.join(',');
   box.querySelectorAll('.pchart-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
-    const uu=paneChartUu(tk); if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
-    setPane(tk,'chart:'+uu.concat([u]).join(',')); renderPanes(p); });
-  box.querySelectorAll('.chip[data-cu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
-    const rest=paneChartUu(tk).filter(x=>x!==n.dataset.cu);
-    setPane(tk, rest.length?('chart:'+rest.join(',')):'chart:'); renderPanes(p); });
+    const cp=paneChartParse(tk); if(!u||cp.uu.indexOf(u)>-1||(svMax()&&cp.uu.length>=svMax())) return;
+    setPane(tk, chartVal(cp.uu.concat([u]), cp.mode)); renderPanes(p); });
+  box.querySelectorAll('.chip[data-cu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk, cp=paneChartParse(tk);
+    const rest=cp.uu.filter(x=>x!==n.dataset.cu);
+    setPane(tk, rest.length?chartVal(rest,cp.mode):'chart:'); renderPanes(p); });
+  box.querySelectorAll('.pchart-mode').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, cp=paneChartParse(tk);
+    setPane(tk, chartVal(cp.uu, s.value)); renderPanes(p); });
+  // Kamera: eine oder mehrere (mehrere = blaetterbare Seiten), wie Werte/Verlauf.
+  const paneCamUu=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('camera:')===0?cur.slice(7).split(',').filter(Boolean):[]; };
+  box.querySelectorAll('.pcam-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
+    const uu=paneCamUu(tk); if(!u||uu.indexOf(u)>-1) return;
+    setPane(tk,'camera:'+uu.concat([u]).join(',')); renderPanes(p); });
+  box.querySelectorAll('.chip[data-camu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
+    const rest=paneCamUu(tk).filter(x=>x!==n.dataset.camu);
+    setPane(tk, rest.length?('camera:'+rest.join(',')):'camera:'); renderPanes(p); });
   box.querySelectorAll('select[data-panez]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panez,'player:'+s.value);
   });
   box.querySelectorAll('select[data-panee]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panee,'energy:'+s.value);
-  });
-  box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{
-    setPane(s.dataset.panec,'camera:'+s.value);
   });
 }
 // Screensaver: rechte Spalte. Gleiche Werte-Grammatik wie die Tab-Panes, damit

@@ -424,14 +424,23 @@ def _clean_tabpane(v) -> str:
     if v in ("weather", "calendar"):
         return v
     if isinstance(v, str):
-        for kopf in ("player:", "energy:", "camera:"):
+        for kopf in ("player:", "energy:", "camera:"):   # camera: ein ODER mehrere (Blaettern), komma-getrennt
             if v.startswith(kopf) and len(v) > len(kopf):
                 return v
-        for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
-            if v.startswith(kopf):
-                uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
-                if uu:
-                    return kopf + ",".join(uu)
+        if v.startswith("chart:"):   # Verlauf: optional 'page:'/'stack:' + Bausteine
+            rest = v[len("chart:"):]
+            mode = ""
+            for m in ("page:", "stack:"):
+                if rest.startswith(m):
+                    mode, rest = m, rest[len(m):]
+                    break
+            uu = [x.strip() for x in rest.split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return "chart:" + mode + ",".join(uu)
+        if v.startswith("status:"):   # mehrere Bausteine, komma-getrennt (Werte)
+            uu = [x.strip() for x in v[len("status:"):].split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return "status:" + ",".join(uu)
     return ""
 
 
@@ -452,11 +461,19 @@ def _clean_svpane(v) -> str:
     for kopf in ("player:", "energy:", "camera:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v
-    for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
-        if v.startswith(kopf):
-            uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
-            if uu:
-                return kopf + ",".join(uu)
+    if v.startswith("chart:"):   # Screensaver stapelt (keine Blaetter-Punkte) -> Modus abstreifen
+        rest = v[len("chart:"):]
+        for m in ("page:", "stack:"):
+            if rest.startswith(m):
+                rest = rest[len(m):]
+                break
+        uu = [x.strip() for x in rest.split(",") if x.strip()][:SV_STATUS_MAX]
+        if uu:
+            return "chart:" + ",".join(uu)
+    if v.startswith("status:"):   # mehrere Bausteine, komma-getrennt (Werte)
+        uu = [x.strip() for x in v[len("status:"):].split(",") if x.strip()][:SV_STATUS_MAX]
+        if uu:
+            return "status:" + ",".join(uu)
     return ""
 
 

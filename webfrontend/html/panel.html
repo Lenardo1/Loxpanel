@@ -141,6 +141,14 @@
   #frontpane .fp-page.solo.cpage.stack .cpsec .chart+.chart{margin-top:6px;}
   #frontpane .fp-page.solo.cpage.stack .chbody{display:block;}
   #frontpane .fp-page.solo.cpage.stack .chbody>svg{display:block;width:100%;height:auto;}
+  /* Seiten-Indikator (Punkte) fuer blaetterbare Widgets — Overlay unten mittig
+     ueber der Pane, scrollt NICHT mit. left/width/bottom setzt syncPager per JS. */
+  .pane-dots{position:absolute;z-index:6;display:flex;gap:9px;justify-content:center;
+    align-items:center;pointer-events:none;height:22px;}
+  .pane-dots i{width:8px;height:8px;border-radius:50%;background:var(--muted);
+    opacity:.32;transition:opacity .2s,transform .2s,background .2s;pointer-events:auto;
+    cursor:pointer;flex:0 0 auto;box-shadow:0 0 0 4px transparent;}
+  .pane-dots i.on{opacity:1;background:var(--accent);transform:scale(1.2);}
   /* Uhr-Seite: dort im Seitenverhaeltnis der Zeichnung (440:150), solange der
      Kasten reicht. Reicht er nicht (quer feste Hoehe, hochkant die Restflaeche
      unter Uhr und Wetter), schrumpfen die Diagramme, statt unten abgeschnitten
@@ -944,6 +952,10 @@
   <div class="conn" id="conn"></div>
   <div class="playerpane" id="playerpane"></div>
   <div class="frontpane" id="frontpane"></div>
+  <!-- Seiten-Indikator (kleine Kreise) fuer blaetterbare Widgets. Liegt als
+       Overlay ueber der Pane, scrollt NICHT mit; per JS (syncPager) ueber
+       #frontpane bzw. #playerpane positioniert und gefuellt. -->
+  <div class="pane-dots" id="paneDots" hidden></div>
   <div class="grid" id="grid"></div>
   <div class="tabs" id="tabs"></div>
   <div class="saver hidden" id="saver">
@@ -1023,11 +1035,19 @@ let panesCfg = {}, themeFill = false, curPlayerZone = '', curEnergyUuid = '', cu
 // sind die Werte der frei gewaehlten Bausteine ({t:'svstatus'} vom Server).
 let svPaneCfg = '', svStatusData = null, curSvStatus = '';
 let cameraData = null;   // letzter {t:'camera'}-Push (Intercom-Bloecke) fuer die Kamera-Pane
+// Mehrere Kameras in einer Pane (camera:a,b,c) werden als blaetterbare Seiten
+// gezeigt. Da der Server je Verbindung nur EINE Kamera streamt, wird immer nur
+// die sichtbare (camCamIdx) gemeldet; die anderen Seiten sind Platzhalter.
+let camList = [], camCamIdx = 0;
 let energyData = null;   // letzter {t:'energy'}-Push fuer die Energiefluss-Pane
 let playerData = null;   // letzter {t:'player'}-Push (Player-Bloecke) fuer die Audio-Pane
 // Verlaufs-Pane (chart:<uuid>): gemeldeter Baustein|Zeitraum, letzter {t:'chart'}-Push,
 // in der Pane gewaehlter Zeitraum (gilt fuer alle Verlaufs-Panes dieses Panels).
 let curChartKey = '', chartData = null, chartRange = '24h';
+// Darstellung der Verlaufs-Pane: 'stack' (mehrere Bausteine gestapelt+scrollbar,
+// wie bisher) oder 'page' (ein Baustein je blaetterbarer Seite). Kodiert im
+// Pane-Wert: 'chart:a,b' = stack (rueckwaertskompatibel), 'chart:page:a,b' = page.
+let chartMode = 'stack';
 let themeSplit = true;   // Split-Screen an/aus (aus = 4"-Panel: nur die Visu, keine Pane 2)
 
 function svg(inner){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>';}
@@ -1331,32 +1351,35 @@ function renderChartPane(elc){ if(!elc) return;
   const d=(chartData && Array.isArray(chartData.charts)) ? chartData : null;
   const charts=d ? d.charts : [];
   const multi=charts.length>1;
-  const sig=(d?d.controls.join(','):'-')+'|'+(d?d.range:'')+'|'+
+  const paged=(chartMode==='page' && multi);   // ein Baustein je blaetterbarer Seite
+  const sig=(paged?'p':'s')+'|'+(d?d.controls.join(','):'-')+'|'+(d?d.range:'')+'|'+
             charts.map(c=>(c.blocks||[]).length).join('.');
-  let page=elc.querySelector('.fp-page.cpage');
-  if(!page || page.dataset.sig!==sig){
+  if(elc.dataset.chsig!==sig){
+    elc.dataset.chsig=sig;
     const rngRow=(d && d.ranges && d.ranges.length)
       ? '<div class="chrng cpr">'+d.ranges.map(r=>'<button type="button" class="chip'+
           (r[0]===d.range?' on':'')+'" data-rng="'+esc(r[0])+'">'+esc(r[1])+'</button>').join('')+'</div>'
       : '';
-    const body=!d
-      ? '<div class="chmsg">Verlauf wird geladen …</div>'
-      : (charts.length
-        ? charts.map(c=>'<div class="cpsec"><div class="cphead"><div class="cpname"></div>'+
-            '<div class="cpval"></div></div>'+
-            (c.blocks||[]).map(b=>chartBoxHtml(b,false)).join('')+'</div>').join('')
-        : '<div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div>');
-    elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+body+'</div></div>';
-    page=elc.querySelector('.fp-page.cpage'); page.dataset.sig=sig;
-    page.querySelectorAll('.cpr [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
+    const sec=c=>'<div class="cpsec"><div class="cphead"><div class="cpname"></div>'+
+        '<div class="cpval"></div></div>'+(c.blocks||[]).map(b=>chartBoxHtml(b,false)).join('')+'</div>';
+    if(!d){
+      elc.innerHTML='<div class="fp-page cpage solo"><div class="cpbody"><div class="chmsg">Verlauf wird geladen …</div></div></div>';
+    } else if(!charts.length){
+      elc.innerHTML='<div class="fp-page cpage solo">'+rngRow+'<div class="cpbody"><div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div></div></div>';
+    } else if(paged){   // je Baustein eine Seite, Zeitraum-Leiste auf jeder Seite
+      elc.innerHTML=charts.map(c=>'<div class="fp-page cpage solo">'+rngRow+'<div class="cpbody">'+sec(c)+'</div></div>').join('');
+    } else {            // gestapelt (wie bisher): alle Bausteine in einer Seite
+      elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+charts.map(sec).join('')+'</div></div>';
+    }
+    elc.querySelectorAll('.cpr [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
       chartRange=btn.dataset.rng; applyPane(); }));
   }
   if(d){
-    const secs=page.querySelectorAll('.cpsec');
+    const secs=elc.querySelectorAll('.cpsec');
     charts.forEach((c,i)=>{ const s=secs[i]; if(!s) return;
       const nm=s.querySelector('.cpname'), vl=s.querySelector('.cpval');
       if(nm) nm.textContent=c.name||''; if(vl) vl.textContent=c.value||''; });
-    paintChartStack(page,charts);
+    paintChartStack(elc,charts);
   }
 }
 // Alle Diagramme des Stapels in DOM-Reihenfolge zeichnen (ein [data-chart]-Kasten
@@ -1766,6 +1789,65 @@ function paneRawNow(){ return (view && view.widget) ? view.widget : (themeSplit 
 function paneKind(v){ if(!v) return null;
   for(const k of ['player','energy','camera','chart','status']) if(v.indexOf(k+':')===0) return k;
   return v; }
+// ---- Seiten-Indikator / Blaettern (Pager) --------------------------------
+// Blaetterbare Widgets bestehen aus mehreren .fp-page-Seiten im scroll-snap-
+// Container (#frontpane). syncPager() zeigt dafuer unten eine Punkt-Reihe,
+// haelt den aktiven Punkt per IntersectionObserver nach und laesst Tippen auf
+// einen Punkt zur Seite springen. onPage(idx) meldet jeden Seitenwechsel — die
+// Kamera-Pane nutzt das, um dem Server die sichtbare Kamera zu melden (der
+// liefert Video/Energie/Verlauf pro Verbindung nur einmal, s. applyPane).
+let _pagerObs=null, _pagerOnPage=null, _pagerIdx=-1;
+function pagerContainer(){
+  const sc=document.querySelector('.screen'); if(!sc) return null;
+  const fp=el('frontpane'); if(!fp || fp.hidden) return null;
+  return (sc.classList.contains('split')||sc.classList.contains('widgettab')) ? fp : null;
+}
+function pagerPages(c){ return c ? [...c.children].filter(x=>x.classList&&x.classList.contains('fp-page')) : []; }
+function clearPager(){
+  if(_pagerObs){ _pagerObs.disconnect(); _pagerObs=null; }
+  _pagerOnPage=null; _pagerIdx=-1;
+  const d=el('paneDots'); if(d){ d.hidden=true; d.innerHTML=''; }
+}
+function setPagerPage(idx){
+  const c=pagerContainer(); if(!c) return;
+  const pg=pagerPages(c)[idx]; if(pg) pg.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function positionDots(c,d){
+  const sc=document.querySelector('.screen'); if(!sc) return;
+  const r=c.getBoundingClientRect(), sr=sc.getBoundingClientRect();
+  if(!r.width){ d.hidden=true; return; }
+  d.hidden=false;
+  d.style.left=(r.left-sr.left)+'px';
+  d.style.width=r.width+'px';
+  d.style.top=(r.bottom-sr.top-26)+'px';
+}
+function syncPager(onPage){
+  const d=el('paneDots'); if(!d) return;
+  const c=pagerContainer();
+  const pages=pagerPages(c);
+  if(!c || pages.length<2){ clearPager(); return; }
+  _pagerOnPage=onPage||null;
+  if(d.children.length!==pages.length){
+    d.innerHTML=pages.map((_,i)=>'<i data-pg="'+i+'"></i>').join('');
+    d.querySelectorAll('[data-pg]').forEach(dot=>dot.addEventListener('pointerdown',ev=>{
+      ev.preventDefault(); setPagerPage(parseInt(dot.dataset.pg)||0); }));
+    _pagerIdx=-1;
+  }
+  positionDots(c,d);
+  if(_pagerObs) _pagerObs.disconnect();
+  _pagerObs=new IntersectionObserver(ents=>{
+    let best=null,bestR=0;
+    ents.forEach(e=>{ if(e.intersectionRatio>bestR){ bestR=e.intersectionRatio; best=e.target; } });
+    if(!best) return;
+    const idx=pages.indexOf(best); if(idx<0||idx===_pagerIdx) return;
+    _pagerIdx=idx;
+    d.querySelectorAll('i').forEach((dot,i)=>dot.classList.toggle('on',i===idx));
+    if(_pagerOnPage) try{ _pagerOnPage(idx); }catch(e){}
+  },{root:c,threshold:[.5,.6]});
+  pages.forEach(p=>_pagerObs.observe(p));
+  if(_pagerIdx<0){ _pagerIdx=0; d.querySelectorAll('i').forEach((dot,i)=>dot.classList.toggle('on',i===0)); }
+}
+
 function applyPane(){
   const sc=document.querySelector('.screen'); if(!sc) return;
   // Widget-Seite (Vollbild-Tab): das ganze Tab IST das Widget, kein Kachelgrid,
@@ -1786,7 +1868,8 @@ function applyPane(){
     // Kamera verlassen -> Video-Stream stoppen (Inhalt leeren), keine Hintergrund-Verbindung.
     // Auch, wenn der Screensaver darueber liegt: das <img> haengt direkt an
     // /mjpeg und streamt sonst unsichtbar weiter.
-    if((kind!=='camera' || svSideOn()) && fp.dataset.cam!==undefined){ fp.innerHTML=''; delete fp.dataset.cam; delete fp.dataset.camsig; }
+    if((kind!=='camera' || svSideOn()) && (fp.dataset.cam!==undefined || fp.dataset.camn!==undefined)){
+      fp.innerHTML=''; delete fp.dataset.cam; delete fp.dataset.camsig; delete fp.dataset.camn; }
   }
   if(kind==='weather') renderWeatherPane(fp);
   else if(kind==='calendar') renderCalendarPane(fp);
@@ -1803,10 +1886,14 @@ function applyPane(){
   // Energiefluss-Kachel dem Server melden (er pusht dann {t:'energy'}).
   const euid=qarg(qraw,'energy:');
   if(euid!==curEnergyUuid){ curEnergyUuid=euid; try{ send({t:'setenergy',uuid:euid}); }catch(e){} }
-  // Kamera (Intercom) dem Server melden (er pusht dann {t:'camera'} mit Video+Buttons).
-  const cuid=qarg(qraw,'camera:');
+  // Kamera (Intercom): mehrere Kameras (camera:a,b,c) sind blaetterbare Seiten;
+  // dem Server IMMER nur die sichtbare melden (er pusht dann {t:'camera'} mit
+  // Video+Buttons). Im Screensaver (zweite Uhr-Spalte) kein Blaettern -> erste.
+  camList = (qarg(qraw,'camera:')||'').split(',').filter(Boolean);
+  if(svSideOn()) camCamIdx=0;
+  else if(camCamIdx>=camList.length) camCamIdx=0;
+  const cuid=camList[camCamIdx]||'';
   if(cuid!==curCameraUuid){ curCameraUuid=cuid; cameraData=null;
-    if(fp){ delete fp.dataset.cam; delete fp.dataset.camsig; }
     const sb=el('svBox'); if(sb){ delete sb.dataset.cam; delete sb.dataset.camsig; }
     try{ send({t:'setcamera',uuid:cuid}); }catch(e){}
     // Sofort einen Platzhalter zeigen, bis der Push kommt — je nachdem, wo die
@@ -1816,7 +1903,9 @@ function applyPane(){
   // Verlaufs-Pane: Baustein und gewaehlten Zeitraum melden (er pusht dann
   // {t:'chart'}). Wie bei Energie/Kamera zaehlt der Screensaver, wenn er oben
   // liegt (chart als zweite Uhr-Spalte), sonst die Pane des aktiven Tabs.
-  const chuid=qarg(qraw,'chart:');   // ein oder mehrere Bausteine, komma-getrennt
+  let chArg=qarg(qraw,'chart:');   // "a,b" | "stack:a,b" | "page:a,b"
+  const chm=chArg.match(/^(page|stack):([\s\S]*)$/); chartMode = chm?chm[1]:'stack';
+  const chuid = chm?chm[2]:chArg;   // nur die Bausteine (ohne Modus) gehen an den Server
   const chkey=chuid ? chuid+'|'+chartRange : '';
   if(chkey!==curChartKey){ curChartKey=chkey; chartData=null;   // alten Stapel verwerfen, bis der neue Push kommt
     try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
@@ -1829,6 +1918,10 @@ function applyPane(){
   const suu = (svKind(qraw)==='status') ? svArg(qraw) : '';
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
+  // Seiten-Indikator nachziehen. Bei Kamera meldet onPage dem Server die
+  // sichtbare Kamera (Mehrfach-Kamera = mehrere blaetterbare Seiten).
+  const onPage = (kind==='camera') ? camPageTo : null;
+  requestAnimationFrame(()=>syncPager(onPage));
 }
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und
@@ -2143,6 +2236,8 @@ window.addEventListener('resize',()=>{
   if(view && !el('grid').classList.contains('scheme')
      && rasterKey(_lastWidget) !== _lastRaster) render();
   panelEinpassen();
+  // Seiten-Indikator neu ueber die Pane legen (Breite/Lage kann sich aendern).
+  const _d=el('paneDots'), _c=pagerContainer(); if(_c&&_d&&!_d.hidden) positionDots(_c,_d);
 });
 
 // Wisch nach rechts = zurueck (vertikales Scrollen bleibt unberuehrt)
@@ -2712,32 +2807,50 @@ function renderEnergyPane(elc){ if(!elc) return;
 // wird wie beim Baustein direkt geladen (kein onload-Gate -> zeigt auch in Browsern, die
 // ein nacktes MJPEG-<img> nicht rendern). Struktur nur bei Änderung neu bauen, sonst nur
 // Buttons/Klingel in-place aktualisieren -> der Video-Stream läuft ununterbrochen weiter.
+// Pager-Callback: zu Kamera idx blaettern. Dem Server die neue Kamera melden
+// (ueber applyPane); bis ihr Push kommt, zeigt die Seite einen Platzhalter.
+function camPageTo(idx){ if(idx===camCamIdx) return; camCamIdx=idx; applyPane(); }
 function renderCameraPane(elc){ if(!elc) return;
+  const n=Math.max(1,camList.length);
+  // Eine .fp-page je Kamera (blaetterbar). Geruest nur bei geaenderter Anzahl
+  // neu bauen, sonst bleiben Scrollposition und laufender Stream erhalten.
+  if(elc.dataset.camn!==String(n)){
+    elc.dataset.camn=String(n);
+    elc.innerHTML=Array.from({length:n},(_,i)=>
+      '<div class="fp-page solo campage" data-camidx="'+i+'"></div>').join('');
+  }
+  const pages=[...elc.querySelectorAll('.campage')];
+  // Nur die sichtbare Kamera streamt (Server = Single-Slot); die uebrigen Seiten
+  // zeigen einen Platzhalter, damit nicht mehrere /mjpeg-Verbindungen offen sind.
+  pages.forEach((pg,i)=>{ if(i!==camCamIdx && pg.dataset.cam!=='idle'){
+    pg.dataset.cam='idle'; delete pg.dataset.camsig;
+    pg.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera '+(i+1)+'</span></div>'; } });
+  const page=pages[camCamIdx]; if(!page) return;
   const blocks=(cameraData&&cameraData.blocks)||null;
   if(blocks===null){   // Push noch nicht da -> Platzhalter
-    if(elc.dataset.cam!=='wait'){ elc.dataset.cam='wait'; delete elc.dataset.camsig;
-      elc.innerHTML='<div class="fp-page solo campage"><div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div></div>'; }
+    if(page.dataset.cam!=='wait'){ page.dataset.cam='wait'; delete page.dataset.camsig;
+      page.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div>'; }
     return;
   }
   const video=blocks.find(b=>b.k==='video'), row=blocks.find(b=>b.k==='row');
   const bell=blocks.find(b=>b.k==='astat'), nostat=blocks.find(b=>b.k==='status');
   const sig=(video?'v':'')+'|'+(row?row.cells.length:0)+'|'+(nostat?nostat.text:'');
-  if(elc.dataset.camsig!==sig){          // Struktur -> Neuaufbau
-    elc.dataset.camsig=sig; elc.dataset.cam='1';
+  if(page.dataset.camsig!==sig){          // Struktur -> Neuaufbau
+    page.dataset.camsig=sig; page.dataset.cam='1';
     let html='<div class="cambell astat crit" hidden></div>';
     html+= video ? '<div class="video"><img alt=""></div>'
                  : '<div class="status">'+esc(nostat?nostat.text:'Kein Video')+'</div>';
     if(row) html+='<div class="brow'+(row.wrap?' wraprow':'')+'">'+row.cells.map(cellHtml).join('')+'</div>';
-    elc.innerHTML='<div class="fp-page solo campage">'+html+'</div>';
-    const vimg=elc.querySelector('.video img'); if(vimg&&video) vimg.src=video.src;   // direkt, KEIN onload-Gate
-    if(row){ const btns=elc.querySelectorAll('.brow [data-c]');
+    page.innerHTML=html;
+    const vimg=page.querySelector('.video img'); if(vimg&&video) vimg.src=video.src;   // direkt, KEIN onload-Gate
+    if(row){ const btns=page.querySelectorAll('.brow [data-c]');
       row.cells.forEach((c,i)=>{ const btn=btns[i]; if(!btn)return;
         btn.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(c.cmd) sendCmd(c.cmd.uuid,c.cmd.cmd,false); }); }); }
   } else if(row){                         // gleiche Struktur -> nur Buttons aktualisieren (Video unangetastet)
-    const btns=elc.querySelectorAll('.brow [data-c]');
+    const btns=page.querySelectorAll('.brow [data-c]');
     row.cells.forEach((c,i)=>{ const btn=btns[i]; if(btn){ btn.textContent=c.label||''; btn.className='btn'+(c.on?' on':''); } });
   }
-  const be=elc.querySelector('.cambell'); if(be){ if(bell){ be.textContent=bell.text||''; be.hidden=false; } else be.hidden=true; }
+  const be=page.querySelector('.cambell'); if(be){ if(bell){ be.textContent=bell.text||''; be.hidden=false; } else be.hidden=true; }
 }
 function renderWeatherPane(elc){ if(!elc) return; const d=frontData||{}, w=d.weather;
   if(!w){ elc.innerHTML='<div class="fp-empty">Kein Wetter konfiguriert.</div>'; return; }
