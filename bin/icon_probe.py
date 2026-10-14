@@ -2,7 +2,6 @@
 """Prueft, ob der Miniserver die Loxone-Icon-Dateien ausliefert."""
 import asyncio
 import json
-import ssl
 import sys
 from pathlib import Path
 
@@ -10,6 +9,7 @@ import aiohttp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from loxone_api import LoxoneClient  # noqa: E402
+from loxone_ws import ms_ssl_kontext  # noqa: E402
 
 
 def _conn() -> dict:
@@ -27,9 +27,7 @@ async def main() -> None:
                             port=port, verify_tls=ms.get("verify_tls", False)) as c:
         jwt = await c.authenticate()
 
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    ctx = await asyncio.to_thread(ms_ssl_kontext, ms.get("verify_tls", False))
 
     candidates = [
         "IconsFilled/sun.svg",

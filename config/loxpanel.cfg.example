@@ -2,14 +2,15 @@
   "_comment": "LoxPanel Plugin-Konfiguration. Kopiere diese Datei nach loxpanel.cfg und passe sie an.",
 
   "miniserver": {
-    "_comment": "Bevorzugt aus der LoxBerry-Miniserver-Verwaltung (msno). host/user/pass als Fallback/Standalone. Gen2 = HTTPS mit selbstsigniertem Zertifikat -> verify_tls:false. response_timeout: Sekunden, die der Miniserver fuer eine Antwort bekommt (etwa auf die Anmeldung beim Pruefen eines neuen Zugangs unter Settings -> Miniserver); antwortet er nicht rechtzeitig, gilt er als nicht erreichbar. Standard 10 = so lange darf auch ein Befehl dauern.",
+    "_comment": "Bevorzugt aus der LoxBerry-Miniserver-Verwaltung (msno). host/user/pass als Fallback/Standalone. Gen2 = HTTPS mit selbstsigniertem Zertifikat -> verify_tls:false. verify_tls:true prueft das Zertifikat gegen die CAs des Systems und klappt nur, wenn host ein Name ist, den das Zertifikat nennt (nicht die IP-Adresse). response_timeout: Sekunden, die der Miniserver fuer eine Antwort bekommt (etwa auf die Anmeldung beim Pruefen eines neuen Zugangs unter Settings -> Miniserver und beim Aufbau der Live-Verbindung); antwortet er nicht rechtzeitig, gilt er als nicht erreichbar. Standard 10 = so lange darf auch ein Befehl dauern. keepalive_interval: so oft (Sekunden) sendet LoxPanel auf der Live-Verbindung (WebSocket) keepalive; kommt danach binnen response_timeout keine Nachricht, verbindet es neu. Standard 60 = ein stiller Abbruch faellt nach gut einer Minute auf (laut Loxone-Doku trennt der Miniserver Clients, die ueber 5 Minuten nichts senden).",
     "msno": 1,
     "host": "192.168.1.50",
     "user": "LoxoneUser",
     "pass": "CHANGEME",
     "port": 443,
     "verify_tls": false,
-    "response_timeout": 10
+    "response_timeout": 10,
+    "keepalive_interval": 60
   },
 
   "loxone": {
