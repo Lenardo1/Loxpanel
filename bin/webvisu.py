@@ -2015,15 +2015,31 @@ class App:
                 pass
         return {k: val for k, val in v.items() if val}
 
+    def ansicht_wirksam(self, pid: str | None) -> str:
+        """Die Ansicht, die die Visu fuer `pid` tatsaechlich zeigt (wie resolve_profile):
+        eine leere, geloeschte oder vertippte Kennung zeigt das Standardprofil."""
+        return pid if pid and pid in self.panels else "default"
+
+    def _ui_profil(self, pid: str | None) -> dict:
+        """ui aus Theme-Vorgabe und dem Profil, das die Visu fuer `pid` zeigt
+        (ansicht_wirksam): sonst bekaeme ein Agent mit ?panel= leer oder geloescht
+        nur die Vorgaben, waehrend seine Visu das Standardprofil zeigt."""
+        return {**self.theme.get("ui", {}),
+                **((self.panels.get(self.ansicht_wirksam(pid)) or {}).get("ui") or {})}
+
     def resolve_profile(self, pid: str | None) -> dict:
-        """Aufgeloestes Panel-Profil: Theme-Vars, Tabs, Raum-/Kategorie-Filter."""
+        """Aufgeloestes Panel-Profil: Theme-Vars, Tabs, Raum-/Kategorie-Filter.
+        Ein unbekanntes Profil (geloescht, vertippt) zeigt das Standardprofil und
+        heisst auch so: sonst nennte die Geraeteliste eine Ansicht, die es nicht
+        mehr gibt, und Abschaltzeit, Nachtmodus und Neustartintervall kaemen nur
+        aus den Vorgaben."""
         prof = self.panels.get(pid or "") or self.panels.get("default") or {}
         ui = {**self.theme.get("ui", {}), **(prof.get("ui") or {})}
         states = {**self.theme.get("states", {}), **(prof.get("states") or {})}
         tabs = [t for t in (prof.get("tabs") or ui.get("tabs") or []) if _is_tab(t)] or \
             ["favoriten", "zentral", "raeume", "kategorien"]
         return {
-            "id": pid or "default",
+            "id": self.ansicht_wirksam(pid),
             "title": prof.get("title") or "LoxPanel",
             "tabs": list(tabs),
             "rooms": self._resolve_ids(prof.get("rooms"), self.rooms),
@@ -2291,8 +2307,7 @@ class App:
         """Display-Abschaltzeit (Sek.) fuer ein Panel aus dem Profil (0=nie,
         None=nicht gesetzt -> Agent nutzt seinen kiosk.conf-Default). Wird dem
         Panel-Agenten in der Announce-Antwort mitgegeben (er fuehrt xset aus)."""
-        ui = {**self.theme.get("ui", {}),
-              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+        ui = self._ui_profil(pid)
         v = ui.get("dpmsOff")
         return max(0, min(3600, int(v))) if isinstance(v, (int, float)) else None
 
@@ -2300,8 +2315,7 @@ class App:
         """Nachtmodus je Panel: `dim` = Abdunklung in Prozent (0 = aus), `wake` =
         Sekunden, die eine Beruehrung wieder voll aufhellt (0 = nicht aufhellen).
         Wie panel_dpms(): Theme-Vorgabe, vom Panel-Profil ueberschreibbar."""
-        ui = {**self.theme.get("ui", {}),
-              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+        ui = self._ui_profil(pid)
 
         def _num(key, lo, hi, default):
             v = ui.get(key)
@@ -2379,8 +2393,7 @@ class App:
         Agent laedt sich die Visu neu. None = nicht eingestellt: Der Agent nimmt
         seinen Wert aus der kiosk.conf, die Visu laedt nachts neu
         (NEULADEN_STUNDE). Geht in die Announce-Antwort und die theme-Nachricht."""
-        ui = {**self.theme.get("ui", {}),
-              **((self.panels.get(pid or "") or {}).get("ui") or {})}
+        ui = self._ui_profil(pid)
         v = ui.get("reloadHours")
         return max(0, min(168, float(v))) if isinstance(v, (int, float)) else None
 
@@ -2467,7 +2480,8 @@ class App:
         for e in devs.values():
             e["type"] = "agent" if e["agent"] else (e["kiosk"] if e["kiosk"] in KIOSK_APPS else "browser")
             if e["agent"] and not e["profile"]:
-                e["profile"] = e["agent"]["panel"]
+                # was die Visu des Agenten zeigt: eine geloeschte Ansicht ist dort das Standardprofil
+                e["profile"] = self.ansicht_wirksam(e["agent"]["panel"])
         anonymous.sort(key=lambda a: a["ip"])
         return {"devices": sorted(devs.values(), key=lambda e: e["name"].lower()),
                 "anonymous": anonymous, "profiles": sorted(self.panels)}
@@ -2617,7 +2631,9 @@ class App:
         Ein Agent, der das kann (AGENT_KANN_PANEL), uebernimmt das Profil im
         ersten Fall mit seiner naechsten Meldung (Abschaltzeit, Neustart-
         intervall, naechster Kiosk-Start). Ausdrueckliche Wahlen unter
-        Displays gelten ab hier nicht mehr.
+        Displays gelten ab hier nicht mehr. Zeigt die Zuordnung auf eine Ansicht,
+        die es nicht (mehr) gibt, gilt wie in der Visu das Standardprofil; die
+        Zuordnung selbst bleibt (`statt` nennt sie im Ergebnis).
         """
         mode = (mode or "").strip()
         results: list = []
@@ -2630,9 +2646,11 @@ class App:
         for name, cfg in self.devices.items():
             if not cfg.get("auto", True):
                 continue
-            profile = (cfg.get("modes") or {}).get(mode)
-            if not profile:
+            zugeordnet = (cfg.get("modes") or {}).get(mode)
+            if not zugeordnet:
                 continue
+            profile = self.ansicht_wirksam(zugeordnet)
+            statt = {} if profile == zugeordnet else {"statt": zugeordnet}
             ws_targets = [ws for ws, dev in self.conn_dev.items() if dev == name]
             if ws_targets:
                 sent = 0
@@ -2647,16 +2665,16 @@ class App:
                             and (now - a["ts"]) < AGENT_ONLINE):
                         self.agent_wunsch[a["ip"]] = profile
                 results.append({"panel": name, "profile": profile,
-                                "ok": sent > 0, "via": "ws"})
+                                "ok": sent > 0, "via": "ws", **statt})
                 continue
             agent = by_name.get(name)
             if agent:
                 ok = await self._agent_start(agent, profile)
                 results.append({"panel": name, "profile": profile,
-                                "ok": ok, "via": "agent"})
+                                "ok": ok, "via": "agent", **statt})
             else:
                 results.append({"panel": name, "profile": profile,
-                                "ok": False, "error": "Panel nicht online"})
+                                "ok": False, "error": "Panel nicht online", **statt})
         return results
 
     def _room_ok(self, uuid: str, prof: dict | None) -> bool:
@@ -7993,7 +8011,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
         if cfg and cfg.get("auto", True):
             mapped = (cfg.get("modes") or {}).get(app.last_mode)
             if mapped:
-                pid = mapped
+                mapped = pid = app.ansicht_wirksam(mapped)
                 # auch dem Agenten, sonst meldete er weiter ?panel= (dessen
                 # Abschaltzeit und Neustartintervall, naechster Kiosk-Start)
                 for a in agenten:
