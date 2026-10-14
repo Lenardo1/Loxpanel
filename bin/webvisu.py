@@ -1501,6 +1501,15 @@ class App:
         su = (control.get("states") or {}).get(name)
         return self.states.get(su) if su else None
 
+    def _endlich(self, control: dict, name: str) -> float | None:
+        """Zahl-State als endliche Zahl; None, wenn er fehlt, keine Zahl ist oder
+        NaN/unendlich (als Binaer-Double gueltig): dann ist der Wert unbekannt."""
+        try:
+            v = float(self._state(control, name))
+        except (TypeError, ValueError):
+            return None
+        return v if math.isfinite(v) else None
+
     def _text(self, control: dict, name: str) -> str:
         """Text-State, URL-dekodiert (Loxone liefert songName/artist prozentkodiert)."""
         v = self._state(control, name)
@@ -1548,6 +1557,8 @@ class App:
         try:
             v = float(value)
         except (TypeError, ValueError):
+            return ""
+        if not math.isfinite(v):   # NaN/unendlich (gueltige Binaer-Doubles): unbekannt
             return ""
         text = zero if (zero and v == 0) else (pos if v >= 0 else neg)
         return f"{text} {self._fmt_num(abs(v), fmt)}"
@@ -2121,11 +2132,14 @@ class App:
         to_w = 1000.0 if "kw" in fmt.lower() else 1.0   # States meist in kW -> Watt
 
         def watt(key):
+            """Leistung in W; None, solange sie fehlt - auch bei NaN/unendlich, die als
+            Binaer-Double gueltig sind: unbekannt, nicht 0 und nicht in Summen."""
             v = self._state(c, key)
             try:
-                return float(v) * to_w
+                w = float(v) * to_w
             except (TypeError, ValueError):
                 return None
+            return w if math.isfinite(w) else None
 
         def classify(nt, v):
             """Richtung (flow: in/out/None) UND Farbe/Rolle (kind) je Knoten aus
@@ -2154,6 +2168,8 @@ class App:
         try:
             soc = float(self._state(c, "Ssoc"))
         except (TypeError, ValueError):
+            soc = None
+        if soc is not None and not math.isfinite(soc):
             soc = None
 
         def agg_nodes():
@@ -2196,33 +2212,50 @@ class App:
 
         cons = []
         prod_sum = cons_sum = 0.0
-        hat_verbraucher = False
+        hat_verbraucher = prod_knoten = prod_fehlt = False
         if c.get("type") == "EFM":
             for i, (label, nd) in enumerate(self._named_items(det.get("nodes"))[:max_cons]):
                 v = watt(f"actual{i}")
-                if v is None:
-                    continue
                 nt = nd.get("nodeType") if isinstance(nd, dict) else None
+                if v is None:
+                    if (nt or "").lower() == "production":
+                        prod_fehlt = True
+                    continue
                 flow, kind = classify(nt, v)
                 cons.append({"name": label or f"Knoten {i + 1}", "icon": "load",
                              "iconUrl": self._node_icon_url(nd),
                              "w": abs(v), "flow": flow, "kind": kind})
                 ntl = (nt or "").lower()
                 if ntl == "production":
+                    prod_knoten = True
                     prod_sum += abs(v)
                 elif ntl in ("load", "group"):
                     hat_verbraucher = True
                     if v > 0:
                         cons_sum += abs(v)
+
+        def erzeugung():
+            """Erzeugung in W: die Erzeugungs-Knoten, sonst Ppwr. None, wenn eine
+            Erzeugung angelegt ist, aber keinen Wert hat - keine erfundene Null."""
+            if prod_sum:
+                return prod_sum
+            if pv is not None:
+                return abs(pv)
+            if prod_knoten:
+                return 0.0
+            if prod_fehlt or "Ppwr" in (c.get("states") or {}):
+                return None
+            return 0.0
+
         if cons:
             cons.sort(key=lambda n: (n["flow"] is None, -n["w"]))   # aktiv zuerst, 0 W ans Ende
             nodes = cons
-            prod_total = prod_sum or (abs(pv) if pv else 0.0)
+            prod_total = erzeugung()
             # gemessene Verbraucher-Knoten, sonst die Bilanz
             cons_total = cons_sum if hat_verbraucher else bilanz()
         else:
             nodes = agg_nodes()   # EM2 oder EFM ohne eigene Knoten
-            prod_total = abs(pv) if pv else 0.0
+            prod_total = erzeugung()
             cons_total = bilanz()
         return {"control": uuid, "name": _clean(c.get("name")) or "Energiefluss",
                 "nodes": nodes,
@@ -3744,7 +3777,7 @@ class App:
             # Spwr Speicher (+Entladen/-Laden), actual0..5 = Knoten aus details.nodes
             fmt = (c.get("details") or {}).get("actualFormat") or "%.2f kW"
             bits = []
-            p = self._state(c, "Ppwr")
+            p = self._endlich(c, "Ppwr")
             if p is not None:
                 bits.append("PV " + self._fmt_num(p, fmt))
             g = self._flow_text(self._state(c, "Gpwr"), fmt, "Bezug", "Einspeisung")
@@ -3754,10 +3787,10 @@ class App:
                       sublabel=" · ".join(bits) or "Energiefluss")
         elif t == "EnergyManager2":
             bits = []
-            p = self._state(c, "Ppwr")
+            p = self._endlich(c, "Ppwr")
             if p is not None:
                 bits.append("PV " + self._fmt_num(p, "%.2f kW"))
-            soc = self._state(c, "Ssoc")
+            soc = self._endlich(c, "Ssoc")
             if soc is not None and (c.get("details") or {}).get("HasSsoc", True):
                 bits.append("Speicher " + self._fmt_num(soc, "%.0f") + " %")
             it.update(icon="central", nav={"view": "control", "id": uuid},
@@ -5281,7 +5314,7 @@ class App:
         if t == "EFM":
             det = c.get("details") or {}
             fmt = det.get("actualFormat") or "%.2f kW"
-            p = self._state(c, "Ppwr")
+            p = self._endlich(c, "Ppwr")
             rows = []
             g = self._flow_text(self._state(c, "Gpwr"), fmt, "Netzbezug", "Einspeisung")
             if g:
@@ -5291,7 +5324,7 @@ class App:
             if sp:
                 rows.append({"k": "status", "text": sp})
             nodes = self._named_items(det.get("nodes"))
-            vals = [(label, self._state(c, f"actual{i}")) for i, (label, _n) in enumerate(nodes[:6])]
+            vals = [(label, self._endlich(c, f"actual{i}")) for i, (label, _n) in enumerate(nodes[:6])]
             vals = [(label, v) for label, v in vals if v is not None]
             if vals:
                 rows.append({"k": "head", "text": "Verbraucher und Quellen"})
@@ -5306,7 +5339,7 @@ class App:
             return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
         if t == "EnergyManager2":
             det = c.get("details") or {}
-            p = self._state(c, "Ppwr")
+            p = self._endlich(c, "Ppwr")
             rows = []
             g = self._flow_text(self._state(c, "Gpwr"), "%.2f kW", "Netzbezug", "Einspeisung")
             if g:
@@ -5315,10 +5348,10 @@ class App:
                 sp = self._flow_text(self._state(c, "Spwr"), "%.2f kW", "Speicher entlädt", "Speicher lädt", "Speicher")
                 if sp:
                     rows.append({"k": "status", "text": sp})
-            soc = self._state(c, "Ssoc")
+            soc = self._endlich(c, "Ssoc")
             if soc is not None and det.get("HasSsoc", True):
                 txt = f"Speicher {self._fmt_num(soc, '%.0f')} %"
-                mn = self._state(c, "MinSoc")
+                mn = self._endlich(c, "MinSoc")
                 if mn is not None:
                     txt += f" (Reserve {self._fmt_num(mn, '%.0f')} %)"
                 rows.append({"k": "status", "text": txt})
