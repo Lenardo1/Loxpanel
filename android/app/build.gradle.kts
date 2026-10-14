@@ -122,9 +122,13 @@ tasks.register<Copy>("syncLoxpanelAssets") {
     from(loxRepoRoot.resolve("bin")) { into("bin") }
     from(loxRepoRoot.resolve("webfrontend")) { into("webfrontend") }
     from(loxRepoRoot.resolve("deploy")) { into("deploy") }
+    // config: nur die Vorlagen aus dem Repo. Was der Server zur Laufzeit dort anlegt
+    // (Zugang, Ansichten, Farben und ihre Sicherungen *.bak samt Kennwoertern), kommt
+    // nie in die App - auch nicht bei einem lokalen Build aus einem Ordner, in dem
+    // der Server schon lief.
     from(loxRepoRoot.resolve("config")) {
         into("config")
-        exclude("loxpanel.cfg", "panels.json", "theme.json")   // keine echten Daten/Layouts
+        include("*.example", "*.example.json", "*.schema.json")
     }
     // Welcher Stand in der App steckt: bin/version.json, gelesen von
     // bin/version_info.py (Anzeige im Konfigurator). Die App packt bin/ bei
