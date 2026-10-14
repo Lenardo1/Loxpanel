@@ -2138,6 +2138,20 @@ function clearHide(){ const p=PANELS[cur]; if(p.hide){ delete p.hide; markDirty(
 let curPickIdx=0;
 function isPick(t){ if(t===PICK_TAB) return true; if(typeof t==='string' && t.indexOf(PICK_TAB)===0){ const s=t.slice(PICK_TAB.length); return /^[2-4]$/.test(s); } return false; }
 function pickKey(i){ return i===0?PICK_TAB:PICK_TAB+(i+1); }
+function pickIdx(k){ return !isPick(k) ? -1 : (k===PICK_TAB ? 0 : parseInt(k.slice(PICK_TAB.length),10)-1); }
+// Fallen freie Seiten weg oder ruecken nach, haengt an ihrer Kennung (auswahl, auswahl2 ...)
+// noch mehr: der Eintrag in der Leiste und das Widget der Seite (ui.panes).
+// neu(i) = neuer Index der Seite i, -1 = sie ist weg. -> Funktion alte Kennung -> neue ('' = weg);
+// andere Kennungen bleiben.
+function pickKennungNeu(neu){ return k=>{ const i=pickIdx(k); if(i<0) return k; const j=neu(i); return j<0 ? '' : pickKey(j); }; }
+function pickNachLoeschen(weg){ return pickKennungNeu(i=>i===weg ? -1 : (i>weg ? i-1 : i)); }
+function panesUmbenennen(panes, f){ const ps={}; Object.entries(panes||{}).forEach(([k,v])=>{ const z=f(k); if(z && !(z in ps)) ps[z]=v; }); return ps; }
+// Leiste und Widgets eines Profils auf die neuen Kennungen bringen
+function pickBezuegeNeu(p, f){
+  if(Array.isArray(p.tabs)) p.tabs=p.tabs.map(f).filter(Boolean);   // auch die klassische Leiste mit einzelnen auswahlN
+  const u=p.ui; if(!u) return;
+  if(u.panes && typeof u.panes==='object'){ const ps=panesUmbenennen(u.panes, f); if(Object.keys(ps).length) u.panes=ps; else delete u.panes; }
+}
 // LESEN: legt nichts an (siehe alter Kommentar - kein Zuruecksetzen entfernter Keys).
 function pickList(p){ const t=p.pickTabs;
   if(Array.isArray(t)&&t[curPickIdx]) return t[curPickIdx].picks||[];
@@ -2158,7 +2172,10 @@ function ensurePickTabs(p){
 function curPT(p){ const t=ensurePickTabs(p); if(curPickIdx>=t.length) curPickIdx=t.length-1; if(curPickIdx<0) curPickIdx=0; return t[curPickIdx]; }
 function pickSyncTabsMode(p){ if(tabMode(p)==='pick') p.tabs=ensurePickTabs(p).map((_,i)=>pickKey(i)); }
 function pickAddTab(p){ const t=ensurePickTabs(p); if(t.length>=4) return; t.push({name:'',picks:[]}); curPickIdx=t.length-1; pickSyncTabsMode(p); pickWiz=0; markDirty(); renderPick(p); renderChips(p); }
-function pickDelTab(p,i){ const t=ensurePickTabs(p); if(t.length<=1) return; t.splice(i,1); if(curPickIdx>=t.length) curPickIdx=t.length-1; pickSyncTabsMode(p); markDirty(); renderPick(p); renderChips(p); }
+function pickDelTab(p,i){ const t=ensurePickTabs(p); if(t.length<=1) return;
+  t.splice(i,1); pickBezuegeNeu(p, pickNachLoeschen(i));
+  if(curPickIdx>i || curPickIdx>=t.length) curPickIdx=Math.max(0, curPickIdx-1);   // dieselbe Seite bleibt gewaehlt
+  pickSyncTabsMode(p); markDirty(); renderPick(p); renderChips(p); renderPanes(p); }
 function icoUrl(ic){ return ic ? (ic.charAt(0)==='/' ? ic : '/icon?p='+encodeURIComponent(ic)) : ''; }
 function pickTabBar(p){
   const t=ensurePickTabs(p);
@@ -2992,7 +3009,9 @@ function wzRender(){
   b.querySelectorAll('[data-pgn]').forEach(function(el){ el.oninput=function(){ WZ.pickPages[+el.dataset.pgn].name=el.value; wzUpd(); }; });
   b.querySelectorAll('[data-pgico]').forEach(function(el){ el.onclick=function(){ var i=+el.dataset.pgico; WZ.icoPage=WZ.icoPage===i?-1:i; wzRender(); }; });
   b.querySelectorAll('[data-wpico]').forEach(function(el){ el.onclick=function(){ WZ.pickPages[+el.dataset.wpico].icon=el.dataset.picv; WZ.icoPage=-1; wzRender(); }; });
-  b.querySelectorAll('[data-pgdel]').forEach(function(el){ el.onclick=function(){ WZ.pickPages.splice(+el.dataset.pgdel,1); if(WZ.icoPage>=WZ.pickPages.length) WZ.icoPage=-1; wzRender(); }; });
+  b.querySelectorAll('[data-pgdel]').forEach(function(el){ el.onclick=function(){ var i=+el.dataset.pgdel;
+    WZ.pickPages.splice(i,1); WZ.pane2=panesUmbenennen(WZ.pane2, pickNachLoeschen(i));   // Widgets ruecken mit
+    if(WZ.icoPage>=WZ.pickPages.length) WZ.icoPage=-1; wzRender(); }; });
   { var pa=$('#wzPgAdd'); if(pa) pa.onclick=function(){ if(WZ.pickPages.length<4){ WZ.pickPages.push({name:'',icon:'',picks:[]}); wzRender(); } }; }
   b.querySelectorAll('[data-pgw]').forEach(function(el){ el.onchange=function(){ var pg=WZ.pickPages[+el.dataset.pgw], k=el.value;
     if(!k) delete pg.widget; else if(k==='weather'||k==='calendar') pg.widget=k; else pg.widget=k+':'+(wzWidgetFirst(k)||'');
@@ -3044,13 +3063,18 @@ function wzBuild(){
   var tabs, e={};
   if(WZ.content==='room'){ tabs=[WZ.roomTab]; if(WZ.roomCats&&WZ.roomCats.length) e.roomCats=WZ.roomCats.slice(0,4); }
   else if(WZ.content==='pick'){
-    // Nur befüllte Seiten (Kacheln ODER Widget) werden zu Tabs; leere fallen weg.
-    var pages=(WZ.pickPages||[]).filter(function(pg){ return (pg.picks&&pg.picks.length)||pg.widget; });
-    if(!pages.length) pages=[WZ.pickPages[0]||{name:'Auswahl'}];
+    // Nur befüllte Seiten (Kacheln ODER Widget) werden zu Tabs; leere fallen weg. Ihre Widgets
+    // (WZ.pane2 nach Kennung) ruecken mit: alt = urspruenglicher Index jeder bleibenden Seite.
+    var alt=[];
+    (WZ.pickPages||[]).forEach(function(pg,i){ if((pg.picks&&pg.picks.length)||pg.widget) alt.push(i); });
+    if(!alt.length) alt=[0];
+    var pages=alt.map(function(i){ return WZ.pickPages[i]||{name:'Auswahl'}; });
+    var seiteNeu=pickKennungNeu(function(i){ return alt.indexOf(i); });
     tabs=pages.map(function(_,i){return pickKey(i);});
     e.pickTabs=pages.map(function(pg){ var o={name:(pg.name||'').trim()||'Auswahl',picks:(pg.picks||[]).slice()}; if(pg.icon) o.icon=pg.icon; if(pg.widget) o.widget=pg.widget; return o; }); }
   else { tabs=WZ.classic.filter(function(t){return t.on;}).map(function(t){return t.key;}); if(!tabs.length) tabs=defaultTabs(); }
-  var panes={}; Object.keys(WZ.pane2).forEach(function(k){ var rv=wzP2Real(WZ.pane2[k]); if(rv) panes[k]=rv; });
+  var panes={}, kennung=(WZ.content==='pick') ? seiteNeu : function(k){ return k; };
+  Object.keys(WZ.pane2).forEach(function(k){ var z=kennung(k), rv=wzP2Real(WZ.pane2[k]); if(z && rv) panes[z]=rv; });
   if(Object.keys(panes).length) ui.panes=panes;
   // Aussehen (Farbschema, Größen, Schrift) aus Schritt „Design"
   var L=WZ.look||{};
