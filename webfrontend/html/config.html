@@ -2045,23 +2045,30 @@ function renderChecklist(p,kind){
                                     : ('<b>alle</b> '+list.length+' sichtbar');
 }
 
-function markDirty(){ dirty=true; const t=$('#toast'); if(t){ t.className='toast'; t.textContent=''; } renderList(); }
+// Zaehlt jede Aenderung: save() weiss so, ob waehrend der Anfrage etwas dazukam.
+let aenderungen=0;
+function markDirty(){ dirty=true; aenderungen++; const t=$('#toast'); if(t){ t.className='toast'; t.textContent=''; } renderList(); }
 
 async function save(){
   const t=$('#toast');
+  // Gespeichert wird der Stand beim Klick: Panels UND Vorgaben jetzt einpacken. Was
+  // waehrend der Anfragen geaendert wird, bleibt ungespeichert (dirty), sonst gaelte
+  // es als gespeichert und ginge beim Schliessen ohne Warnung verloren.
+  const stand=aenderungen;
   try{
     const panels={}; for(const k in PANELS){ if(k!=='__global__') panels[k]=PANELS[k]; }
+    const g=PANELS.__global__;
+    const themaBody=g ? JSON.stringify({ui:g.ui||{}, categories:g.catColors||{}}) : null;
     const r=await fetch('/api/panels',{method:'POST',headers:{'Content-Type':'application/json'},
                           body:JSON.stringify({panels})});
     const j=await r.json();
     let okT=true, errT='';
-    if(PANELS.__global__){
-      const g=PANELS.__global__;
+    if(themaBody!==null){
       const r2=await fetch('/api/theme',{method:'POST',headers:{'Content-Type':'application/json'},
-                            body:JSON.stringify({ui:g.ui||{}, categories:g.catColors||{}})});
+                            body:themaBody});
       const j2=await r2.json(); okT=j2.ok; errT=j2.error||'';
     }
-    if(j.ok&&okT){ dirty=false;
+    if(j.ok&&okT){ dirty=aenderungen!==stand;
       // Was der Server nicht uebernommen hat (unbekannt/ungueltig), nennen statt
       // es still zu verlieren; die Warnung bleibt stehen (siehe unten).
       const weg=j.verworfen||[];
