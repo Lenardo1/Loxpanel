@@ -15,7 +15,9 @@ chmod +x "$BINDIR/loxpanel-ctl.sh" 2>/dev/null
 LPTMP="${LOXPANEL_UPGRADE_TMP:-/tmp}"
 LPBK="$LPTMP/loxpanel-upgrade-backup"
 LPARCH="$LPTMP/loxpanel-upgrade-archive"
+LPEIN="$LPTMP/loxpanel-upgrade-plugin.cfg"
 DATADIR="$ARGV5/data/plugins/$ARGV3"
+CONFIGDIR="$ARGV5/config/plugins/$ARGV3"
 RC=0
 if [ -d "$LPBK" ] && [ -n "$(ls -A "$LPBK" 2>/dev/null)" ]; then
 	mkdir -p "$DATADIR/config"
@@ -41,16 +43,36 @@ if [ -d "$LPARCH" ] && [ -n "$(ls -A "$LPARCH" 2>/dev/null)" ]; then
 	chown loxberry:loxberry "$DATADIR/backups" 2>/dev/null
 fi
 
+# Einstellungen des Plugins (Port am LoxBerry) zurueck, vor dem Start; die
+# Datei muss loxberry gehoeren ("loxpanel-ctl.sh port" schreibt sie im Widget).
+if [ -f "$LPEIN" ]; then
+	mkdir -p "$CONFIGDIR"
+	if cp "$LPEIN" "$CONFIGDIR/loxpanel_plugin.cfg"; then
+		rm -f "$LPEIN"
+		chown loxberry:loxberry "$CONFIGDIR/loxpanel_plugin.cfg" 2>/dev/null
+		echo "<OK> Plugin-Einstellungen (Port am LoxBerry) wiederhergestellt (Update-sicher)."
+	else
+		echo "<ERROR> Plugin-Einstellungen nicht zurückgespielt – die Kopie liegt in $LPEIN."
+		RC=1
+	fi
+fi
+
 # Reste eines alten Containers entfernen (Daten liegen im Volume -> verlustfrei).
 docker rm -f loxpanel > /dev/null 2>&1
 
 # LoxPanel starten – aber nur, wenn Docker schon verfuegbar ist. Beim Erst-
 # Install wird Docker erst nach dem Reboot installiert; dann startet der
-# daemon (Boot) das Panel automatisch.
+# daemon (Boot) das Panel automatisch. Scheitert der Start (etwa: Port am
+# LoxBerry belegt), steht der Grund in der Ausgabe darueber.
 if which docker > /dev/null 2>&1; then
 	echo "<INFO> Starte LoxPanel..."
-	su -s /bin/bash loxberry -c "$BINDIR/loxpanel-ctl.sh start"
-	echo "<OK> LoxPanel laeuft – Oberflaeche: http://<LoxBerry-IP>:8099/config"
+	PORT=$(su -s /bin/bash loxberry -c "$BINDIR/loxpanel-ctl.sh port")
+	if su -s /bin/bash loxberry -c "$BINDIR/loxpanel-ctl.sh start"; then
+		echo "<OK> LoxPanel laeuft – Oberflaeche: http://<LoxBerry-IP>:$PORT/config"
+	else
+		echo "<WARNING> LoxPanel ist nicht gestartet (Grund steht darüber). Im LoxBerry-Widget prüfen, etwa einen freien „Port am LoxBerry“ einstellen."
+		RC=1
+	fi
 else
 	echo "<INFO> Docker wird beim Neustart installiert – LoxPanel startet danach automatisch."
 fi

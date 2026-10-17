@@ -1,15 +1,24 @@
 #!/bin/bash
-# LoxPanel Docker-Steuerung.  Nutzung: loxpanel-ctl.sh start|stop|restart|check|backup|restore <datei>|keep
-#   start   pullt das aktuelle Image und startet den Container
-#   stop    stoppt den Container (merkt sich das -> check startet ihn NICHT neu)
+# LoxPanel Docker-Steuerung.  Nutzung: loxpanel-ctl.sh start|stop|restart|check|boot|backup|restore <datei>|keep|port [<port>]|zustand
+#   start   pullt das aktuelle Image und startet den Container (nicht, wenn
+#           der Port am LoxBerry schon belegt ist)
+#   stop    stoppt den Container (merkt sich das -> check startet ihn NICHT neu,
+#           bis "start" oder der naechste Neustart des LoxBerry)
 #   restart stop + start  (zieht dabei das neueste Image = manuelles Update)
 #   check   startet den Container, falls er (unerwartet) nicht laeuft
-#           (fuer Boot-daemon und 5-Minuten-Cron; ein bewusst gestopptes
-#            Panel wird NICHT wieder gestartet, waehrend backup/restore
-#            wartet die Pruefung auf den naechsten Lauf)
+#           (fuer den 5-Minuten-Cron; ein bewusst gestopptes Panel wird NICHT
+#            wieder gestartet, waehrend backup/restore wartet die Pruefung auf
+#            den naechsten Lauf)
+#   boot    wie check, beim Start des LoxBerry (daemon): hebt ein "stop" auf
 #   backup  sichert die Konfiguration (Panels/Theme/Miniserver) als tar.gz
 #   restore <datei>  spielt ein Backup zurueck (sichert vorher den Ist-Stand)
 #   keep    gibt aus, wie viele Backups behalten werden (KEEP, fuer das Widget)
+#   port    gibt den Port am LoxBerry aus (fuer Widget und postroot.sh);
+#           port <port> stellt ihn ein und startet LoxPanel damit (neu),
+#           ausser es ist gestoppt
+#   zustand fuer das Widget, eine Angabe je Zeile: port=, laeuft= (1/0),
+#           gestoppt= (seit wann, leer = nicht gestoppt), belegt= (wer den Port
+#           belegt, solange LoxPanel nicht laeuft; leer = frei)
 # REPLACELBPCONFIGDIR / REPLACELBPDATADIR werden beim Install durch echte Pfade ersetzt.
 # LOXPANEL_CTL_CONFIGDIR / LOXPANEL_CTL_DATADIR ersetzen sie nur zum Testen
 # ausserhalb eines LoxBerry, im Betrieb gelten die Pfade der Installation.
@@ -49,6 +58,17 @@ SPERRE="$DATADIR/.loxpanel-ctl.lock"
 LOCALTIME="${LOXPANEL_CTL_LOCALTIME:-/etc/localtime}"
 TZ_ZIEL="/run/loxberry-localtime"
 ZEITZONE="$CONFIGDIR/docker-compose.zeitzone.yml"
+# Einstellungen des Plugins (nicht der Visu): PORT=, der Port am LoxBerry, unter
+# dem Oberflaeche und Panels LoxPanel erreichen. Schreibt "port <port>" (Widget),
+# Plugin-Updates nehmen die Datei mit (pre-/postroot.sh). Fehlt sie, gilt
+# PORT_STANDARD: der Port, auf dem der Server im Container lauscht
+# (LOXPANEL_PORT im Dockerfile). LOXPANEL_CTL_PORT ersetzt den Standard nur zum
+# Testen ausserhalb eines LoxBerry.
+EINSTELLUNGEN="$CONFIGDIR/loxpanel_plugin.cfg"
+PORT_STANDARD="${LOXPANEL_CTL_PORT:-8099}"
+# Von start geschrieben: der Port fuer ${LOXPANEL_LB_PORT} in der Compose-Datei
+# (docker compose --env-file; ueber sudo kaeme eine Umgebungsvariable nicht an)
+PORTDATEI="$CONFIGDIR/docker-compose.port.env"
 
 # Image aus der Compose-Datei lesen (Fallback fest).
 _img() {
@@ -67,6 +87,57 @@ _indocker() {
 
 running() {
 	[ -n "$(sudo docker ps --filter 'name=^/loxpanel$' --filter status=running -q 2>/dev/null)" ]
+}
+
+_port_gueltig() {
+	[[ "$1" =~ ^[0-9]{1,5}$ ]] && [ "$((10#$1))" -ge 1 ] && [ "$((10#$1))" -le 65535 ]
+}
+
+# Eingestellter Port am LoxBerry (letzte Zeile PORT= in $EINSTELLUNGEN), sonst
+# PORT_STANDARD. Ein ungueltiger Eintrag zaehlt nicht: dann der Standard und
+# eine Warnung auf stderr.
+_port() {
+	local p=""
+	[ -f "$EINSTELLUNGEN" ] && p=$(sed -n 's/^[[:space:]]*PORT[[:space:]]*=[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' "$EINSTELLUNGEN" | tail -1)
+	if [ -z "$p" ]; then
+		echo "$PORT_STANDARD"
+	elif _port_gueltig "$p"; then
+		echo "$((10#$p))"
+	else
+		echo "Warnung: PORT=$p in $EINSTELLUNGEN ist kein gültiger Port (1–65535) – nehme $PORT_STANDARD." >&2
+		echo "$PORT_STANDARD"
+	fi
+}
+
+# Nimmt am LoxBerry jemand Verbindungen auf Port $1 an? Nur der Aufbau, es
+# geht nichts hinaus.
+_port_offen() {
+	timeout 3 bash -c 'exec 3<>"/dev/tcp/127.0.0.1/$1"' _ "$1" 2>/dev/null
+}
+
+# Wer Port $1 belegt: ein Docker-Container, der ihn veroeffentlicht, sonst ein
+# anderes Programm (welches, sieht loxberry ohne root nicht)
+_wer() {
+	local n
+	n=$(sudo docker ps --filter "publish=$1" --format '{{.Names}}' 2>/dev/null | head -1)
+	if [ -n "$n" ]; then echo "Docker-Container „$n“"; else echo "ein anderes Programm"; fi
+}
+
+# Belegt etwas anderes als LoxPanel Port $1? Dann Status 0 und wer (_wer).
+# Laeuft LoxPanel, haelt es den Port selbst.
+_fremd_belegt() {
+	running && return 1
+	_port_offen "$1" || return 1
+	_wer "$1"
+}
+
+# docker compose mit allen Dateien, die start schreibt (Port, Zeitzone)
+_compose() {
+	local dateien=()
+	[ -f "$PORTDATEI" ] && dateien+=(--env-file "$PORTDATEI")
+	dateien+=(-f "$COMPOSE")
+	[ -f "$ZEITZONE" ] && dateien+=(-f "$ZEITZONE")
+	sudo docker compose "${dateien[@]}" "$@" 2>&1
 }
 
 # Sperre auf fd 9 nicht-blockierend nehmen: 0 = gesperrt, 1 = ein anderer Lauf
@@ -231,14 +302,29 @@ EOF
 	return 1
 }
 
+# Port- und Zeitzonendatei schreiben und den Container hochfahren (ohne pull).
+# Ist der Port belegt, gar nicht erst versuchen: docker scheiterte erst nach dem
+# Anlegen, und das Widget erreichte unter dem Port das andere Programm.
+_hochfahren() {
+	local p wer
+	p=$(_port)
+	if wer=$(_fremd_belegt "$p"); then
+		echo "Port $p am LoxBerry ist schon belegt ($wer) – LoxPanel startet so nicht. Im LoxBerry-Widget unter „Port am LoxBerry“ einen freien Port einstellen."
+		return 1
+	fi
+	printf '%s\n' "# Von loxpanel-ctl.sh start geschrieben, nicht bearbeiten: Port aus $EINSTELLUNGEN." \
+		"LOXPANEL_LB_PORT=$p" > "$PORTDATEI" || {
+		echo "$PORTDATEI ließ sich nicht schreiben – LoxPanel nicht gestartet."; return 1; }
+	_zeitzone
+	[ "$1" = pull ] && _compose pull
+	_compose up -d
+}
+
 start() {
-	local dateien=(-f "$COMPOSE")
 	rm -f "$STOPPED"
-	_zeitzone && dateien+=(-f "$ZEITZONE")
 	# Erst pullen, dann up -d: 'up' nutzt sonst ein evtl. veraltetes lokales
 	# Image (der :latest-Tag ist rollend).
-	sudo docker compose "${dateien[@]}" pull 2>&1
-	sudo docker compose "${dateien[@]}" up -d 2>&1
+	_hochfahren pull
 }
 
 stop() {
@@ -246,25 +332,81 @@ stop() {
 	sudo docker compose -f "$COMPOSE" down 2>&1
 }
 
+# Port am LoxBerry einstellen. Belegt ist er nur, wenn ihn nicht LoxPanel selbst
+# haelt (LoxPanel laeuft auf dem bisherigen). Ein laufendes Panel faehrt mit dem
+# neuen Port neu hoch (up -d legt den Container neu an), ein gestopptes nimmt
+# ihn beim naechsten Start.
+port_setzen() {
+	local neu=$1 alt wer
+	_port_gueltig "$neu" || { echo "„$neu“ ist kein gültiger Port (1–65535) – nichts geändert."; return 1; }
+	neu=$((10#$neu))
+	alt=$(_port)
+	[ "$neu" = "$alt" ] && { echo "Port bleibt $neu."; return 0; }
+	if _port_offen "$neu"; then
+		wer=$(_wer "$neu")
+		echo "Port $neu am LoxBerry ist schon belegt ($wer) – nichts geändert."; return 1
+	fi
+	{ printf '%s\n' "# Einstellungen des LoxBerry-Plugins LoxPanel (nicht der Visu), bleiben bei Updates erhalten." \
+		"# PORT: Port am LoxBerry für Oberfläche und Panels (Widget: „Port am LoxBerry“)." \
+		"PORT=$neu" > "$EINSTELLUNGEN.neu" && mv -f "$EINSTELLUNGEN.neu" "$EINSTELLUNGEN"; } || {
+		rm -f "$EINSTELLUNGEN.neu"; echo "$EINSTELLUNGEN ließ sich nicht schreiben – nichts geändert."; return 1; }
+	echo "Port am LoxBerry: $neu (vorher $alt). Panels und die App erreichen LoxPanel jetzt unter diesem Port."
+	if running; then
+		echo "Starte LoxPanel mit dem neuen Port neu …"
+		_hochfahren
+	elif [ -f "$STOPPED" ]; then
+		echo "Panel ist gestoppt – der Port gilt beim nächsten Start."
+	else
+		start
+	fi
+}
+
+# 5-Minuten-Pruefung (und Boot): starten, falls nicht bewusst gestoppt und
+# nicht gerade backup/restore laeuft
+pruefen() {
+	[ -f "$STOPPED" ] && return 0     # bewusst gestoppt -> nichts tun
+	# Nicht waehrend backup/restore: restore haelt den Container fuer den
+	# Tausch an, ein Start hier liesse den Server mitten im Tausch laufen.
+	# Die naechste Pruefung holt es nach. Die Sperre gilt bis zum Ende, sonst
+	# begaenne ein restore mitten im Start. Ist die Sperrdatei nicht zu
+	# oeffnen (2), trotzdem pruefen: ein Panel, das nie mehr startet, waere
+	# schlimmer.
+	_sperre
+	[ $? = 1 ] && { echo "Sicherung oder Wiederherstellung läuft – Prüfung übersprungen."; return 0; }
+	running || start
+}
+
+zustand() {
+	local p seit="" wer="" lauf=0
+	p=$(_port)
+	running && lauf=1
+	[ -f "$STOPPED" ] && seit=$(date -r "$STOPPED" '+%d.%m.%Y %H:%M')
+	[ "$lauf" = 0 ] && _port_offen "$p" && wer=$(_wer "$p")
+	printf 'port=%s\nlaeuft=%s\ngestoppt=%s\nbelegt=%s\n' "$p" "$lauf" "$seit" "$wer"
+}
+
 case "$1" in
-	start)   start ;;
+	start)   start || exit 1 ;;
 	stop)    stop ;;
-	restart) stop; start ;;
-	check)
-		[ -f "$STOPPED" ] && exit 0     # bewusst gestoppt -> nichts tun
-		# Nicht waehrend backup/restore: restore haelt den Container fuer den
-		# Tausch an, ein Start hier liesse den Server mitten im Tausch laufen.
-		# Die naechste Pruefung holt es nach. Die Sperre gilt bis zum Ende, sonst
-		# begaenne ein restore mitten im Start. Ist die Sperrdatei nicht zu
-		# oeffnen (2), trotzdem pruefen: ein Panel, das nie mehr startet, waere
-		# schlimmer.
-		_sperre
-		[ $? = 1 ] && { echo "Sicherung oder Wiederherstellung läuft – Prüfung übersprungen."; exit 0; }
-		running || start
+	restart) stop; start || exit 1 ;;
+	check)   pruefen || exit 1 ;;
+	boot)
+		# Neustart des LoxBerry: ein "stop" gilt nur bis hierher. Sonst bliebe
+		# das Panel nach einem einzigen Tipp auf "Stoppen" fuer immer aus, ohne
+		# dass es irgendwo stuende.
+		if [ -f "$STOPPED" ]; then
+			rm -f "$STOPPED"
+			echo "LoxPanel war über „Stoppen“ angehalten – startet mit dem LoxBerry wieder."
+		fi
+		pruefen || exit 1
 		;;
 	backup)  backup ;;
 	restore) restore "$2" ;;
 	keep)    echo "$KEEP" ;;
-	*) echo "Nutzung: $0 start|stop|restart|check|backup|restore <datei>|keep"; exit 1 ;;
+	port)
+		if [ $# -ge 2 ]; then port_setzen "$2" || exit 1; else _port; fi
+		;;
+	zustand) zustand ;;
+	*) echo "Nutzung: $0 start|stop|restart|check|boot|backup|restore <datei>|keep|port [<port>]|zustand"; exit 1 ;;
 esac
 exit 0

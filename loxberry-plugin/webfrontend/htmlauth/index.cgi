@@ -1,10 +1,12 @@
 #!/usr/bin/perl
 # LoxBerry-Plugin-Seite fuer LoxPanel – laeuft im LoxBerry-Rahmen (lbheader/
 # lbfooter) und LoxBerry-Design (Bootstrap-Klassen).
-#  - zeigt den Container-Status
+#  - zeigt den Container-Status (gestoppt, Port belegt ...)
 #  - Miniserver-Zugang -> wird an den laufenden Container weitergereicht
-#    (POST http://localhost:8099/api/settings/miniserver)
+#    (POST http://localhost:<port>/api/settings/miniserver), aber nur, wenn
+#    dort wirklich LoxPanel antwortet
 #  - Buttons zur vollen Oberflaeche (/config, /settings) und Container-Steuerung
+#  - Port am LoxBerry einstellen (loxpanel-ctl.sh port, loxpanel_plugin.cfg)
 use strict;
 use warnings;
 use CGI;
@@ -17,13 +19,54 @@ use LoxBerry::Web;
 
 my $cgi     = CGI->new;
 my $version = LoxBerry::System::pluginversion() // "";
-my $api     = "http://localhost:8099";
 my $ctl     = "REPLACELBPBINDIR/loxpanel-ctl.sh";
 my $log     = "REPLACELBPDATADIR/last_action.log";   # Verlauf der letzten Container-Aktion
 my $bdir    = "REPLACELBPDATADIR/backups";           # Konfig-Sicherungen (pre-/postroot.sh nehmen sie ueber Plugin-Updates mit)
 my $lbhost  = LoxBerry::System::get_localip() // "localhost";
 
 sub h { my $s = shift; $s = "" unless defined $s; $s =~ s/&/&amp;/g; $s =~ s/</&lt;/g; $s =~ s/>/&gt;/g; $s =~ s/"/&quot;/g; return $s; }
+
+# Eine Auskunft von loxpanel-ctl.sh (port, keep, zustand) als Zeilen. Was das
+# Plugin einstellt, steht nur dort; das Widget fragt es ab.
+sub ctl_auskunft {
+    my @zeilen;
+    if (-x $ctl && open(my $fh, '-|', $ctl, @_)) {
+        @zeilen = <$fh>;
+        close $fh;
+    }
+    chomp @zeilen;
+    return @zeilen;
+}
+
+# Port am LoxBerry, unter dem LoxPanel laeuft (loxpanel_plugin.cfg, sonst der
+# Standard des Skripts)
+my ($port) = grep { /^\d+$/ } ctl_auskunft('port');
+my $api    = defined $port ? "http://localhost:$port" : undef;
+
+# Antwortet unter $api LoxPanel? -> Einstellungen (Hash) oder undef. Erkannt an
+# /api/settings mit "miniserver" und "version" (api_settings in webvisu.py): Belegt
+# ein anderes Programm den Port, bekommt es keine Zugangsdaten.
+sub loxpanel_einstellungen {
+    return undef unless $api;
+    my $r = LWP::UserAgent->new(timeout => 5)->get("$api/api/settings");
+    return undef unless $r->is_success;
+    my $j = eval { decode_json($r->decoded_content) };
+    return (ref($j) eq 'HASH' && ref($j->{miniserver}) eq 'HASH' && ref($j->{version}) eq 'HASH') ? $j : undef;
+}
+
+# Warum LoxPanel nicht antwortet, aus "loxpanel-ctl.sh zustand": (Text, Art der
+# Meldung). Gestoppt und Port belegt nennen den Weg zurueck.
+sub nicht_erreichbar {
+    my %z = map { /^(\w+)=(.*)$/ ? ($1 => $2) : () } ctl_auskunft('zustand');
+    my $p = h($z{port} // $port // '');
+    return ("Port&nbsp;$p am LoxBerry ist belegt (" . h($z{belegt}) . ") &ndash; LoxPanel kann so nicht starten. "
+          . "Unten unter &bdquo;Port am LoxBerry&ldquo; einen freien Port einstellen.", 'danger') if ($z{belegt} // '') ne '';
+    return ("LoxPanel ist gestoppt (&bdquo;Stoppen&ldquo; am " . h($z{gestoppt}) . ") &ndash; startet wieder mit "
+          . "&bdquo;Starten&ldquo; oder beim n&auml;chsten Neustart des LoxBerry.", 'warning') if ($z{gestoppt} // '') ne '';
+    return ("Container l&auml;uft, LoxPanel antwortet aber (noch) nicht auf Port&nbsp;$p &ndash; "
+          . "kurz nach dem Start normal, sonst &bdquo;Jetzt updaten / Neu starten&ldquo;.", 'warning') if ($z{laeuft} // '') eq '1';
+    return ("Container nicht erreichbar &ndash; l&auml;uft er? (unten &bdquo;Starten&ldquo;)", 'danger');
+}
 
 # Eine Steuer-Aktion nicht-blockierend im Hintergrund starten (Ausgabe -> $log,
 # das unten live angezeigt wird). Alle drei Standard-Fds umleiten, damit Apache
@@ -49,6 +92,19 @@ sub _lox_cred {
     return $enc;
 }
 
+# Port des Miniservers aus der LoxBerry-Konfiguration: bei "HTTPS bevorzugen"
+# (PreferHttps) der HTTPS-Port, sonst der HTTP-Port. Das Schema waehlt der
+# Server am Port (80 = HTTP, sonst HTTPS: _ms_https in webvisu.py).
+# PreferHttps kommt je nach LoxBerry als JSON-Wahrheitswert oder als Text.
+sub _lox_port {
+    my ($m) = @_;
+    my $https = $m->{PreferHttps};
+    $https = ref($https) ? ($https ? 1 : 0)
+           : (defined $https && $https =~ /^\s*(?:1|true|on|yes)\s*$/i ? 1 : 0);
+    my $p = ($https && ($m->{PortHttps} // '') =~ /^\s*\d+\s*$/) ? $m->{PortHttps} : $m->{Port};
+    return int($p || 443);
+}
+
 # Miniserver-Zugang an den Container weiterreichen und Ergebnis-HTML liefern.
 # Antwort von /api/settings/miniserver: "error" ist ein fester Text, der Fehler
 # des Miniservers steht getrennt in "fehler". "gespeichert" = Miniserver nicht
@@ -60,6 +116,10 @@ sub _lox_cred {
 # kommt "Port ungueltig" als Latin-1 an.
 sub apply_miniserver {
     my ($data) = @_;
+    unless (loxpanel_einstellungen()) {
+        my ($text, $art) = nicht_erreichbar();
+        return "<div class='alert alert-$art'>Zugang nicht gesendet: $text</div>";
+    }
     my $ua = LWP::UserAgent->new(timeout => 25);
     my $r  = $ua->post("$api/api/settings/miniserver",
         'Content-Type' => 'application/json', Content => encode_json($data));
@@ -97,12 +157,15 @@ elsif ($action eq 'fromlox') {
     my %ms = LoxBerry::System::get_miniservers();
     my $m;
     for my $k (sort { $a <=> $b } keys %ms) { $m = $ms{$k}; last; }
-    if ($m && ($m->{IPAddress} // '') ne '') {
+    my $user = $m ? _lox_cred($m->{Admin_RAW}, $m->{Admin}) : '';
+    if ($m && ($m->{IPAddress} // '') ne '' && $user eq '') {
+        $msg = "<div class='alert alert-danger'>In LoxBerry ist f&uuml;r den Miniserver kein Benutzer eingetragen (Hauptmen&uuml; &rarr; Miniserver).</div>";
+    } elsif ($m && ($m->{IPAddress} // '') ne '') {
         $msg = apply_miniserver({
             host       => $m->{IPAddress},
-            user       => _lox_cred($m->{Admin_RAW}, $m->{Admin}),
+            user       => $user,
             pass       => _lox_cred($m->{Pass_RAW},  $m->{Pass}),
-            port       => int($m->{Port} || 443),   # LoxBerry-Port spiegeln (80=Gen1/HTTP, 443=Gen2/HTTPS)
+            port       => _lox_port($m),
             verify_tls => JSON::false,
         });
     } else {
@@ -116,6 +179,17 @@ elsif ($action =~ /^(start|stop|restart)$/) {
          . "bei einem Update wird das Image geladen (kann 1&ndash;2&nbsp;Min dauern). "
          . "Der Verlauf erscheint unten unter &bdquo;Letzte Aktion&ldquo; und aktualisiert sich automatisch.</div>";
     $refresh = 1;
+}
+elsif ($action eq 'port') {
+    my $neu = scalar($cgi->param('lbport')) // '';
+    $neu =~ s/^\s+|\s+$//g;
+    if ($neu =~ /^\d{1,5}$/) {       # nur Ziffern -> shell-sicher, den Bereich prueft loxpanel-ctl.sh
+        launch_bg("Port am LoxBerry ($neu)", $ctl, "port", $neu);
+        $msg = "<div class='alert alert-info'>Port wird umgestellt &hellip; ein laufendes LoxPanel startet dabei neu. Verlauf unten.</div>";
+        $refresh = 1;
+    } else {
+        $msg = "<div class='alert alert-danger'>&bdquo;" . h($neu) . "&ldquo; ist kein Port &ndash; nur Ziffern (1&ndash;65535).</div>";
+    }
 }
 elsif ($action eq 'backup') {
     launch_bg("Backup", $ctl, "backup");
@@ -146,22 +220,31 @@ elsif ($action eq 'delete_backup') {
 
 # ---- Status vom Container holen ----
 my ($running, $conn, $mhost, $muser, $mport, $haspass) = (0, 0, '', '', 443, 0);
-my $sr = LWP::UserAgent->new(timeout => 5)->get("$api/api/settings");
-if ($sr->is_success) {
+my $j = loxpanel_einstellungen();
+if ($j) {
     $running = 1;
-    my $j = eval { decode_json($sr->decoded_content) };
-    if ($j) {
-        $conn = $j->{connected} ? 1 : 0;
-        my $m = $j->{miniserver} // {};
-        $mhost = $m->{host} // ''; $muser = $m->{user} // '';
-        $mport = $m->{port} // 443; $haspass = $m->{hasPass} ? 1 : 0;
-    }
+    $conn = $j->{connected} ? 1 : 0;
+    my $m = $j->{miniserver};
+    $mhost = $m->{host} // ''; $muser = $m->{user} // '';
+    $mport = $m->{port} // 443; $haspass = $m->{hasPass} ? 1 : 0;
 }
-my $stat = !$running ? "<span style='color:#a94442'>Container l&auml;uft nicht</span>"
-    : $conn ? "<span style='color:#3c763d'>l&auml;uft &middot; Miniserver verbunden</span>"
-    : "<span style='color:#8a6d3b'>l&auml;uft &middot; noch kein Miniserver</span>";
+my $stat = $running
+    ? ($conn ? "<span style='color:#3c763d'>l&auml;uft &middot; Miniserver verbunden</span>"
+             : "<span style='color:#8a6d3b'>l&auml;uft &middot; noch kein Miniserver</span>")
+    : "<span style='color:#a94442'>Container l&auml;uft nicht</span>";
+# Laeuft LoxPanel nicht, steht der Grund im Status-Feld (ausser eine Aktion
+# meldet gerade selbst etwas)
+if (!$running && $msg eq '') {
+    my ($text, $art) = nicht_erreichbar();
+    $msg = "<div class='alert alert-$art'>$text</div>";
+}
 
 my ($hh, $hu, $hp) = (h($mhost), h($muser), h($mport));
+my $lbport = h($port // '');
+my $links = defined $port
+    ? "<a class=\"lpbtn lpgreen\" href=\"http://$lbhost:$lbport/config\" target=\"_blank\">Panels &amp; Kacheln &ouml;ffnen</a>\n"
+    . "      <a class=\"lpbtn lpgreen\" href=\"http://$lbhost:$lbport/settings\" target=\"_blank\">Settings &ouml;ffnen</a>"
+    : "<p style='color:#a94442;margin:0'>Port am LoxBerry unbekannt &ndash; $ctl antwortet nicht.</p>";
 my $passph = $haspass ? "unver&auml;ndert lassen" : "Passwort eingeben";
 
 # ---- Verlauf der letzten Aktion (Tail) ----
@@ -227,12 +310,8 @@ for my $b (@backups) {
         . "</td></tr>";
 }
 # Wie viele Sicherungen behalten werden, legt nur loxpanel-ctl.sh fest (KEEP).
-my $keep = '';
-if (-x $ctl && open(my $kf, '-|', $ctl, 'keep')) {
-    $keep = <$kf> // '';
-    close $kf;
-    chomp $keep;
-}
+my ($keep) = ctl_auskunft('keep');
+$keep //= '';
 my $keep_html = $keep =~ /^\d+$/ ? " Behalten werden die letzten $keep." : "";
 my $backups_html = $blist
     ? "<div style='overflow-x:auto'><table style='width:100%;border-collapse:collapse'>"
@@ -286,8 +365,7 @@ print <<"HTML";
     </div>
     <hr>
     <div class="lprow">
-      <a class="lpbtn lpgreen" href="http://$lbhost:8099/config" target="_blank">Panels &amp; Kacheln &ouml;ffnen</a>
-      <a class="lpbtn lpgreen" href="http://$lbhost:8099/settings" target="_blank">Settings &ouml;ffnen</a>
+      $links
     </div>
   </div>
 </div>
@@ -299,6 +377,18 @@ print <<"HTML";
       <form method="post"><input type="hidden" name="action" value="restart"><button class="lpbtn lpgrey" type="submit">Jetzt updaten / Neu starten</button></form>
       <form method="post"><input type="hidden" name="action" value="start"><button class="lpbtn lpgrey" type="submit">Starten</button></form>
       <form method="post"><input type="hidden" name="action" value="stop"><button class="lpbtn lpgrey" type="submit">Stoppen</button></form>
+    </div>
+    <p style="color:#777;font-size:12px;margin:7px 0 0">&bdquo;Stoppen&ldquo; h&auml;lt LoxPanel bis &bdquo;Starten&ldquo; oder bis zum n&auml;chsten Neustart des LoxBerry an; die 5-Minuten-Pr&uuml;fung startet es so lange nicht.</p>
+    <hr>
+    <form method="post" id="portform">
+      <input type="hidden" name="action" value="port">
+      <div class="lpfields">
+        <div class="lpf" style="flex:.6;min-width:110px"><label>Port am LoxBerry</label><input class="form-control" name="lbport" value="$lbport" inputmode="numeric"></div>
+      </div>
+    </form>
+    <p style="color:#777;font-size:12px;margin:7px 0 8px">Unter diesem Port erreichen Oberfl&auml;che, Panels und die App LoxPanel. Belegt ihn ein anderes Plugin, hier einen freien eintragen; ein laufendes LoxPanel startet damit neu. Der Port bleibt bei Updates erhalten, Panels und App brauchen danach die neue Adresse.</p>
+    <div class="lprow" style="margin-top:0">
+      <button class="lpbtn lpgrey" type="submit" form="portform">Port &uuml;bernehmen</button>
     </div>
   </div>
 </div>

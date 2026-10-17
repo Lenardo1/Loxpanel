@@ -8,6 +8,7 @@ ARGV5=$5   # LoxBerry-Basisordner
 LPTMP="${LOXPANEL_UPGRADE_TMP:-/tmp}"
 LPBK="$LPTMP/loxpanel-upgrade-backup"      # config/
 LPARCH="$LPTMP/loxpanel-upgrade-archive"   # backups/ (Archive aus dem Widget)
+LPEIN="$LPTMP/loxpanel-upgrade-plugin.cfg" # Einstellungen des Plugins (Port am LoxBerry)
 DATADIR="$ARGV5/data/plugins/$ARGV3"
 RC=0
 
@@ -48,8 +49,25 @@ elif [ -d "$LPARCH" ]; then
 	echo "<INFO> Sicherungen aus einem abgebrochenen Update gefunden, werden zurückgespielt."
 fi
 
-# Laufenden Container vor dem (Neu-)Installieren stoppen (belegt sonst Port 8099).
+# Einstellungen des Plugins (Port am LoxBerry, im Widget gesetzt) mitnehmen:
+# LoxBerry loescht auch den Config-Ordner des Plugins. Scheitert die Kopie, nur
+# warnen: LoxPanel startet dann auf dem Standard-Port, und ist der belegt, sagt
+# das Widget es. Fehlt der Config-Ordner, ist ein frueheres Update nach dem
+# Loeschen abgebrochen: dann bleibt dessen Kopie stehen.
 CONFIGDIR="$ARGV5/config/plugins/$ARGV3"
+if [ -f "$CONFIGDIR/loxpanel_plugin.cfg" ]; then
+	if cp -p "$CONFIGDIR/loxpanel_plugin.cfg" "$LPEIN"; then
+		echo "<INFO> Plugin-Einstellungen (Port am LoxBerry) gesichert (Update-sicher)."
+	else
+		rm -f "$LPEIN"
+		echo "<WARNING> Plugin-Einstellungen ($CONFIGDIR/loxpanel_plugin.cfg) ließen sich nicht mitnehmen – LoxPanel startet nach dem Update auf dem Standard-Port, im Widget unter „Port am LoxBerry“ neu einstellen."
+		RC=1
+	fi
+elif [ -d "$CONFIGDIR" ]; then
+	rm -f "$LPEIN"       # kein eigener Port mehr: alte Kopie darf nicht wieder auftauchen
+fi
+
+# Laufenden Container vor dem (Neu-)Installieren stoppen (belegt sonst seinen Port).
 if [ -f "$CONFIGDIR/docker-compose.yml" ]; then
 	echo "<INFO> Stoppe laufendes LoxPanel..."
 	sudo docker compose -f "$CONFIGDIR/docker-compose.yml" down 2>/dev/null

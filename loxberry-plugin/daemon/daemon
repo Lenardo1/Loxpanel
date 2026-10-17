@@ -1,6 +1,7 @@
 #!/bin/bash
 # Wird beim Boot von LoxBerry ausgefuehrt -> startet LoxPanel (sofern Docker
-# verfuegbar und das Panel nicht bewusst gestoppt wurde).
+# verfuegbar ist). Ein "Stoppen" im Widget gilt nur bis zu diesem Neustart
+# (loxpanel-ctl.sh boot).
 if which docker > /dev/null 2>&1; then
-	su -s /bin/bash loxberry -c "REPLACELBPBINDIR/loxpanel-ctl.sh check"
+	su -s /bin/bash loxberry -c "REPLACELBPBINDIR/loxpanel-ctl.sh boot"
 fi
