@@ -37,10 +37,10 @@ sudo apt install -y python3-pip chromium unclutter fonts-inter fonts-roboto
 sudo apt install -y gcc libc6-dev libffi-dev python3-dev
 sudo pip3 install --break-system-packages -r /opt/loxpanel/requirements.txt
 ```
-Die Paketliste steht nur in `requirements.txt`: Kalender und die Anmeldung am
-Audioserver brauchen mehr als `loxone-api`. Fehlt eins der Pakete dafuer, startet
-der Server trotzdem und nennt es beim Start im Log; ohne `loxone-api` (und das
-damit installierte `aiohttp`) startet er nicht.
+Die Paketliste steht nur in `requirements.txt`: Kalender, Intercom und die
+Anmeldung am Audioserver brauchen mehr als `loxone-api`. Fehlt eins der Pakete
+dafuer, startet der Server trotzdem und nennt es beim Start im Log; ohne
+`loxone-api` (und das damit installierte `aiohttp`) startet er nicht.
 
 `--break-system-packages` kennt pip erst ab Version 23 (Debian 12); auf
 aelteren Systemen die Option weglassen. Auf 32-bit-ARM bekommt pip
@@ -54,12 +54,12 @@ rustup installieren (dessen `cargo` muss auch fuer `sudo pip3` im `PATH` liegen)
 
 ## 3) Miniserver-Zugang
 Nach Schritt 4 im Browser `http://<px30-ip>:8099/config` oeffnen und den Zugang
-unter **Settings → Miniserver** eintragen. Der Server legt `config/loxpanel.cfg`
-selbst an und verbindet sich; bis dahin wartet er und zeigt jedem Panel, wo der
-Konfigurator zu oeffnen ist. Alternativ in der `.service` unter `[Service]` je
-eine Zeile `Environment=LOXPANEL_MS_HOST=<ip>` (ebenso `_USER`, `_PASS`, `_PORT`,
-`_VERIFY_TLS`); ein unter Settings gespeicherter Zugang hat Vorrang vor diesen
-Variablen.
+unter **Einstellungen → Miniserver** eintragen. Der Server prueft die Anmeldung und
+legt `config/loxpanel.cfg` selbst an; bis dahin wartet er und zeigt jedem Panel,
+wo der Konfigurator zu oeffnen ist. Alternativ in der `.service` unter
+`[Service]` je eine Zeile `Environment=LOXPANEL_MS_HOST=<ip>` (ebenso `_USER`,
+`_PASS`, `_PORT`, `_VERIFY_TLS`); ein unter Einstellungen gespeicherter Zugang hat
+Vorrang vor diesen Variablen.
 
 ## 4) Server als Dienst
 ```bash
@@ -95,11 +95,11 @@ Dann Panel neu starten:
 sudo reboot
 ```
 
-## 6) Panel-Agent (empfohlen: Fernstart aus der Settings-Seite)
+## 6) Panel-Agent (empfohlen: Fernstart aus dem Reiter Displays)
 
 Statt `kiosk.sh` direkt zu starten, den **Agenten** starten — er startet den
 Kiosk selbst UND meldet das Panel beim Server, sodass du es unter
-`http://<SERVER>/settings` findest und dort **Start / Reload / Ansicht wechseln**
+`http://<SERVER>/config` im Reiter **Displays** findest und dort **Start / Reload / Ansicht wechseln**
 kannst. Nutzt dieselbe `loxpanel-kiosk.conf` (zusaetzlich optional `AGENT_PORT`,
 `AGENT_NAME`); nur Python-Standardlib, keine Extra-Pakete.
 

@@ -37,7 +37,7 @@ class MainActivity : Activity() {
                 appendLine("    ${Visu.BASIS}config")
                 appendLine()
                 appendLine("Log ansehen:")
-                appendLine("    adb logcat -s LPSERVER python.stdout python.stderr")
+                appendLine("    adb logcat -s LPSERVER LPANZEIGE python.stdout python.stderr")
             }
         }
         setContentView(ScrollView(this).apply { addView(tv) })

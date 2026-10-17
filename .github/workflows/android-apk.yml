@@ -14,6 +14,11 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+# Das Release anlegen und die Datei anhaengen braucht Schreibrecht auf den
+# Inhalt; ohne die Angabe gilt die Voreinstellung des Repos.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest

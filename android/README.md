@@ -91,10 +91,41 @@ braucht keinen Schlüssel.
 ## Start-Adresse der Anzeige
 Port und Adresse des eingebetteten Servers stehen in `Visu.kt`. Die Anzeige lädt
 beim Start die zuletzt angezeigte Visu-Adresse, beim allerersten Start die Visu mit
-dem Standardprofil. Wechselt die Ansicht über *Displays* oder die
+dem Standardprofil. Wechselt die Ansicht über *Geräte* oder die
 Betriebsmodus-Automatik, lädt sich die Visu mit neuem `?panel=`. Die App merkt
 sich diese Adresse, nach einem Neustart steht also dieselbe Ansicht da. Welche
 Adressen als Visu gelten, prüft `gradle testDebugUnitTest`.
+
+## Stabilität: Wächter und Absturz der Anzeige
+Ein Wandpanel soll wochenlang ohne Eingriff laufen. Drei Teile sorgen dafür,
+die Werte stehen in `Waechter.kt`:
+
+- **Server-Wächter** (`ServerService`): Der Dienst fragt den eingebetteten
+  Server alle 30 s nach `/api/health`. Antwortet er dreimal hintereinander
+  nicht oder meldet er eine beendete Hintergrund-Aufgabe (503), beendet der
+  Dienst den Prozess der App. Android startet sie gleich wieder: den Dienst,
+  weil er `START_STICKY` ist, die Anzeige, wenn sie vorn war (`stateNotNeeded`
+  im Manifest). Nach dem Start hat der Server 5 Minuten für die erste Antwort,
+  denn der erste Start nach einem Update kopiert den Code und entpackt Python.
+  Höchstens 3 Neustarts je Stunde, damit ein dauerhaft kaputter Server die App
+  nicht in eine Schleife schickt. Fehlt nur die Verbindung zum Miniserver,
+  startet nichts neu: `/api/health` meldet das als `"miniserver": false`, und
+  der Server verbindet von selbst neu. Server und Wächter starten je Prozess
+  einmal, auch wenn Anzeige, Boot und Android den Dienst mehrfach starten.
+- **Absturz der Anzeige** (`KioskActivity`, ab Android 8): Stürzt der
+  Renderer der WebView ab oder beendet Android ihn wegen Speichermangel, baut
+  die Anzeige eine neue WebView auf und lädt die Visu nach 2 s, statt die
+  ganze App mitzureißen. Hängt der Renderer, etwa in einer Endlosschleife,
+  meldet Android das ab Android 10 frühestens alle 5 s. Nach 6 Meldungen in
+  Folge beendet die Anzeige ihn, dann greift derselbe Neuaufbau.
+- **Neu laden in der Nacht** (Visu): Ohne Eintrag bei *Auto-Neustart alle
+  (Std.)* lädt sich die Visu jede Nacht um 3 Uhr neu (`NEULADEN_STUNDE` im
+  Server), aber nur, während die Uhr-Seite steht. Ein dunkles Display bleibt
+  dabei dunkel.
+
+Zum Nachsehen: `adb logcat -s LPSERVER LPANZEIGE`. Der Wächter schreibt unter
+`LPSERVER` mit „Wächter:“ davor, die Anzeige unter `LPANZEIGE`. Die Regeln
+prüft `gradle testDebugUnitTest` (`WaechterTest`).
 
 ## Wenn der Spike grün ist
 Nächste Schritte für die echte App (separat, kein Teil dieses Spikes):
@@ -116,8 +147,11 @@ und „Display an“.
 | `turnScreenOn()` | Visu bei Klingel, Wecker, Notify, Goto und wenn der Server das Display einschaltet | Schoner weg, Leerlaufzeit beginnt neu |
 | `turnScreenOff()` | Visu, wenn der Server das Display abschaltet (*Displays*, `/api/display`) | Schoner an |
 | `isScreenOn()` | Visu vor `turnScreenOn()` | `true`, solange kein Schoner zu sehen ist |
+| `startIntercom(uuid)` | Sprechen auf Gen-1-Detailseite oder Kamera-Pane | Asynchroner SIP-Start mit nativer Mikrofonfreigabe und RTP-Audio; Boolean bestätigt Annahme |
+| `stopIntercom()` | Auflegen | Bricht den Aufbau ab bzw. legt auf; gibt Mikrofon, Lautsprecher und Audiofokus frei |
+| `intercomStatus()` | Visu alle 500 ms bei sichtbarer Sprechbedienung | JSON-String `{state, uuid, message}` ohne SIP-Zugang; Zustände `idle`, `connecting`, `connected`, `ending`, `error` |
 
-Die drei letzten heißen wie bei Fully Kiosk, damit die Visu beide Apps gleich
+Die drei Methoden zur Displaysteuerung heißen wie bei Fully Kiosk, damit die Visu beide Apps gleich
 behandelt.
 
 Hat das Gerät unter *Displays* einen Präsenzmelder, gibt die Visu der App
@@ -132,3 +166,14 @@ mit der Fläche: 70 % abdunkeln ergibt 7 % der eingestellten Helligkeit. Die
 App setzt nur die Helligkeit ihres Fensters, die Einstellung des Geräts
 bleibt. Bei automatischer Helligkeit kennt sie die tatsächliche Helligkeit
 nicht und lehnt ab; dann dunkelt die Visu wie im Browser ab.
+
+Berührungen im Schoner (Uhr-Seite der Visu oder dunkles Display) hält die App
+kurz zurück (`SchonerBeruehrung`, `WARTE_MS` = 120 ms): Ein Finger weckt wie
+bisher, nach der Wartezeit oder beim Loslassen, und erreicht keine Kachel.
+Setzt in dieser Zeit ein zweiter Finger auf, ist es eine Geste wie auf den
+Loxone-Tastern (Licht dimmen, Stimmung, Beschattung, Raum verlassen): Die App
+reicht die ganze Berührung samt dem zurückgehaltenen ersten Ereignis an die
+Visu weiter und lässt das Display dunkel. Ob Gesten an sind, entscheidet die
+Visu; ohne Gesten weckt sie selbst (`setSaver(false)`). Die Entscheidung steht
+ohne Android in `SchonerBeruehrung.kt` und ist in `SchonerBeruehrungTest`
+geprüft.
