@@ -3,10 +3,19 @@ name: Plugin Release
 # Baut das LoxBerry-Plugin-ZIP (Inhalt von loxberry-plugin/ im ZIP-Root) und
 # haengt es an das GitHub-Release. release.cfg -> ARCHIVEURL zeigt auf
 # .../releases/latest/download/loxpanel-plugin.zip.
+#
+# Ausgeloest vom Tag v*, wie APK (android-apk.yml) und .deb (deb.yml). Frueher
+# hing der Lauf an `release: published`. Legt aber einer der beiden anderen
+# Workflows das Release an (softprops/action-gh-release mit GITHUB_TOKEN),
+# loest GitHub dafuer keinen weiteren Workflow aus: Das ZIP fehlte, und
+# LoxBerry faende unter ARCHIVEURL nichts. Ein Release aus der Oberflaeche
+# ("Create new tag on publish") legt den Tag an und kommt so ebenfalls hier an.
+#
+# Die Release-Notizen sind der Eintrag der Version im Changelog der README.
 
 on:
-  release:
-    types: [published]
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -25,11 +34,25 @@ jobs:
           cd ..
           unzip -l loxpanel-plugin.zip | head -30
 
+      - name: Release-Notizen aus dem Changelog
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v kopf="- **${version}** – " \
+            'index($0, kopf) == 1 { print substr($0, length(kopf) + 1); exit }' \
+            README.md > release-notes.md
+          if [ -s release-notes.md ]; then
+            cat release-notes.md
+          else
+            echo "::warning::Kein Eintrag für ${version} im Changelog der README, das Release bleibt ohne Notizen."
+          fi
+
       - name: An Release anhaengen
-        if: github.event_name == 'release'
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: loxpanel-plugin.zip
+          body_path: release-notes.md
 
       - name: Als Artefakt hochladen (bei manuellem Lauf)
         if: github.event_name == 'workflow_dispatch'

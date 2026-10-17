@@ -1,8 +1,6 @@
 package com.loxpanel.spike
 
 import android.app.Activity
-import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.view.Gravity
 import android.widget.ScrollView
@@ -10,34 +8,36 @@ import android.widget.TextView
 
 /**
  * Startet den LoxPanel-Server-Service und zeigt einen kurzen Status.
- * Die eigentliche Anzeige des Panels macht die KioskActivity (Visu.BASIS).
+ * Die eigentliche Anzeige des Panels macht die KioskActivity (Visu.basis).
  */
 class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val intent = Intent(this, ServerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        val eingerichtet = Visu.eingerichtet(this)
+        val eigener = eingerichtet && Visu.eigenerServer(this)
+        if (eigener) ServerService.starten(this)
+        val basis = Visu.basis(this)
 
         val tv = TextView(this).apply {
             textSize = 14f
             setPadding(32, 32, 32, 32)
             gravity = Gravity.TOP or Gravity.START
             text = buildString {
-                appendLine("LoxPanel-Server wird gestartet …")
+                appendLine(when {
+                    !eingerichtet -> "Noch nicht eingerichtet: Die Anzeige fragt beim Start, wo der Server läuft."
+                    eigener -> "LoxPanel-Server auf diesem Gerät wird gestartet …"
+                    else -> "Server im Netz: ${Visu.server(this@MainActivity)}"
+                })
                 appendLine()
                 appendLine("Visu:")
-                appendLine("    ${Visu.BASIS}")
+                appendLine("    $basis")
                 appendLine()
                 appendLine("Konfiguration:")
-                appendLine("    ${Visu.BASIS}config")
+                appendLine("    ${basis}config")
                 appendLine()
                 appendLine("Log ansehen:")
-                appendLine("    adb logcat -s LPSERVER python.stdout python.stderr")
+                appendLine("    adb logcat -s LPSERVER LPANZEIGE python.stdout python.stderr")
             }
         }
         setContentView(ScrollView(this).apply { addView(tv) })

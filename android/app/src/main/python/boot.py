@@ -46,11 +46,14 @@ def _start_server(app_dir, port):
     webvisu.main()                                  # baut App+Routen -> (gepatchtes) run_app
 
 
-def start_bg(app_dir, port):
+def start_bg(app_dir, port, intercom_token=""):
     """Startet den Server in einem Daemon-Thread. Idempotent."""
     global _started
     if _started:
         return "already-running"
+    # Nur die native Bruecke kennt dieses Prozess-Token, nie die WebView.
+    if intercom_token:
+        os.environ["LOXPANEL_INTERCOM_TOKEN"] = str(intercom_token)
     _started = True
 
     def _run():

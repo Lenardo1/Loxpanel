@@ -6,7 +6,10 @@ Stop-Befehle entgegen, um den Chromium-Kiosk fernzusteuern. Nur Standardlib.
 
 Config: dieselbe deploy/loxpanel-kiosk.conf wie kiosk.sh
   SERVER=host:port     LoxPanel-Server (Pflicht)
-  PANEL=<id>           Panel-Profil / Startseite
+  PANEL=<id>           Startansicht, nur bis der Server dem Geraet eine Ansicht
+                       zuordnet (Konfigurator, Geraete); leer = Standardansicht
+  DPMS_OFF=<sek>       Display aus nach Sekunden, nur solange der Server keinen
+                       Wert schickt (Vorgaben oder Geraet); leer = 180
   AGENT_PORT=8130      HTTP-Port des Agenten (Default 8130)
   AGENT_NAME=<name>    Anzeigename (Default: Hostname)
 

@@ -1,5 +1,6 @@
 package com.loxpanel.spike
 
+import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,24 +9,89 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import java.io.File
+import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Foreground-Service, der den eingebetteten LoxPanel-Server (webvisu.py) startet
  * und am Leben hält. Der echte LoxPanel-Code liegt in den App-Assets und wird
  * beim ersten Start nach filesDir/loxpanel kopiert, dann aus Python importiert.
+ *
+ * Wächter: Der Dienst fragt den Server in festem Abstand nach /api/health.
+ * Antwortet er nicht mehr (Server-Thread beendet, Ereignisschleife hängt) oder
+ * meldet er eine beendete Hintergrund-Aufgabe, beendet der Dienst den Prozess
+ * der App. Android startet ihn neu: den Dienst, weil er START_STICKY ist, die
+ * Anzeige, wenn sie vorn war (stateNotNeeded im Manifest). Wann und wie oft,
+ * regelt [Waechter].
  */
 class ServerService : Service() {
+
+    companion object {
+        /** Der Server läuft je Prozess einmal. Anzeige, BootReceiver und der
+         *  Neustart durch Android starten den Dienst, jeder Start ruft
+         *  onStartCommand. */
+        private val gestartet = AtomicBoolean(false)
+
+        /** Ob der eingebettete Server in diesem Prozess gestartet wurde. Er
+         *  lässt sich nicht beenden; wer ihn loswerden will, startet den
+         *  Prozess neu (KioskActivity nach einem Wechsel auf einen Server im
+         *  Netz). */
+        val serverLaeuft: Boolean get() = gestartet.get()
+
+        /** Einstellungen des Wächters: die Zeitpunkte seiner Neustarts für die
+         *  Bremse. Sie müssen den Neustart überdauern. */
+        private const val WAECHTER = "waechter"
+        private const val NEUSTARTS = "neustarts"
+
+        /** Startet den Dienst, wenn der Server auf diesem Gerät laufen soll.
+         *  Mit einem Server im Netz gibt es nichts zu starten. */
+        fun starten(ctx: Context) {
+            if (!Visu.eingerichtet(ctx) || !Visu.eigenerServer(ctx)) return
+            val svc = Intent(ctx, ServerService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(svc) else ctx.startService(svc)
+        }
+
+        /** Nach einer geänderten Server-Einstellung: Dienst starten oder
+         *  beenden, je nachdem, wo der Server jetzt läuft. */
+        fun anpassen(ctx: Context) {
+            if (Visu.eigenerServer(ctx)) starten(ctx)
+            else ctx.stopService(Intent(ctx, ServerService::class.java))
+        }
+    }
+
+    /** Der Wächter dieses Dienstes; endet mit ihm (onDestroy). */
+    private var waechter: ScheduledExecutorService? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startForeground(1, buildNotification())
+        // Ein Server im Netz braucht keinen Dienst. Hierher kommt nur der
+        // Neustart durch Android (START_STICKY) nach einem Wechsel der
+        // Einstellung; startForeground muss trotzdem vorher stehen.
+        if (!Visu.eigenerServer(this)) {
+            Log.i("LPSERVER", "Server im Netz (${Visu.server(this)}), Dienst endet")
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         // Die Anzeige startet der BootReceiver bzw. der Nutzer (KioskActivity);
         // der Dienst kümmert sich nur um den Server.
+        val start = SystemClock.elapsedRealtime()
+        if (waechter == null) waechter = waechterStarten(start)
+        if (!gestartet.compareAndSet(false, true)) return START_STICKY
         Thread {
             try {
                 val appDir = File(filesDir, "loxpanel")
@@ -35,7 +101,7 @@ class ServerService : Service() {
                     Python.start(AndroidPlatform(this))
                 }
                 val res = Python.getInstance().getModule("boot")
-                    .callAttr("start_bg", appDir.absolutePath, Visu.PORT)
+                    .callAttr("start_bg", appDir.absolutePath, Visu.PORT, IntercomNative.token)
                 Log.i("LPSERVER", "boot.start_bg -> $res")
             } catch (e: Throwable) {
                 Log.e("LPSERVER", "Serverstart fehlgeschlagen", e)
@@ -43,6 +109,74 @@ class ServerService : Service() {
         }.start()
 
         return START_STICKY
+    }
+
+    override fun onDestroy() {
+        waechter?.shutdownNow()
+        waechter = null
+        super.onDestroy()
+    }
+
+    /** Prüft den Server ab [start] (elapsedRealtime) in festem Abstand und
+     *  startet die App neu, wenn er gestört ist. Liefert den Executor, damit
+     *  der Dienst ihn mit sich beenden kann. */
+    private fun waechterStarten(start: Long): ScheduledExecutorService {
+        val ctx = applicationContext
+        val stand = Waechter.Stand(start)
+        var gebremst = false
+        return Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "loxpanel-waechter").apply { isDaemon = true } }
+            .also { it.scheduleWithFixedDelay({
+                // Ein Fehler darf den Wächter nicht beenden: Der Executor führte
+                // die Prüfung danach nie wieder aus.
+                try {
+                    val gesund = gesund()
+                    if (gesund && !stand.warGesund) {
+                        Log.i("LPSERVER", "Wächter: Server antwortet, ${(SystemClock.elapsedRealtime() - start) / 1000} s nach dem Start")
+                    }
+                    if (gesund) gebremst = false
+                    if (stand.pruefung(gesund, SystemClock.elapsedRealtime()) && !neuStarten(ctx) && !gebremst) {
+                        gebremst = true
+                        Log.w("LPSERVER", "Wächter: Server gestört, die Bremse lässt keinen Neustart zu " +
+                            "(höchstens ${Waechter.NEUSTARTS_HOECHSTENS} in ${Waechter.BREMSE_MS / 60_000} min)")
+                    }
+                } catch (e: Throwable) {
+                    Log.e("LPSERVER", "Wächter: Prüfung fehlgeschlagen", e)
+                }
+            }, Waechter.PRUEF_ABSTAND_MS, Waechter.PRUEF_ABSTAND_MS, TimeUnit.MILLISECONDS) }
+    }
+
+    /** Ob der eigene Server antwortet und alle seine Hintergrund-Aufgaben
+     *  laufen: /api/health meldet dann 200, sonst 503. */
+    private fun gesund(): Boolean {
+        val con = URL(Visu.EIGENER + "api/health").openConnection() as HttpURLConnection
+        return try {
+            con.connectTimeout = Waechter.VERBINDEN_MS
+            con.readTimeout = Waechter.ANTWORT_MS
+            con.useCaches = false
+            val code = con.responseCode
+            if (code != HttpURLConnection.HTTP_OK) Log.w("LPSERVER", "Wächter: /api/health meldet $code")
+            code == HttpURLConnection.HTTP_OK
+        } catch (e: IOException) {
+            Log.w("LPSERVER", "Wächter: Server antwortet nicht ($e)")
+            false
+        } finally {
+            con.disconnect()
+        }
+    }
+
+    /** Beendet den Prozess der App, damit Android Server und Anzeige frisch
+     *  startet. false, wenn die Bremse das nicht erlaubt. */
+    @SuppressLint("ApplySharedPref")
+    private fun neuStarten(ctx: Context): Boolean {
+        val prefs = ctx.getSharedPreferences(WAECHTER, Context.MODE_PRIVATE)
+        val jetzt = System.currentTimeMillis()
+        val bisher = Waechter.zaehlende(Waechter.ausText(prefs.getString(NEUSTARTS, null)), jetzt)
+        if (!Waechter.neustartErlaubt(bisher, jetzt)) return false
+        // commit statt apply: Der Prozess endet gleich, der Eintrag muss vorher stehen.
+        prefs.edit().putString(NEUSTARTS, Waechter.alsText(bisher + jetzt)).commit()
+        Log.w("LPSERVER", "Wächter: Server gestört, App startet neu")
+        Process.killProcess(Process.myPid())
+        return true
     }
 
     /**
