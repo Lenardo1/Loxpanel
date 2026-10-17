@@ -23,17 +23,17 @@ Auf dem Wandpanel in `deploy/loxpanel-kiosk.conf` einfach
 
 **Miniserver-Zugang** — zwei Wege:
 - **Env-Variablen** in `.env` (`LOXPANEL_MS_HOST/USER/PASS/PORT/VERIFY_TLS`).
-- oder unter **Settings → Miniserver** auf der `/config`-Seite; der Server
+- oder unter **Einstellungen → Miniserver** auf der `/config`-Seite; der Server
   schreibt ihn nach `config/loxpanel.cfg` im gemounteten `./config`-Volume.
 
-Ein unter Settings gespeicherter Zugang (`loxpanel.cfg` mit `host`) hat Vorrang
+Ein unter Einstellungen gespeicherter Zugang (`loxpanel.cfg` mit `host`) hat Vorrang
 vor den Env-Variablen; die gelten nur, solange dort kein Host steht.
 
 **Persistenz:** Der Host-Ordner `./config` ist als Volume unter `/app/config`
 gemountet. Dort liegen/entstehen:
 - `panels.json` — von der `/config`-Seite geschrieben (Panel-Profile, Kachel-Styles).
 - `theme.json` — globales Theme (optional; sonst eingebaute Defaults).
-- `loxpanel.cfg` — von Settings geschrieben (Miniserver, Intercom, Nacht, Audio,
+- `loxpanel.cfg` — von den Einstellungen geschrieben (Miniserver, Intercom, Nacht, Audio,
   Kalender & Wetter).
 
 > Ohne `theme.json`/`panels.json` startet LoxPanel mit Defaults (eine Standard-

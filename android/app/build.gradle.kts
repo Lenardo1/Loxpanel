@@ -125,7 +125,7 @@ tasks.register<Copy>("syncLoxpanelAssets") {
     // config: nur die Vorlagen aus dem Repo. Was der Server zur Laufzeit dort anlegt
     // (Zugang, Ansichten, Farben und ihre Sicherungen *.bak samt Kennwoertern), kommt
     // nie in die App - auch nicht bei einem lokalen Build aus einem Ordner, in dem
-    // der Server schon lief.
+    // der Server schon lief. Gewacht: tests/test_apk_inhalt.py
     from(loxRepoRoot.resolve("config")) {
         into("config")
         include("*.example", "*.example.json", "*.schema.json")

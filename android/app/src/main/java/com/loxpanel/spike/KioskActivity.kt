@@ -1,7 +1,9 @@
 package com.loxpanel.spike
 
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.content.Context
 import android.content.Intent
 import android.content.res.Resources
@@ -15,16 +17,21 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebViewRenderProcess
+import android.webkit.WebViewRenderProcessClient
 import android.widget.FrameLayout
+import org.json.JSONObject
 
 /**
  * Eingebauter Kiosk: Vollbild-WebView auf den lokalen LoxPanel-Server. Ersetzt
@@ -47,6 +54,10 @@ import android.widget.FrameLayout
  * Helligkeit des Fensters auf einen Teil der eingestellten Systemhelligkeit,
  * statt eine dunkle Fläche über sich zu legen. Bei automatischer Helligkeit
  * lehnt die App ab, dann dunkelt die Visu wie bisher selbst ab.
+ *
+ * Absturz der Anzeige: Stürzt der Renderer der WebView ab oder beendet Android
+ * ihn, baut die Anzeige eine neue WebView auf, statt die App mitzureißen. Hängt
+ * er (ab Android 10 gemeldet), beendet sie ihn nach einer halben Minute selbst.
  */
 class KioskActivity : Activity(), SensorEventListener {
 
@@ -56,6 +67,11 @@ class KioskActivity : Activity(), SensorEventListener {
     private val ui = Handler(Looper.getMainLooper())
     private var errored = false
     private var reloadPending = false
+    private val intercom by lazy { IntercomAudio(this, ui) }
+    private val intercomCapability = IntercomCapability()
+    private var intercomPageCapability: String? = null
+    @Volatile private var intercomPage = false
+    private var destroyed = false
 
     // Bildschirmschoner nach Inaktivität. Die Zeit kommt aus /config ("Display aus
     // nach (Sek.)", Feld dpmsOff) über die JS-Brücke LoxKiosk; bis dahin 90 s als
@@ -73,6 +89,12 @@ class KioskActivity : Activity(), SensorEventListener {
     // im Nachtmodus der Visu, ein Teil davon (setDisplayBrightness).
     private var helligkeit = Helligkeit.SYSTEM
     private val goDark = Runnable { enterScreensaver() }
+    // Berührung im Schoner: ein Finger weckt, zwei Finger gehen als Geste an die
+    // Visu (Gesten im Dunkeln). Das erste Ereignis hält die Anzeige zurück, bis
+    // feststeht, ob ein zweiter Finger kommt (SchonerBeruehrung).
+    private val beruehrung = SchonerBeruehrung()
+    private var gehalten: MotionEvent? = null
+    private val fristAb = Runnable { if (beruehrung.frist() == SchonerBeruehrung.Tun.WECKEN) schonerWecken() }
 
     private val sensorManager by lazy { getSystemService(Context.SENSOR_SERVICE) as? SensorManager }
     // Näherungssensor (falls vorhanden). Am Shelly ist er ein Wake-up-Sensor, den
@@ -84,7 +106,6 @@ class KioskActivity : Activity(), SensorEventListener {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -96,13 +117,35 @@ class KioskActivity : Activity(), SensorEventListener {
         // aktiv bleibt und den Näherungssensor auswerten kann (sofortiges Wecken).
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        web = WebView(this)
-        web.setBackgroundColor(Color.parseColor("#0b1020"))
-        web.overScrollMode = View.OVER_SCROLL_NEVER
-        web.isVerticalScrollBarEnabled = false
-        web.isHorizontalScrollBarEnabled = false
+        web = neueWebView()
 
-        with(web.settings) {
+        // Dunkel-Overlay: NUR schwarz (echtes Schwarz beim Backlight-Aus), KEINE
+        // eigene Uhr — die Uhr zeigt die Visu. Zunächst versteckt.
+        saver = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            visibility = View.GONE
+        }
+
+        root = FrameLayout(this)
+        root.addView(web, vollbild())
+        root.addView(saver, vollbild())
+        setContentView(root)
+
+        show()
+        wake()
+    }
+
+    /** Die WebView der Anzeige mit Einstellungen und JS-Brücke: beim Start und
+     *  wenn sie neu aufgebaut wird, weil ihr Renderer beendet ist. */
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun neueWebView(): WebView {
+        val w = WebView(this)
+        w.setBackgroundColor(Color.parseColor("#0b1020"))
+        w.overScrollMode = View.OVER_SCROLL_NEVER
+        w.isVerticalScrollBarEnabled = false
+        w.isHorizontalScrollBarEnabled = false
+
+        with(w.settings) {
             javaScriptEnabled = true
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false   // Wecker-Ton ohne Nutzergeste
@@ -115,37 +158,120 @@ class KioskActivity : Activity(), SensorEventListener {
             cacheMode = WebSettings.LOAD_DEFAULT
         }
 
-        web.webViewClient = object : WebViewClient() {
+        w.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(v: WebView, r: WebResourceRequest): Boolean = false
+            override fun onPageStarted(v: WebView, adresse: String?, favicon: android.graphics.Bitmap?) {
+                intercomPage = adresse?.let { Visu.istVisu(it) } == true
+                intercomPageCapability = if (intercomPage) intercomCapability.rotate() else {
+                    intercomCapability.clear()
+                    null
+                }
+                intercom.stop()
+            }
             override fun onReceivedError(v: WebView, req: WebResourceRequest?, err: WebResourceError?) {
-                if (req == null || req.isForMainFrame) { errored = true; scheduleReload() }
+                if (req == null || req.isForMainFrame) {
+                    intercomPage = false
+                    intercomCapability.clear()
+                    intercomPageCapability = null
+                    intercom.stop()
+                    errored = true
+                    scheduleReload()
+                }
             }
             // Jede geladene Visu-Adresse merken (auch nach einem Ansichtswechsel
             // per ?panel=), damit die App nach einem Neustart dort weitermacht.
             override fun onPageFinished(v: WebView, adresse: String?) {
                 Visu.merken(this@KioskActivity, adresse)
+                if (v === web && adresse == v.url && adresse?.let { Visu.istVisu(it) } == true) {
+                    intercomBruecke(v)
+                }
+            }
+            // Der Renderer ist abgestürzt oder von Android beendet (Speicher,
+            // HaengerWaechter). Ohne diese Behandlung beendet Android die ganze
+            // App; so baut sich nur die Anzeige neu auf.
+            @TargetApi(Build.VERSION_CODES.O)
+            override fun onRenderProcessGone(v: WebView, detail: RenderProcessGoneDetail): Boolean {
+                Log.w("LPANZEIGE", if (detail.didCrash()) "Renderer abgestürzt, Anzeige wird neu aufgebaut"
+                    else "Renderer beendet, Anzeige wird neu aufgebaut")
+                anzeigeNeuAufbauen(v)
+                return true
             }
         }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) w.setWebViewRenderProcessClient(HaengerWaechter())
         // Brücke für die Visu: übergibt die konfigurierte Display-aus-Zeit (dpmsOff
         // aus /config) an den nativen Screensaver.
-        web.addJavascriptInterface(KioskBridge(), "LoxKiosk")
+        val bridge = KioskBridge()
+        w.addJavascriptInterface(bridge, "LoxKiosk")
+        // Stabile rohe Referenz fuer erneute Seiten-Rueckrufe; die Fassade darf
+        // LoxKiosk ersetzen, ohne beim zweiten onPageFinished den Zugang zu verlieren.
+        w.addJavascriptInterface(bridge, "LoxKioskNative")
+        return w
+    }
 
-        // Dunkel-Overlay: NUR schwarz (echtes Schwarz beim Backlight-Aus), KEINE
-        // eigene Uhr — die Uhr zeigt die Visu. Zunächst versteckt.
-        saver = FrameLayout(this).apply {
-            setBackgroundColor(Color.BLACK)
-            visibility = View.GONE
+    /** Ersetzt die WebView, deren Renderer beendet ist, durch eine neue unter dem
+     *  Dunkel-Overlay und lädt die Visu nach der Pause von scheduleReload: Stürzt
+     *  der neue Renderer gleich wieder ab, baut die Anzeige nicht in einer
+     *  Schleife auf. */
+    private fun anzeigeNeuAufbauen(alt: WebView) {
+        if (alt !== web) return
+        intercomPage = false
+        intercomCapability.clear()
+        intercomPageCapability = null
+        intercom.stop()
+        root.removeView(alt)
+        alt.destroy()
+        web = neueWebView()
+        root.addView(web, 0, vollbild())
+        scheduleReload()
+    }
+
+    /** Ab Android 10 meldet die WebView, wenn ihr Renderer nicht reagiert
+     *  (Endlosschleife im Skript), frühestens alle 5 s. Nach mehreren Meldungen
+     *  in Folge beendet die Anzeige ihn, onRenderProcessGone baut sie neu auf. */
+    @TargetApi(Build.VERSION_CODES.Q)
+    private class HaengerWaechter : WebViewRenderProcessClient() {
+        private var meldungen = 0
+
+        override fun onRenderProcessUnresponsive(view: WebView, renderer: WebViewRenderProcess?) {
+            meldungen++
+            if (Waechter.rendererBeenden(meldungen)) {
+                Log.w("LPANZEIGE", "Renderer reagiert nicht ($meldungen Meldungen), wird beendet")
+                renderer?.terminate()
+            }
         }
 
-        root = FrameLayout(this)
-        root.addView(web, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        root.addView(saver, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
-        setContentView(root)
+        override fun onRenderProcessResponsive(view: WebView, renderer: WebViewRenderProcess?) {
+            meldungen = 0
+        }
+    }
 
-        show()
-        wake()
+    private fun vollbild() = FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+
+    /** addJavascriptInterface ist auch in fremden Frames sichtbar. Deshalb
+     *  bekommt nur das lokale Hauptdokument eine Fassade mit privatem Zugang;
+     *  die rohen Methoden verlangen ihn und verraten ihn niemals. */
+    private fun intercomBruecke(v: WebView) {
+        val capability = JSONObject.quote(intercomPageCapability ?: return)
+        val origin = JSONObject.quote(Visu.BASIS.removeSuffix("/"))
+        v.evaluateJavascript("""
+            (function(n, key) {
+              if (window !== window.top || location.origin !== $origin || location.pathname !== '/') return;
+              if (!n || typeof n.startIntercomNative !== 'function') return;
+              window.LoxKiosk = {
+                setDisplayOff: function(s) { return n.setDisplayOff(s); },
+                setSaver: function(on) { return n.setSaver(on); },
+                turnScreenOn: function() { return n.turnScreenOn(); },
+                turnScreenOff: function() { return n.turnScreenOff(); },
+                isScreenOn: function() { return n.isScreenOn(); },
+                setDisplayBrightness: function(p) { return n.setDisplayBrightness(p); },
+                startIntercom: function(uuid) { return n.startIntercomNative(uuid, key); },
+                stopIntercom: function() { return n.stopIntercomNative(key); },
+                intercomStatus: function() { return n.intercomStatusNative(key); }
+              };
+              window.dispatchEvent(new Event('loxpanel-intercom-ready'));
+            })(window.LoxKioskNative, $capability);
+        """.trimIndent(), null)
     }
 
     /** Lädt die Visu: die zuletzt angezeigte Adresse, sonst das Standardprofil. */
@@ -153,13 +279,14 @@ class KioskActivity : Activity(), SensorEventListener {
 
     /** Nach 2 s erneut laden (entprellt, wiederholt sich bei anhaltendem Fehler). */
     private fun scheduleReload() {
-        if (reloadPending) return
+        if (reloadPending || destroyed) return
         reloadPending = true
-        ui.postDelayed({ reloadPending = false; show() }, 2000)
+        ui.postDelayed({ reloadPending = false; if (!destroyed) show() }, 2000)
     }
 
     override fun onResume() {
         super.onResume()
+        intercom.onResume()
         enterImmersive()
         // Näherungssensor abonnieren (falls vorhanden) -> weckt aus dem Screensaver.
         // FASTEST für flottes Aufwecken bei Annäherung (Proximity ist on-change +
@@ -170,20 +297,102 @@ class KioskActivity : Activity(), SensorEventListener {
     }
 
     override fun onPause() {
+        intercom.onPause()
         super.onPause()
         sensorManager?.unregisterListener(this)
     }
 
-    // Berührung: im dunklen Screensaver weckt sie nur (Tap wird geschluckt, löst
-    // keine Kachel aus) und holt den 1. Tab; sonst normal an die Visu weiterreichen.
+    override fun onStop() {
+        intercom.onStop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        destroyed = true
+        intercomPage = false
+        intercomCapability.clear()
+        intercomPageCapability = null
+        intercom.destroy()
+        ui.removeCallbacksAndMessages(null)
+        gehalten?.recycle()
+        gehalten = null
+        web.removeJavascriptInterface("LoxKiosk")
+        web.removeJavascriptInterface("LoxKioskNative")
+        web.destroy()
+        super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == IntercomAudio.MICROPHONE_REQUEST) {
+            intercom.permissionResult(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
+        }
+    }
+
+    // Berührung: im Screensaver weckt ein Finger nur (Tap wird geschluckt, löst
+    // keine Kachel aus) und holt den 1. Tab; zwei Finger gehen als Geste an die
+    // Visu und lassen das Display dunkel. Sonst normal an die Visu weiterreichen.
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        // Wecken, solange IRGENDEIN Saver läuft — der native Dunkel-Modus ODER
+        // Im Schoner, solange IRGENDEIN Saver läuft — der native Dunkel-Modus ODER
         // der Visu-Uhr-Saver (visuSaver). So weckt Tippen auch in der Uhr-Phase,
         // in der das Display noch hell ist, auf den 1. Tab (statt nur aus dem
-        // Dunkeln). Der Tap wird dabei geschluckt (löst keine Kachel aus).
-        if (saverOn || visuSaver) { userWake(); return true }
+        // Dunkeln). Eine Berührung, die im Schoner begann, endet auch dort, sonst
+        // bekäme die Visu Ereignisse ohne Anfang.
+        if (saverOn || visuSaver || beruehrung.laeuft) return imSchoner(ev)
         wake()
         return super.dispatchTouchEvent(ev)
+    }
+
+    /** Berührung im Schoner nach [SchonerBeruehrung]: Ein Finger weckt nach
+     *  WARTE_MS oder beim Loslassen, zwei Finger reichen die ganze Berührung samt
+     *  dem zurückgehaltenen ersten Ereignis an die Visu weiter. Ob sie Gesten
+     *  erlaubt, entscheidet die Visu; ohne Gesten weckt sie selbst. */
+    private fun imSchoner(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                gehalten?.recycle()
+                gehalten = MotionEvent.obtain(ev)
+                beruehrung.runter(ev.eventTime)
+                ui.removeCallbacks(fristAb)
+                ui.postDelayed(fristAb, SchonerBeruehrung.WARTE_MS)
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> nachTun(beruehrung.weitererFinger(ev.eventTime), ev)
+            MotionEvent.ACTION_UP -> nachTun(beruehrung.hoch(), ev)
+            MotionEvent.ACTION_CANCEL -> nachTun(beruehrung.abbruch(), ev)
+            else -> nachTun(beruehrung.weiter(), ev)
+        }
+        return true
+    }
+
+    private fun nachTun(tun: SchonerBeruehrung.Tun, ev: MotionEvent) {
+        when (tun) {
+            SchonerBeruehrung.Tun.NACHREICHEN -> {
+                ui.removeCallbacks(fristAb)
+                val erstes = gehalten
+                gehalten = null
+                if (erstes != null) {
+                    super.dispatchTouchEvent(erstes)
+                    erstes.recycle()
+                }
+                super.dispatchTouchEvent(ev)
+            }
+            SchonerBeruehrung.Tun.DURCHREICHEN -> super.dispatchTouchEvent(ev)
+            SchonerBeruehrung.Tun.WECKEN -> schonerWecken()
+            SchonerBeruehrung.Tun.HALTEN, SchonerBeruehrung.Tun.SCHLUCKEN -> Unit
+        }
+        if (!beruehrung.laeuft) {
+            ui.removeCallbacks(fristAb)
+            gehalten?.recycle()
+            gehalten = null
+        }
+    }
+
+    /** Ein Finger im Schoner: zurückgehaltenes Ereignis verwerfen, wecken. */
+    private fun schonerWecken() {
+        ui.removeCallbacks(fristAb)
+        gehalten?.recycle()
+        gehalten = null
+        userWake()
     }
 
     // Annäherung weckt aus jedem Saver (nativ dunkel ODER Visu-Uhr) und holt den 1. Tab.
@@ -220,6 +429,22 @@ class KioskActivity : Activity(), SensorEventListener {
 
     /** JS-Brücke der Visu. */
     inner class KioskBridge {
+        /** Nur die lokale Visu kann eine native Gegensprech-Sitzung beginnen. */
+        @JavascriptInterface
+        fun startIntercomNative(uuid: String, capability: String?): Boolean =
+            intercomPage && intercomCapability.accepts(capability) && intercom.start(uuid) {
+                intercomPage && intercomCapability.accepts(capability)
+            }
+
+        @JavascriptInterface
+        fun stopIntercomNative(capability: String?): Boolean =
+            intercomCapability.accepts(capability) && intercom.stop()
+
+        @JavascriptInterface
+        fun intercomStatusNative(capability: String?): String =
+            if (intercomCapability.accepts(capability)) intercom.status()
+            else """{"state":"idle","uuid":"","message":""}"""
+
         /** Die konfigurierte Display-aus-Zeit (dpmsOff aus /config). >0 = Backlight
          *  aus so viele Sekunden nach Saver-Start; 0 = nie (Uhr bleibt hell). */
         @JavascriptInterface

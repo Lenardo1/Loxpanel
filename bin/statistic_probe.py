@@ -28,8 +28,8 @@ der Anlage in AppHub.js (Modul StatisticV2Ext) die Belegung des Befehls:
 Aufruf im Container (liest nur, veraendert nichts, zeigt keine Passwoerter;
 das Token erscheint nur als <JWT>):
 
-    curl -fsSL <raw-url> | docker exec -i loxpanel python3 -u - [v2]
-    docker exec -i loxpanel python3 -u bin/statistic_probe.py [v2]      # im Image
+    curl -fsSL <raw-url> | docker exec -i LoxPanel python3 -u - [v2]
+    docker exec -i LoxPanel python3 -u bin/statistic_probe.py [v2]      # im Image
 
 Zugang wie der Server: loxpanel.cfg (Settings) vor LOXPANEL_MS_*.
 """
@@ -169,7 +169,7 @@ async def part2(s, base, headers) -> None:
                         queue.append(url)
 
     collect(text, base)
-    apphub = urljoin(base, "scripts/AppHub.js")   # Hauptmodul der App
+    apphub = urljoin(base, "scripts/AppHub.js")   # Hauptmodul der App (audioserver_probe)
     if apphub not in seen:
         seen.add(apphub)
         queue.insert(0, apphub)
