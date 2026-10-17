@@ -11,16 +11,31 @@ Die Adapter arbeiten auf dem rohen LoxAPP3.json-Control-Dict
 """
 from __future__ import annotations
 
+import functools
 import json
 from typing import Any
+
+# So viele verschiedene JSON-Texte behaelt json_aus_text(); eine Anlage hat
+# einige Dutzend JSON-States (Stimmungen, Weckzeiten, Senderlisten ...), der
+# Rest faellt als am laengsten unbenutzt heraus
+JSON_TEXTE_MAX = 256
+
+
+@functools.lru_cache(maxsize=JSON_TEXTE_MAX)
+def json_aus_text(text: str) -> tuple[bool, Any]:
+    """JSON-Text eines States geparst -> (ok, Wert), zwischengespeichert: jede
+    Kachel und Seite liest dieselben Listen bei jedem Rendern, geparst wird ein
+    Text nur einmal. Der Wert ist geteilt, Aufrufer duerfen ihn nicht aendern."""
+    try:
+        return True, json.loads(text)
+    except ValueError:
+        return False, None
 
 
 def _parse_json_state(value: Any) -> Any:
     if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except ValueError:
-            return value
+        ok, wert = json_aus_text(value)
+        return wert if ok else value
     return value
 
 

@@ -12,14 +12,18 @@ services:
     ports:
       - "8099:8099"
     environment:
-      # Miniserver-Zugang (aus .env). Ein unter Settings -> Miniserver gespeicherter
+      # Miniserver-Zugang (aus .env). Ein unter Einstellungen -> Miniserver gespeicherter
       # Zugang (config/loxpanel.cfg im Volume) hat Vorrang vor diesen Variablen.
       LOXPANEL_MS_HOST: "${LOXPANEL_MS_HOST}"
       LOXPANEL_MS_USER: "${LOXPANEL_MS_USER}"
       LOXPANEL_MS_PASS: "${LOXPANEL_MS_PASS}"
       LOXPANEL_MS_PORT: "${LOXPANEL_MS_PORT:-443}"
       LOXPANEL_MS_VERIFY_TLS: "${LOXPANEL_MS_VERIFY_TLS:-false}"
+      LOXPANEL_LOG_LEVEL: "${LOXPANEL_LOG_LEVEL:-INFO}"   # DEBUG zeigt auch jede HTTP-Anfrage
+      # Zeitzone (aus .env). Ohne sie laeuft der Container in UTC, und die
+      # Uhrzeiten der Termine am Panel stehen um den UTC-Abstand verschoben.
+      TZ: "${TZ:-}"
     volumes:
       # Persistiert panels.json (von /config geschrieben), theme.json und
-      # loxpanel.cfg (von Settings geschrieben). Host-Ordner ./config.
+      # loxpanel.cfg (von den Einstellungen geschrieben). Host-Ordner ./config.
       - ./config:/app/config
