@@ -12,11 +12,11 @@ set -e
 # ===== ANPASSEN (oder per Env uebergeben: SERVER=... bash install-agent.sh) =====
 SERVER="${SERVER:-192.168.1.10:8099}"    # IP:Port deines LoxPanel-Servers (Docker-Host/Pi)
 AGENT_NAME="${AGENT_NAME:-$(hostname)}"  # Anzeigename in /settings
-PANEL="${PANEL:-}"                       # Panel-Profil-ID (leer = Standardansicht)
+PANEL="${PANEL:-}"                       # Startansicht, leer = der Server ordnet die Ansicht zu (Konfigurator, Geraete)
 AUTOSTART="${AUTOSTART:-1}"              # 1 = Kiosk beim Booten; 0 = nur Agent, Start aus /settings
 TIMEZONE="${TIMEZONE:-Europe/Vienna}"   # Systemzeitzone (Screensaver-Uhr); leer = unveraendert lassen
 NUDGE_X="${NUDGE_X:-}"                   # horiz. Feinversatz der Visu in px (z.B. -8 = 8px nach links); leer = 0
-DPMS_OFF="${DPMS_OFF:-180}"              # Sek. bis Display abschaltet (Backlight aus); 0 = nie
+DPMS_OFF="${DPMS_OFF:-}"                 # Sek. bis Display abschaltet, leer = der Server (Vorgaben, Geraet), sonst 180; 0 = nie
 BL_ON="${BL_ON:-200}"                    # Helligkeit im Ein-Zustand (0..max_brightness); leer = max
 KIOSK_RESTART_SECS="${KIOSK_RESTART_SECS:-}"         # Pause vor Neustart nach Chromium-Absturz; 0 = aus; leer = Standard (5)
 KIOSK_RESTART_MAX_SECS="${KIOSK_RESTART_MAX_SECS:-}" # Obergrenze bei Absturzschleife (ueber DPMS_OFF!); leer = Standard (300)
@@ -44,7 +44,10 @@ Stop-Befehle entgegen, um den Chromium-Kiosk fernzusteuern. Nur Standardlib.
 
 Config: dieselbe deploy/loxpanel-kiosk.conf wie kiosk.sh
   SERVER=host:port     LoxPanel-Server (Pflicht)
-  PANEL=<id>           Panel-Profil / Startseite
+  PANEL=<id>           Startansicht, nur bis der Server dem Geraet eine Ansicht
+                       zuordnet (Konfigurator, Geraete); leer = Standardansicht
+  DPMS_OFF=<sek>       Display aus nach Sekunden, nur solange der Server keinen
+                       Wert schickt (Vorgaben oder Geraet); leer = 180
   AGENT_PORT=8130      HTTP-Port des Agenten (Default 8130)
   AGENT_NAME=<name>    Anzeigename (Default: Hostname)
 
@@ -811,14 +814,16 @@ PYEOF
 sudo chmod 644 "$AGENT"
 
 echo "==> 3/5 Config ($CONF)"
+# PANEL und DPMS_OFF nur, wenn gesetzt: Ansicht und Display-Abschaltung kommen vom Server
+# (Zuordnung des Geraets, Vorgaben oder Geraet im Konfigurator)
 sudo tee "$CONF" >/dev/null <<EOF
 SERVER=$SERVER
-PANEL=$PANEL
+${PANEL:+PANEL=$PANEL}
 AGENT_NAME=$AGENT_NAME
 AGENT_PORT=8130
 AUTOSTART=$AUTOSTART
 X=$NUDGE_X
-DPMS_OFF=$DPMS_OFF
+${DPMS_OFF:+DPMS_OFF=$DPMS_OFF}
 BL_ON=$BL_ON
 PAUSE_ON_BLANK=0
 KIOSK_RESTART_SECS=$KIOSK_RESTART_SECS

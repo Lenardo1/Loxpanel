@@ -1,0 +1,999 @@
+/* LoxPanel-Visu, Stylesheet grund.css: Grundgeruest: Kasten, Panes, Kopfzeile und Werteleiste, Kachelfeld, Kacheln, Kachel-Sets, Leisten. Geladen aus panel.html als /panel/grund.css, in dieser Reihenfolge. */
+  :root{
+    /* Sichtbare Hoehe: 100dvh folgt auf iOS/Android den ein- und ausfahrenden
+       Browser-Leisten, 100vh ist dort die groesste Hoehe und schneidet die
+       Tab-Leiste unten ab. Aeltere Kiosk-Browser kennen nur vh. */
+    --vh:100vh;
+    --bg:#0d120e; --screen:#0f1512; --line:rgba(var(--wash,255,255,255),.08);
+    --ink:#e7ede7; --muted:#9fb0a4; --glow:#e0a24d; --accent:#52b881; --on-accent:#08130c;
+    --good:#52b881; --crit:#e2695f;
+    --tile:rgba(var(--wash,255,255,255),.045);
+    /* Deckfarbe der Auflagen: Weiss hebt auf dunklem Grund ab, Schwarz auf
+       hellem. Ein helles Theme schickt "0,0,0" und dreht damit saemtliche
+       Auflagen auf einen Schlag um. */
+    --wash:255,255,255;
+    --mono:ui-monospace,"Cascadia Code",Consolas,monospace;
+    --nudge-x:0px;    /* Feinversatz der ganzen Visu; live via ?x=-6 (negativ=links) */
+  }
+  *{box-sizing:border-box;}
+  [hidden]{display:none !important;}   /* el.hidden zuverlaessig, trotz eigener display-Regeln */
+  /* Touch-Panel (Wandpanel/Tablet): keinen Mauszeiger anzeigen — auch nicht die
+     pointer-Hand ueber Kacheln. Am Desktop (echte Maus) bleibt der Cursor.
+     Zwei Trigger: Media-Query (Touch-Geraet) + .touch-Klasse (erste Beruehrung). */
+  @media (hover:none),(pointer:coarse){ *{cursor:none !important;} }
+  @supports (height:100dvh){ :root{--vh:100dvh;} }
+  body.touch *{cursor:none !important;}
+  html,body{margin:0;height:100%;background:var(--rahmen,var(--bg));color:var(--ink);
+    font-family:var(--font,"Inter","Roboto","Segoe UI Variable Text",-apple-system,"Segoe UI",system-ui,sans-serif);
+    display:grid;place-items:center;-webkit-font-smoothing:antialiased;}
+  .screen{
+    position:relative;
+    width:100vw;height:var(--vh);
+    max-width:calc(var(--cols,2) * 240px);max-height:calc(var(--rows,2) * 240px);
+    border-radius:0;overflow:hidden;background:var(--screen);
+    box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 0 60px rgba(0,0,0,.5);
+    /* --ui-scale: Skalierung (Profil/Geraet "scale", gesetzt in applyScale).
+       Der Kasten behaelt seine Layout-Groesse aus 240er Kacheln, die Anzeige
+       waechst gleichmaessig mit - Schrift, Icons, Uhr-Seite, Panes. Erst
+       skaliert, dann versetzt: der Feinversatz bleibt in echten Pixeln. */
+    transform:translateX(var(--nudge-x,0)) scale(var(--ui-scale,1));
+    display:grid;grid-template-rows:minmax(0,1fr) auto;}
+  /* "Bildschirm fuellen": ganzen Tablet-Schirm nutzen (Voll-Zoom). Die Kacheln
+     passen sich der Geraeteform an (koennen leicht rechteckig werden) statt als
+     zentrierter cols:rows-Kasten mit Rand zu stehen. Gilt auch fuer Vollbreit. */
+  .screen.fill{max-width:none;max-height:none;width:100vw;height:var(--vh);}
+  /* Skaliert fuellt der Kasten den Schirm auf den Pixel genau - eine Rundung
+     darf keine Scrollleiste erzeugen. NUR auf html (wirkt aufs Fenster), nicht
+     auf body: body ist hier Grid-Element mit place-items:center und damit nur
+     so breit wie der UNskalierte Kasten. overflow:hidden dort schnitt die
+     vergroesserte Anzeige links und rechts ab - sichtbar und fuer Tipps. */
+  html.scaled{overflow:hidden;}
+  /* Split-Layout (grosse Tablets): EIN Panel = links navigierbare Visu, rechts
+     fester Player, unten EINE gemeinsame Tab-Leiste ueber die volle Breite. */
+  /* Denke in einem 4x2-Raster: links 2x2 = Visu, rechts 2x2 = Player. Der Block
+     hat Seitenverhaeltnis 4:2 (=2:1) und wird zentriert eingepasst (quadratische
+     Kacheln, kein Strecken ueber den ganzen Schirm). */
+  /* Split (fill AUS): feste Kachelgroesse wie die uebrigen Tabs -> gleiche Hoehe.
+     2 Panes nebeneinander = 2x Visu-Breite, deshalb --cols*480; Hoehe --rows*240
+     (identisch zur nicht-geteilten .screen -> kein Hoehensprung beim Tab-Wechsel). */
+  .screen.split{max-width:none;max-height:none;
+    width:min(100vw, calc(var(--cols,2) * 480px));height:min(var(--vh), calc(var(--rows,2) * 240px));
+    grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto;}
+  /* Split im Hochformat (Klasse "hoch", gesetzt in applyHoch): die beiden
+     Haelften UEBEREINANDER statt nebeneinander - oben die Visu, darunter Pane 2,
+     unten die Tab-Leiste. Nebeneinander blieben auf einem hochkant haengenden
+     Tablet zwei schmale Streifen mit leerer Flaeche darueber und darunter.
+     Masse gespiegelt: Breite --cols*240, Hoehe --rows*480 (zwei Haelften). Steht
+     VOR der fill-Regel, damit "Bildschirm fuellen" auch hier den Schirm fuellt. */
+  .screen.split.hoch{width:min(100vw, calc(var(--cols,2) * 240px));height:min(var(--vh), calc(var(--rows,2) * 480px));
+    grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto;}
+  .screen.split.hoch #playerpane,
+  .screen.split.hoch #frontpane{grid-column:1;grid-row:2;border-left:0;border-top:1px solid var(--line);}
+  .screen.split.hoch #tabs{grid-row:3;}
+  /* "Bildschirm fuellen" im Split: ganzen Tablet-Schirm nutzen (Kacheln passen
+     sich an, statt zentriertem 2:1-Kasten mit Rand). */
+  .screen.split.fill{width:100vw;height:var(--vh);}
+  /* Automatisches Raster (Tablet): der Kasten ist der ganze Schirm (wie "fill"),
+     das Widget belegt ganze Kachelspalten bzw. -zeilen (autoRaster) - die
+     Kacheln bleiben mit und ohne Widget gleich gross. */
+  .screen.split.auto:not(.hoch){grid-template-columns:var(--auto-k,1fr) var(--auto-p,1fr);}
+  .screen.split.hoch.auto{grid-template-rows:var(--auto-k,1fr) var(--auto-p,1fr) auto;}
+  /* Widget-Seite (Vollbild-Tab): das Widget fuellt die ganze Flaeche, kein
+     Kachelgrid, kein Split - gleiche gerahmte fp-page wie in Pane 2. */
+  .screen.widgettab #grid{display:none;}
+  .screen.widgettab #frontpane{display:flex;flex-direction:column;grid-column:1/-1;grid-row:1;
+    min-height:0;overflow-y:auto;padding:10px;gap:10px;scroll-snap-type:y mandatory;scroll-padding-top:10px;}
+  .screen.widgettab #playerpane{display:flex;flex-direction:column;grid-column:1/-1;grid-row:1;
+    min-height:0;overflow:hidden;padding:10px;gap:10px;}
+  .screen.widgettab #frontpane .fp-page,
+  .screen.widgettab #playerpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
+    display:flex;flex-direction:column;gap:10px;padding:16px;
+    background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:16px;
+    scroll-snap-align:start;scroll-snap-stop:always;}
+  .screen.widgettab #frontpane .fp-page.solo,
+  .screen.widgettab #playerpane .fp-page.solo{flex:1 1 0;min-height:0;max-height:100%;overflow:hidden;}
+  .screen.widgettab #frontpane .fp-page.solo.cpage{overflow-y:auto;gap:10px;}
+  #playerpane{display:none;}
+  #frontpane{display:none;}
+  .screen.split #grid{grid-column:1;grid-row:1;}
+  .screen.split #playerpane{display:flex;flex-direction:column;grid-column:2;grid-row:1;
+    min-height:0;border-left:1px solid var(--line);overflow:hidden;padding:10px;gap:10px;}
+  /* Split-Pane Wetter/Kalender/Energie: rechte Spalte, auf Pane-Hoehe begrenzt
+     (min-height:0 + minmax(0,1fr)-Zeile) -> Inhalt scrollt INNEN statt ueber den
+     Kachelrahmen hinauszulaufen. Seiten-Snapping wie beim Kachel-Grid:
+     jede .fp-page fuellt genau die Pane-Hoehe, Scrollen rastet seitenweise ein. */
+  .screen.split #frontpane{display:flex;flex-direction:column;grid-column:2;grid-row:1;
+    min-height:0;border-left:1px solid var(--line);overflow-y:auto;padding:10px;gap:10px;
+    scroll-snap-type:y mandatory;scroll-padding-top:10px;}
+  /* Jede Seite = ein gerahmter 480x480-Block wie der 2x2-Kachelblock links:
+     min-height:100% fuellt die Pane-Hoehe, gleiche Rahmung/Innenabstand wie eine
+     Kachel -> Inhalt startet auf gleicher Hoehe (nicht mehr "zu hoch"). */
+  .screen.split #frontpane .fp-page,
+  .screen.split #playerpane .fp-page{flex:0 0 auto;min-height:100%;box-sizing:border-box;
+    display:flex;flex-direction:column;gap:10px;padding:16px;
+    background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:16px;
+    scroll-snap-align:start;scroll-snap-stop:always;}
+  /* Einzel-Seite (Energie/Kamera/Audio): genau EINE Pane hoch (480x480), fuellt sie
+     exakt statt content-getrieben zu wachsen. Der Inhalt (quadratisches Radial-SVG,
+     4:3-Video, Cover) skaliert per object-fit/preserveAspectRatio hinein - sonst
+     erzwingt z.B. das 480x480-SVG seine Breite als Hoehe -> Pane ~550 statt 480.
+     Wetter/Kalender bleiben mehrseitig (Snap) und duerfen scrollen. */
+  .screen.split #frontpane .fp-page.solo,
+  .screen.split #playerpane .fp-page.solo{flex:1 1 0;min-height:0;max-height:100%;overflow:hidden;}
+  /* Verlaufs-Pane: die Diagramme teilen sich die Pane-Hoehe (fit statt scrollen),
+     damit sie auf kurzen Displays (z.B. 480px) nicht ueberlaufen. Nur im
+     #frontpane (Split-Pane, Widget-Seite): die Uhr-Seite zeichnet denselben
+     Verlaufs-Baustein, hochkant ist ihre Box aber so hoch wie ihr Inhalt - dort
+     fielen Diagramme mit flex-basis 0 auf 0px zusammen. */
+  .screen.split #frontpane .fp-page.solo.cpage,
+  .screen.widgettab #frontpane .fp-page.solo.cpage{overflow:hidden;gap:8px;display:flex;flex-direction:column;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .cpbody{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .cpsec{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  #frontpane .fp-page.solo.cpage .chbody{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  #frontpane .fp-page.solo.cpage:not(.stack) .chbody>svg{flex:1 1 auto;min-height:0;width:100%;height:100%;}
+  /* Gestapelter Verlauf (mehrere Bausteine): die Zeitraum-Leiste klebt als fester
+     Kopf oben, NUR die Bausteine (.cpbody) scrollen - jeder in natuerlicher Hoehe
+     (Seitenverhaeltnis 440:150) mit Kopf (Name+Wert). Die Pane selbst scrollt nicht
+     (overflow:hidden oben), damit der Kopf stehen bleibt und alles im Rahmen bleibt. */
+  #frontpane .fp-page.solo.cpage.stack .cpr{flex:0 0 auto;margin:0 0 8px;}
+  #frontpane .fp-page.solo.cpage.stack .cpbody{flex:1 1 0;min-height:0;overflow-y:auto;overflow-x:hidden;display:block;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec{display:block;margin-bottom:12px;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec:last-child{margin-bottom:0;}
+  #frontpane .fp-page.solo.cpage.stack .cpsec .chart+.chart{margin-top:6px;}
+  #frontpane .fp-page.solo.cpage.stack .chbody{display:block;}
+  #frontpane .fp-page.solo.cpage.stack .chbody>svg{display:block;width:100%;height:auto;}
+  /* Uhr-Seite: dort im Seitenverhaeltnis der Zeichnung (440:150), solange der
+     Kasten reicht. Reicht er nicht (quer feste Hoehe, hochkant die Restflaeche
+     unter Uhr und Wetter), schrumpfen die Diagramme, statt unten abgeschnitten
+     zu werden - etwa bei drei Diagrammen eines Zaehlers. Die Huellen um die
+     Diagramme (.cpbody, je Baustein .cpsec) schrumpfen mit; mehrere Bausteine
+     teilen sich den Kasten, denn auf dem Bildschirmschoner scrollt niemand.
+     Unter der Zeitraum-Leiste nur ihr eigener Abstand (.chrng), wie vor #77 im
+     ersten Diagramm; mit dem Abstand der Seite dazu schrumpften zwei Diagramme
+     bei 960x480 schon ohne Not. */
+  .saver .sv-box .fp-page.solo.cpage{gap:0;}
+  .saver .sv-box .fp-page.solo.cpage .cpbody,
+  .saver .sv-box .fp-page.solo.cpage .cpsec{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;gap:10px;}
+  .saver .sv-box .fp-page.solo.cpage .chart{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .saver .sv-box .fp-page.solo.cpage .chbody{flex:0 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .saver .sv-box .fp-page.solo.cpage .chbody>svg{flex:0 1 auto;min-height:0;}
+  #frontpane .cphead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;}
+  #frontpane .cpname{font-weight:650;font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #frontpane .cpval{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  /* Kamera-Pane: MJPEG-Live-Bild fuellt die rechte Spalte (kein Padding/Scroll). */
+  /* Kamera-Pane: volle Intercom-Ansicht (Klingel-Banner + Video + Tür-/Ausgang-Buttons). */
+  #frontpane.cam{justify-content:flex-start;}
+  #frontpane .cambell{margin:0;}
+  #frontpane .camwait{display:flex;flex-direction:column;align-items:center;gap:10px;
+    color:var(--muted);padding:24px 0;}
+  #frontpane .camwait svg{width:56px;height:56px;opacity:.5;}
+  /* Werte unter dem Kamerabild (camera:<uuid>|<werte>): nehmen den Rest der
+     Pane, die Zeilen teilen sich die Hoehe wie in der Werte-Pane (gleiche
+     .werte-Regeln), scrollen erst, wenn sie nicht mehr passen. Das Video
+     behaelt sein 4:3 oben. */
+  #frontpane .campage .camwerte{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;
+    overflow-y:auto;overflow-x:hidden;}
+  #frontpane .campage .camwerte .fp-h{flex:0 0 auto;}
+  /* Pane 2 nutzt ihre Flaeche (wetterEinpassen, kalenderEinpassen, werteEinpassen).
+     Wetter: Seite 1 so hoch wie die Flaeche, die Kurve nimmt den Rest und wird in
+     genau dieser Groesse gezeichnet. */
+  .screen #frontpane .fp-page.wx{height:100%;min-height:0;overflow:hidden;}
+  .screen #frontpane .fp-page.wx .fp-curve{flex:1 1 0;min-height:0;}
+  .screen #frontpane .fp-page.wx .fp-curve svg{height:100%;}
+  /* breit: Lage und Kurve nebeneinander, Vorschau und Details darunter */
+  .screen #frontpane .fp-page.wx.breit{display:grid;grid-template-columns:max-content minmax(0,1fr);
+    grid-template-rows:auto minmax(0,1fr);grid-auto-rows:auto;column-gap:18px;}
+  .screen #frontpane .fp-page.wx.breit>.fp-h,
+  .screen #frontpane .fp-page.wx.breit>.fp-fore,
+  .screen #frontpane .fp-page.wx.breit>.fp-det{grid-column:1/-1;}
+  /* breit und schmal: die Beschreibung steht unter Symbol und Temperatur. Als
+     Raster, damit die Spalte nur so breit wird wie Symbol und Temperatur. */
+  .screen #frontpane .fp-page.wx.breit .fp-now,
+  .screen #frontpane .fp-page.wx.schmal .fp-now{display:grid;grid-template-columns:auto auto;
+    justify-content:start;align-content:center;column-gap:18px;row-gap:6px;}
+  .screen #frontpane .fp-page.wx.breit .fp-now .meta,
+  .screen #frontpane .fp-page.wx.schmal .fp-now .meta{grid-column:1/-1;}
+  /* schmal: die Vorschau laesst sich seitlich wischen, statt sieben Tage zu quetschen */
+  .screen #frontpane .fp-page.wx.schmal .fp-fore{grid-template-columns:none;grid-auto-flow:column;
+    grid-auto-columns:58px;overflow-x:auto;scrollbar-width:none;}
+  .screen #frontpane .fp-page.wx.schmal .fp-fore::-webkit-scrollbar{display:none;}
+  /* eng: kleinere Lage ohne "Heute hoch/tief" (steht in der Vorschau), Vorschau
+     ohne Regenwahrscheinlichkeit */
+  .screen #frontpane .fp-page.wx.eng .fp-now{gap:12px;padding-bottom:2px;}
+  .screen #frontpane .fp-page.wx.eng .fp-now .heute{display:none;}
+  .screen #frontpane .fp-page.wx.eng .fp-now .ico{width:52px;height:52px;}
+  .screen #frontpane .fp-page.wx.eng .fp-now .t{font-size:44px;}
+  .screen #frontpane .fp-page.wx.eng .fp-fc{padding:7px 2px 8px;gap:3px;min-width:0;}
+  .screen #frontpane .fp-page.wx.eng .fp-fc .pop{display:none;}
+  /* eng: das Datum bleibt einzeilig ("Sa 10.10." braeche sonst um und machte die
+     Vorschau eine Zeile hoeher); wo es nicht passt, verkleinert es
+     vorschauDatumEinpassen() auf die Zelle. min-width:0 haelt die Spalten gleich
+     breit, statt sie auf das Datum aufzuweiten. */
+  .screen #frontpane .fp-page.wx.eng .fp-fc .d{white-space:nowrap;max-width:100%;overflow:hidden;}
+  /* Kalender: eine Seite, unter dem Monat (breit: daneben) die Termine, die fuer
+     sich scrollen */
+  .screen #frontpane .fp-page.kal{height:100%;min-height:0;overflow:hidden;}
+  .screen #frontpane .fp-page.kal .kal-monat{flex:none;}
+  .screen #frontpane .fp-page.kal .kal-liste{flex:1 1 0;min-height:0;overflow-y:auto;
+    display:flex;flex-direction:column;gap:6px;scrollbar-width:none;}
+  .screen #frontpane .fp-page.kal .kal-liste::-webkit-scrollbar{display:none;}
+  .screen #frontpane .fp-page.kal.breit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);column-gap:16px;}
+  .screen #frontpane .fp-page.kal.eng .fp-mon{padding:10px 10px 12px;}
+  .screen #frontpane .fp-page.kal.eng .fp-mon-h{padding-bottom:7px;margin-bottom:6px;}
+  .screen #frontpane .fp-page.kal.eng .fp-mon-c{min-height:28px;padding:2px 0 8px;}
+  .screen #frontpane .fp-page.kal.eng2 .fp-mon{padding:8px 8px 9px;}
+  .screen #frontpane .fp-page.kal.eng2 .fp-mon-h{padding-bottom:4px;margin-bottom:4px;}
+  .screen #frontpane .fp-page.kal.eng2 .fp-mnav{width:28px;height:28px;}
+  .screen #frontpane .fp-page.kal.eng2 .fp-mon-wd{padding-bottom:3px;}
+  .screen #frontpane .fp-page.kal.eng2 .fp-mon-c{min-height:24px;padding:1px 0 6px;font-size:12px;}
+  /* Werte: die Zeilen teilen sich die Hoehe, Symbol und Schrift wachsen mit */
+  .screen #frontpane .werte .sv-st{flex:1 0 auto;
+    padding:8px clamp(11px,calc(var(--zh,44px)*.18),22px);}
+  .screen #frontpane .werte .sv-st .ico{width:clamp(22px,calc(var(--zh,44px)*.34),44px);
+    height:clamp(22px,calc(var(--zh,44px)*.34),44px);}
+  .screen #frontpane .werte .sv-st .nm{font-size:clamp(14px,calc(var(--zh,44px)*.15),21px);}
+  .screen #frontpane .werte .sv-st .nm .rm{font-size:clamp(11px,calc(var(--zh,44px)*.1),15px);}
+  .screen #frontpane .werte .sv-st .vl{font-size:clamp(15px,calc(var(--zh,44px)*.28),42px);}
+  /* hohe Zeilen: der grosse Wert steht unter Symbol und Name wie auf einer Kachel,
+     der Name hat die ganze Breite und bricht an Wortgrenzen um */
+  .screen #frontpane .werte.hoch .sv-st{grid-template-columns:auto minmax(0,1fr);
+    grid-template-areas:"ico nm" "vl vl";align-content:center;row-gap:6px;}
+  .screen #frontpane .werte.hoch .sv-st .ico{grid-area:ico;}
+  .screen #frontpane .werte.hoch .sv-st .nm{grid-area:nm;white-space:normal;overflow-wrap:break-word;}
+  .screen #frontpane .werte.hoch .sv-st .vl{grid-area:vl;justify-self:end;}
+  /* Energiefluss-Pane (Radial, Loxone-Standard). Erzeugung=Akzent, Verbrauch=Glow. */
+  .epane{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .epane .etop{display:flex;justify-content:center;padding:2px 0 2px;}
+  .epane .ettl{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);}
+  .epane .ewrap{flex:1;min-height:0;}
+  .epane .ewrap svg{width:100%;height:100%;display:block;}
+  .epane .ebot{text-align:center;color:var(--muted);font-size:12px;padding-top:2px;}
+  .epane .ebot b{color:var(--ink);font-weight:600;}
+  .epane .spoke{stroke:var(--line);stroke-width:2;}
+  .epane .ehub{fill:var(--screen);stroke:var(--line);stroke-width:1.5;}
+  .epane .ering{fill:var(--screen);stroke-width:3;}
+  .epane .ering.prod{stroke:var(--accent);} .epane .ering.cons{stroke:var(--glow);} .epane .ering.grid{stroke:var(--crit);}
+  .epane .ering.idle{stroke:var(--muted);opacity:.55;}
+  .epane .eic{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;}
+  .epane .eic.prod{stroke:var(--accent);} .epane .eic.cons{stroke:var(--glow);} .epane .eic.grid{stroke:var(--crit);} .epane .eic.idle{stroke:var(--muted);}
+  /* echtes Loxone-Icon: SVG-<mask> (Alpha des Bildes), Rechteck in Rollenfarbe darunter */
+  .epane .emask.prod{fill:var(--accent);} .epane .emask.cons{fill:var(--glow);} .epane .emask.grid{fill:var(--crit);} .epane .emask.idle{fill:var(--muted);}
+  .epane .enval{fill:var(--ink);font-size:16px;font-weight:600;text-anchor:middle;}
+  .epane .enval.idle{fill:var(--muted);}
+  .epane .enlab{fill:var(--muted);font-size:12px;text-anchor:middle;}
+  .epane .edot{opacity:0;}
+  .epane .edot.prod{fill:var(--accent);} .epane .edot.cons{fill:var(--glow);} .epane .edot.grid{fill:var(--crit);}
+  /* Fluss-Punkte laufen dauerhaft (Bewegung = Flussrichtung, also Info, kein
+     Deko-Effekt). Farbe = Rolle (prod/cons/grid), Richtung = Fluss (fin/fout) –
+     entkoppelt: z.B. Einspeisung ist gruen UND laeuft nach aussen (fout). Die Pane
+     wird nur bei Strukturaenderung neu gezeichnet, sonst laufen die Punkte
+     ununterbrochen weiter (siehe paintEnergy/updateEnergyPane). */
+  .epane .edot{animation:2.6s linear infinite;}
+  .epane .edot.fin{animation-name:eflowin;} .epane .edot.fout{animation-name:eflowout;}
+  .epane .edot.idle{animation:none;opacity:0;}
+  /* Radial in der Detailansicht (Antippen der Energie-Kachel; auch 4"-Panel ohne Split) */
+  .epane-detail{width:min(100%,440px);margin:6px auto 0;}
+  .epane-detail .epane{height:clamp(280px,58vh,460px);}
+  @keyframes eflowout{0%{transform:translate(0,0);opacity:0}12%{opacity:1}80%{opacity:1}100%{transform:translate(var(--dx),var(--dy));opacity:0}}
+  @keyframes eflowin{0%{transform:translate(var(--dx),var(--dy));opacity:0}12%{opacity:1}80%{opacity:1}100%{transform:translate(0,0);opacity:0}}
+  .screen.split #tabs{grid-column:1 / -1;grid-row:2;}   /* Tab-Leiste ueber volle Breite */
+  /* Web-App auf iPhone/iPad ohne Home-Taste: der Home-Balken liegt sonst auf
+     den Tabs. env() ist 0, wo das Geraet keinen Rand meldet (Wandpanel). */
+  #tabs{padding-bottom:env(safe-area-inset-bottom,0px);}
+  /* Kopfzeile (Widget "header", applyPane): EINE Zeile ueber dem Kachelraster
+     mit Uhr, Wetter in Kurzform und bis zu SV_STATUS_MAX Werten - statt einer
+     Pane daneben. Der Kasten bekommt eine dritte Zeile, Breite und Raster
+     bleiben wie ohne Widget (keine Teilung; "Screen fuellen" verdoppelt
+     weiter). Die Hoehe steht in --kopf-h, autoRaster() zieht sie von der
+     freien Hoehe ab, BEVOR die Klasse gesetzt ist (kopfHoehe liest die
+     Konfiguration, nicht das Element). Mit dem Kachelfaktor waechst sie
+     (setzeFaktor setzt --kopf-h = KOPF_H * --ks). */
+  .screen{--kopf-h:64px;}
+  .kopfzeile{display:none;}
+  .screen.kopf{grid-template-rows:auto minmax(0,1fr) auto;}
+  .screen.kopf .kopfzeile{display:flex;align-items:center;gap:14px;grid-column:1/-1;grid-row:1;
+    height:var(--kopf-h);box-sizing:border-box;padding:0 16px;min-width:0;overflow:hidden;
+    border-bottom:1px solid var(--line);background:var(--tabbar,rgba(0,0,0,.25));}
+  .screen.kopf #grid{grid-row:2;grid-column:1/-1;}
+  .screen.kopf #tabs{grid-row:3;}
+  .screen.kopf .verbindung{grid-row:2;}
+  .kz-uhr{display:flex;flex-direction:column;justify-content:center;flex:none;}
+  .kz-uhr .t{font-size:calc(26px * var(--ks,1));font-weight:600;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+  .kz-uhr .d{font-size:calc(12px * var(--ks,1));color:var(--muted);margin-top:3px;white-space:nowrap;}
+  .kz-wx{display:flex;align-items:center;gap:8px;flex:none;min-width:0;padding-left:14px;border-left:1px solid var(--line);}
+  .kz-wx .ico{width:calc(28px * var(--ks,1));height:calc(28px * var(--ks,1));flex:none;color:var(--glow);}
+  .kz-wx .ico svg{width:100%;height:100%;}
+  .kz-wx .t{font-size:calc(22px * var(--ks,1));font-weight:600;line-height:1;}
+  .kz-wx .m{display:flex;flex-direction:column;font-size:calc(12px * var(--ks,1));color:var(--muted);line-height:1.2;min-width:0;}
+  .kz-wx .m .c{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+  /* Werte: rechtsbuendig, was nicht mehr passt, blendet kopfEinpassen() aus */
+  .kz-werte{display:flex;gap:8px;margin-left:auto;flex:0 1 auto;min-width:0;overflow:hidden;}
+  /* Wert-Chip: eigene Flaeche (--tile), also die Schrift dazu (--ink) - nicht die der Leiste
+     darunter, die ein Kachel-Set dunkel und mit heller Schrift zeigt (Touch: --tab-an) */
+  .kz-w{display:grid;grid-template-columns:auto auto;grid-template-areas:"ico vl" "ico nm";column-gap:8px;
+    align-items:center;flex:none;background:var(--tile);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:5px 10px;}
+  .kz-w .ico{grid-area:ico;width:calc(22px * var(--ks,1));height:calc(22px * var(--ks,1));display:grid;place-items:center;color:var(--ico,var(--ink));}
+  .kz-w .ico svg{width:100%;height:100%;}
+  .kz-w .ico img{width:100%;height:100%;object-fit:contain;}
+  .kz-w .ico.img{display:inline-block;background-color:var(--ico,var(--ink));
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .kz-w .vl{grid-area:vl;font-size:calc(15px * var(--ks,1));font-weight:600;line-height:1.1;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .kz-w .nm{grid-area:nm;font-size:calc(11px * var(--ks,1));color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;}
+  .kz-w.on .ico{color:var(--ico-fixed,var(--glow));}
+  .kz-w.on .vl{color:var(--ico-fixed,var(--an-text,var(--glow)));}   /* Text: --an-text, wo ein Kachel-Set ihn nennt */
+  .kz-w.good .ico,.kz-w.good .vl{color:var(--good);}
+  .kz-w.crit .ico,.kz-w.crit .vl{color:var(--crit-ink,var(--crit));}
+  .kz-w.on .ico.img{background-color:var(--ico-fixed,var(--glow));}
+  .kz-w[hidden]{display:none;}   /* kopfEinpassen(): was nicht passt, bleibt weg */
+  /* Werteleiste (ui.valueBar, view.leiste, renderLeiste): die Anzeige-Bausteine
+     einer Seite als Kette von Werten in EINER Zeile ueber dem Raster statt als
+     Kacheln - das Raster bleibt dem Bedienbaren. Dieselben Chips wie die Werte
+     der Kopfzeile; was nicht in die Zeile passt, scrollt waagerecht statt
+     wegzubleiben (diese Werte haben keine Kachel mehr). Hoehe --leiste-h =
+     LEISTE_H * --ks (setzeFaktor), autoRaster() zieht sie wie die Kopfzeile
+     von der freien Hoehe ab. Mit Kopfzeile steht sie darunter; im Split quer
+     nur ueber dem Raster, das Widget daneben reicht ueber beide Zeilen,
+     hochkant liegt sie ueber Raster und Widget. */
+  .screen{--leiste-h:48px;}
+  .werteleiste{display:none;}
+  .screen.leiste{grid-template-rows:auto minmax(0,1fr) auto;}
+  .screen.leiste .werteleiste{display:flex;align-items:center;gap:8px;grid-column:1;grid-row:1;
+    height:var(--leiste-h);box-sizing:border-box;padding:0 10px;min-width:0;
+    overflow-x:auto;overflow-y:hidden;scrollbar-width:none;scroll-snap-type:x proximity;
+    border-bottom:1px solid var(--line);background:var(--tabbar,rgba(0,0,0,.25));}
+  .screen.leiste .werteleiste::-webkit-scrollbar{display:none;}
+  .screen.leiste .werteleiste .kz-w{scroll-snap-align:start;cursor:pointer;}
+  .screen.leiste .werteleiste .kz-w:active{transform:scale(.96);}
+  .screen.leiste #grid{grid-row:2;}
+  .screen.leiste #tabs{grid-row:3;}
+  .screen.leiste .verbindung{grid-row:2;}
+  .screen.kopf.leiste{grid-template-rows:auto auto minmax(0,1fr) auto;}
+  .screen.kopf.leiste .werteleiste{grid-row:2;}
+  .screen.kopf.leiste #grid{grid-row:3;}
+  .screen.kopf.leiste #tabs{grid-row:4;}
+  .screen.kopf.leiste .verbindung{grid-row:3;}
+  .screen.split.leiste:not(.hoch) #playerpane,
+  .screen.split.leiste:not(.hoch) #frontpane{grid-row:1/3;}
+  .screen.split.hoch.leiste{grid-template-rows:auto minmax(0,1fr) minmax(0,1fr) auto;}
+  .screen.split.hoch.auto.leiste{grid-template-rows:auto var(--auto-k,1fr) var(--auto-p,1fr) auto;}
+  .screen.split.hoch.leiste #playerpane,
+  .screen.split.hoch.leiste #frontpane{grid-row:3;}
+  .screen.split.hoch.leiste #tabs{grid-row:4;}
+  /* Player-Pane Innenaufbau (Cover gross oben, Titel, Transport, Lautstaerke) */
+  /* Cover = zentriertes QUADRAT, passt in die verfuegbare Flaeche (Breite ODER
+     Hoehe, je nachdem was kleiner ist) -> kein Abschneiden bei flachem Tablet. */
+  #playerpane .ppcover{flex:1;min-height:0;display:grid;place-items:center;color:var(--muted);}
+  #playerpane .ppcover>*{grid-area:1/1;}   /* Note-Platzhalter + Cover uebereinander */
+  /* Cover als zentriertes Quadrat, das in die Flaeche passt, ABER nach oben
+     begrenzt ist: sonst fuellt z.B. ein Senderlogo die halbe Seite. */
+  #playerpane .ppcover img{max-width:min(100%,300px);max-height:min(100%,300px);
+    aspect-ratio:1;object-fit:cover;
+    border-radius:14px;opacity:0;transition:opacity .2s;}
+  #playerpane .ppcover .coverph{width:96px;height:96px;display:grid;place-items:center;
+    background:rgba(var(--wash,255,255,255),.06);border-radius:14px;}
+  #playerpane .ppcover .coverph svg{width:56px;height:56px;}
+  #playerpane .pptitle{font-size:18px;font-weight:600;text-align:center;line-height:1.2;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #playerpane .ppsub{font-size:14px;color:var(--muted);text-align:center;margin-top:-4px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #playerpane .pptrans{display:flex;gap:14px;justify-content:center;align-items:center;}
+  #playerpane .ppvol{display:flex;align-items:center;gap:8px;}
+  #playerpane .ppvol .sico{color:var(--muted);} #playerpane .ppvol .sico svg{width:20px;height:20px;}
+  #playerpane .ppvol .sld{flex:1;}
+  #playerpane .ppvol .sval{min-width:34px;text-align:right;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums;}
+  /* Scrollbarer Kachelbereich: var(--cols) Spalten x var(--rows) Reihen sichtbar */
+  .grid{--gap:10px;--pad:10px;grid-area:1/1;
+    display:grid;grid-template-columns:repeat(var(--cols,2),1fr);grid-auto-flow:row dense;
+    grid-auto-rows:calc((100% - (var(--rows,2) - 1) * var(--gap)) / var(--rows,2));gap:var(--gap);padding:var(--pad);
+    overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;}
+  /* Schlanke Scrollleiste im Theme fuer JEDEN scrollenden Bereich. Ohne das
+     zeichnet der Browser in der Split-Pane seine Standardleiste (16 px, grau)
+     direkt neben das 5-px-Band des Kachelrasters - und nimmt der Pane die
+     Breite weg. Die Pane scrollt seit dem Seiten-Snapping immer, weil Wetter
+     und Kalender zwei Seiten hoch sind. */
+  .grid,#frontpane,.frontpage,.menubox{
+    scrollbar-width:thin;scrollbar-color:rgba(var(--wash,255,255,255),.18) transparent;}
+  .grid::-webkit-scrollbar,#frontpane::-webkit-scrollbar,
+  .frontpage::-webkit-scrollbar,.menubox::-webkit-scrollbar{width:5px;}
+  .grid::-webkit-scrollbar-thumb,#frontpane::-webkit-scrollbar-thumb,
+  .frontpage::-webkit-scrollbar-thumb,.menubox::-webkit-scrollbar-thumb{
+    background:rgba(var(--wash,255,255,255),.18);border-radius:3px;}
+  /* Seiten-Snapping: Kachelraster rastet hart in Vierer-Seiten ein (4 oben/4
+     unten, nie dazwischen), lange Listen rasten nur sanft ein. Snap-Punkte
+     setzt render() per .snap auf jede 4. Kachel. */
+  .grid.snapy{scroll-snap-type:y mandatory;scroll-padding-top:10px;}
+  .grid.list.snapy{scroll-snap-type:y proximity;}
+  .tile.snap{scroll-snap-align:start;}
+  /* Waagerechte Seiten (Tablet: Split an und kein quadratischer Schirm,
+     seitenQuer()): das Raster ist eine Zeile aus Seiten in Schirmbreite, jede
+     Seite ein eigenes Raster aus --cols x --rows Kacheln, eingerastet je
+     Seite. Das 4"-Panel (quadratisch oder Split aus) blaettert weiter
+     senkrecht (.snapy). --punkte-h: Hoehe der Seitenpunkte unter den Kacheln,
+     autoRaster() rechnet sie von der Hoehe ab, sobald es mehr als eine Seite gibt. */
+  .grid{--punkte-h:14px;--hinweis-h:24px;}
+  .grid.hpages{display:flex;flex-wrap:nowrap;align-items:stretch;gap:0;padding:0;
+    overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;}
+  .grid.hpages::-webkit-scrollbar{display:none;}
+  .grid.hpages .page{flex:0 0 100%;width:100%;height:100%;box-sizing:border-box;padding:var(--pad);
+    display:grid;grid-template-columns:repeat(var(--cols,2),1fr);grid-template-rows:repeat(var(--rows,2),minmax(0,1fr));
+    grid-auto-flow:row dense;gap:var(--gap);scroll-snap-align:start;scroll-snap-stop:always;}
+  .grid.hpages.punkte .page{padding-bottom:calc(var(--pad) + var(--punkte-h));}
+  /* Seitenpunkte: ein Element in Seitenbreite, das am linken Rand des
+     Sichtfensters klebt (sticky) und in der Zeile keinen Platz einnimmt
+     (negativer Rand) - so steht es ueber jeder Seite an derselben Stelle. */
+  .grid.hpages .punkte{position:sticky;left:0;flex:0 0 100%;width:100%;margin-right:-100%;height:100%;
+    box-sizing:border-box;z-index:2;pointer-events:none;display:none;
+    align-items:flex-end;justify-content:center;gap:2px;}
+  .grid.hpages.punkte .punkte{display:flex;}
+  .grid.hpages .punkte i{display:block;width:7px;height:7px;padding:6px 5px 3px;box-sizing:content-box;
+    border-radius:50%;background:var(--muted);background-clip:content-box;opacity:.45;
+    pointer-events:auto;cursor:pointer;transition:opacity .2s;}
+  .grid.hpages .punkte i.on{opacity:1;background-color:var(--accent);}
+  /* Fusszeile mit dem Hinweis-Symbol der Gesten (raster.js fussH): auf jeder
+     Seite der Ansicht so hoch wie das Symbol, die Seitenpunkte stehen mittig
+     darin (Punkt 7 px, darunter 3 px Innenabstand), das Symbol rechts buendig
+     mit den Kacheln. Zu sehen ist es nur, wo Gesten wirken (view.gestenHilfe). */
+  .grid.hpages.fuss .page{padding-bottom:calc(var(--pad) + var(--hinweis-h));}
+  .grid.hpages.fuss .punkte{display:flex;}
+  .grid.hpages.fuss .punkte i{margin-bottom:calc((var(--hinweis-h) - 7px) / 2 - 3px);}
+  .grid.hpages .punkte .ghinweis{position:absolute;right:var(--pad);bottom:0;
+    width:var(--hinweis-h);height:var(--hinweis-h);display:grid;place-items:center;
+    color:var(--muted);pointer-events:auto;cursor:pointer;}
+  .grid.hpages .punkte .ghinweis[hidden]{display:none;}
+  .grid.hpages .punkte .ghinweis svg{width:20px;height:20px;}
+  /* Breite Kachel (it.w = 2: Audio, Raumregelung, Energiefluss, je Kachel
+     einstellbar): zwei Spalten; der dichte Fluss (dense) fuellt die Luecke
+     davor mit der naechsten schmalen Kachel. Seiten und Rastpunkte rechnet
+     rasterLage() genauso nach. */
+  .tile.w2{grid-column:span 2;}
+  .tile.h2{grid-row:span 2;}   /* 2 x 2 aus dem Seiten-Editor (Punkt 10), immer auch w2 */
+  /* Kachelfaktor --ks (am .screen, gesetzt in setzeFaktor): Kachelbreite durch
+     KACHEL_REF (170 px), begrenzt auf KS_MIN..KS_MAX. Symbol, Schrift, Tasten,
+     Innenabstand, Radius, Ring, Mini-Verlauf und die Kopfzeile werden damit
+     multipliziert - eine 415-px-Kachel traegt so 32-px-Schrift und ein
+     76-px-Symbol statt derselben 16/38 wie eine 170-px-Kachel. Die eingestellten
+     Groessen (--name-size usw.) gelten als "bei 170-px-Kachel". */
+  .tile{background:linear-gradient(180deg,var(--tile),rgba(var(--wash,255,255,255),.015));
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:calc(16px * var(--ks,1));padding:calc(16px * var(--ks,1));
+    display:flex;flex-direction:column;justify-content:space-between;
+    cursor:pointer;user-select:none;overflow:hidden;
+    transition:background .16s,border-color .16s,transform .07s;}
+  .tile:active{transform:scale(.97);}
+  /* Sprungmarke angetippt: die Kacheln der Gruppe leuchten kurz auf (innerer
+     Akzentrahmen; die Kachel selbst nutzt keinen Schatten, nur den Rahmen). */
+  .tile.katleucht{animation:katleucht 1.5s ease-out;}
+  @keyframes katleucht{0%,40%{box-shadow:inset 0 0 0 3px var(--accent);}100%{box-shadow:inset 0 0 0 3px transparent;}}
+  /* Aktiv-Overlay: Farbe je Zustand (--*-rgb), Aussehen global via --ov-* (pro Kachel ueberschreibbar) */
+  .tile.on{background:rgba(var(--on-rgb,224,162,77),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--on-rgb,224,162,77),var(--ov-bord,.55));}
+  .tile .head{display:flex;justify-content:space-between;align-items:flex-start;}
+  /* Mini-Verlauf (it.spark): fuellt die freie Mitte zwischen Icon und Text */
+  .tile .tspark{flex:1 1 auto;min-height:0;margin:calc(6px * var(--ks,1)) 0 calc(4px * var(--ks,1));overflow:hidden;}
+  .tile .tspark svg{display:block;}
+  .tile .tspark .mm{font-size:calc(9.5px * var(--ks,1));fill:var(--muted);font-variant-numeric:tabular-nums;}
+  /* Enge Kachel (kleines Panel, viele Zeilen): die Mitte ist zu niedrig -> der
+     Verlauf rueckt in die Kopfzeile neben das Icon, die Angabe ersetzt die Raumzeile.
+     Schmale Kachel (sparkbadge): die Angabe passt nicht in den Kopf -> ebenfalls
+     in die Raumzeile, dort hat sie die ganze Breite. Kacheln ohne Raumzeile
+     (Raum-Ansicht, alle Bausteine in einem Raum) bekommen die Zeile dafuer. */
+  .tile .tsline{display:none;}
+  .tile.sparktight .head .tspark{flex:1 1 0;min-width:0;align-self:stretch;margin:0 8px;}
+  .tile.sparktight .tsbadge,.tile.sparktight .room:not(.tsline),
+  .tile.sparkbadge .tsbadge,.tile.sparkbadge .room:not(.tsline){display:none;}
+  .tile.sparktight .tsline,
+  .tile.sparkbadge .tsline{display:block;text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums;}
+  /* Kurzangabe zum Mini-Verlauf im Kopf der Kachel (vom Server formuliert) */
+  .tile .tsbadge{flex:1 1 auto;min-width:0;text-align:right;margin:3px 6px 0;font-size:calc(12px * var(--ks,1));
+    color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+  .tile .ico,.tile .icowrap{color:var(--ico,var(--muted));}
+  .tile.on .ico,.tile.on .icowrap{color:var(--ico-fixed,var(--glow));}
+  .tile .ico svg{width:calc(var(--ico-size,38px) * var(--ks,1));height:calc(var(--ico-size,38px) * var(--ks,1));}
+  .tile .ico .rawico{width:calc(var(--ico-size,38px) * var(--ks,1));height:calc(var(--ico-size,38px) * var(--ks,1));object-fit:contain;display:block;}
+  /* Positionsring: Stellung von Rollladen, Tor, Fenster und Dimmer als Bogen
+     um das Icon. Der Server schickt "pos" nur fuer diese Bausteine; ohne den
+     Wert entsteht gar kein Element und die Kachel sieht aus wie immer.
+     Fester viewBox 0..100, Groesse ueber --ico-size - der Ring waechst also
+     mit, wenn die Icon-Groesse verstellt wird. Farbe ueber currentColor, damit
+     er dem Zustand UND dem Theme folgt, ohne eigene Farbregel. */
+  .tile .icowrap{position:relative;display:inline-grid;place-items:center;}
+  .tile .posring{position:absolute;left:50%;top:50%;pointer-events:none;
+    width:calc((var(--ico-size,38px) + 18px) * var(--ks,1));height:calc((var(--ico-size,38px) + 18px) * var(--ks,1));
+    transform:translate(-50%,-50%);}
+  .tile .posring circle{fill:none;stroke:currentColor;stroke-width:var(--posring-w,6);}
+  .tile .posring .trk{opacity:var(--posring-trk,.18);}
+  /* Der Uebergang laesst den Bogen der Fahrt FOLGEN statt in 1-%-Stufen zu
+     springen - keine Dauer-Animation: im Stand steht er absolut still. */
+  .tile .posring .val{stroke-linecap:round;opacity:var(--posring-op,1);
+    transition:stroke-dasharray .4s linear;}
+  @media (prefers-reduced-motion:reduce){ .tile .posring .val{transition:none;} }
+  .favs{display:flex;gap:10px;overflow-x:auto;padding:6px 2px;-webkit-overflow-scrolling:touch;}
+  .favs.wrap{flex-wrap:wrap;overflow-x:visible;justify-content:flex-start;gap:12px;}
+  .phead{font-weight:650;font-size:15px;margin:10px 2px 2px;padding-bottom:6px;border-bottom:1px solid var(--line);text-align:left;}
+  /* Wecker: read-only Liste der Weckzeit-Eintraege */
+  .alist{display:flex;flex-direction:column;gap:10px;width:100%;max-width:520px;margin:6px auto 0;}
+  .arow{background:var(--tile);border:1px solid var(--line);border-radius:14px;padding:13px 16px;
+    display:grid;grid-template-columns:auto 1fr auto;column-gap:12px;row-gap:3px;align-items:center;}
+  .arow .adot{width:10px;height:10px;border-radius:50%;background:var(--accent);grid-row:1;grid-column:1;}
+  .arow .anm{grid-row:1;grid-column:2;font-weight:600;font-size:16px;text-align:left;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .arow .atime{grid-row:1;grid-column:3;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;text-align:right;}
+  .arow .arep{grid-row:2;grid-column:2/4;color:var(--muted);font-size:13px;text-align:left;}
+  .arow.off{opacity:.5;}
+  .arow.off .adot{background:var(--muted);}
+  /* Weckzeit antippbar (bearbeiten), vorn ein Schalter statt des Punkts */
+  .arow.tap{cursor:pointer;}
+  .arow .asw{grid-row:1/3;grid-column:1;position:relative;width:46px;height:28px;border-radius:14px;
+    background:rgba(var(--wash,255,255,255),.18);cursor:pointer;}
+  .arow .asw::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;
+    background:var(--ink);transition:left .15s;}
+  .arow .asw.on{background:var(--accent);}
+  .arow .asw.on::after{left:21px;}
+  /* Wert mit -/+ (Laufzeit einer Zone, Dauern des Weckers) */
+  .stp{display:flex;align-items:center;gap:10px;background:var(--tile);border:1px solid var(--line);
+    border-radius:12px;padding:10px 12px;}
+  .stp .stpl{flex:1;min-width:0;text-align:left;font-weight:600;font-size:15px;}
+  .stp .stps{font-size:12.5px;font-weight:400;color:var(--muted);margin-top:2px;}
+  .stp .stpv{min-width:92px;text-align:center;font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;}
+  .stp .sbtn{width:44px;height:44px;font-size:24px;touch-action:none;}
+  /* Formular (Weckzeit): Name, Uhrzeit, Tage */
+  .fld{display:flex;flex-direction:column;gap:6px;text-align:left;font-size:13px;color:var(--muted);}
+  .fld input{font:inherit;font-size:17px;color:var(--ink);background:var(--tile);border:1px solid var(--line);
+    border-radius:10px;padding:10px 12px;min-width:0;}
+  .tpk{display:flex;justify-content:center;align-items:center;gap:8px;}
+  .tpc{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .tpc .sbtn{width:64px;height:40px;touch-action:none;}
+  .tpc .sbtn svg{width:22px;height:22px;}
+  .tpv{font-size:46px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .tpsep{font-size:46px;font-weight:600;line-height:1.1;}
+  .chipset{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+  .chipset .chp{min-width:46px;padding:10px 12px;border-radius:999px;border:1px solid var(--line);
+    background:var(--tile);font-weight:600;font-size:14px;text-align:center;cursor:pointer;
+    user-select:none;-webkit-user-select:none;}
+  .chipset .chp.on{background:linear-gradient(180deg,rgba(var(--on-rgb,224,162,77),.22),rgba(var(--on-rgb,224,162,77),.05));
+    border-color:rgba(var(--on-rgb,224,162,77),.55);color:var(--an-text,var(--glow));}
+  .btn.dis{opacity:.4;pointer-events:none;}
+  .btn.arm{border-color:var(--crit);color:var(--crit);}
+  /* Antippen oeffnet eine Unterseite: Wischen darueber scrollt die Seite */
+  .btn.nav{touch-action:manipulation;}
+  /* Bilder verpasster Klingeln; Antippen zeigt eins gross */
+  .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;}
+  .gal .gimg{margin:0;background:var(--tile);border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    cursor:pointer;}
+  .gal .gimg img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;background:#000;}
+  .gal .gimg figcaption{font-size:13.5px;padding:6px 8px;text-align:left;font-variant-numeric:tabular-nums;}
+  .galov{position:absolute;inset:0;z-index:30;background:rgba(0,0,0,.92);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:10px;padding:12px;}
+  .galov img{max-width:100%;max-height:84%;object-fit:contain;border-radius:8px;}
+  .galov .gcap{color:#fff;font-size:15px;}
+  .fav{flex:0 0 auto;width:88px;cursor:pointer;text-align:center;}
+  .favc{width:88px;height:88px;border-radius:12px;overflow:hidden;background:rgba(var(--wash,255,255,255),.06);display:grid;place-items:center;color:var(--muted);}
+  .favc img{width:100%;height:100%;object-fit:cover;}
+  .favc svg{width:34px;height:34px;}
+  .favn{font-size:12px;margin-top:5px;line-height:1.15;max-height:2.4em;overflow:hidden;}
+  /* Maskiertes Kachel-Icon: Fuellfarbe DIREKT aus der Icon-/Theme-Variable statt
+     ueber currentColor. Sonst bricht die eingeschraenkte Panel-WebView, sobald
+     eine eigene Icon-Farbe (--ico inline) gesetzt ist -> Icon bleibt leer.
+     Die Zustaende spiegeln die Farbregeln von .tile .ico (on/good/crit). */
+  .tile .ico.img{display:inline-block;width:calc(var(--ico-size,38px) * var(--ks,1));height:calc(var(--ico-size,38px) * var(--ks,1));background-color:var(--ico,var(--muted));
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .tile.on .ico.img{background-color:var(--ico-fixed,var(--glow));}
+  .tile.good .ico.img{background-color:var(--good);}
+  .tile.crit .ico.img{background-color:var(--crit-ink,var(--crit));}
+  .tile .chev{color:var(--muted);opacity:.55;}
+  .tile .chev svg{width:calc(20px * var(--ks,1));height:calc(20px * var(--ks,1));}
+  /* Raumzeile tritt hinter Name und Zustand zurueck - aber TYPOGRAFISCH, nicht
+     ueber die Farbe: sie ist leichter (400 statt 500, also leichter als die
+     Zustandszeile darunter) und weiter gesperrt, was Versalien als ruhiges
+     Etikett lesen laesst statt als Ueberschrift.
+     KEINE opacity mehr. theme_colors.derive() rechnet --muted so aus, dass es
+     auf --tile gerade AA (4.5:1) schafft; die fruehere opacity:.85 drueckte es
+     danach wieder darunter - in 9 von 17 geprueften Themes, bis auf 3.75:1. */
+  /* Textfaktor --kst: wie --ks, aber eine Kachel, deren Name nicht in seine
+     Zeilen passt, nimmt ihn in Stufen zurueck (fitTile: kst1..kst3). */
+  .tile{--kst:var(--ks,1);}
+  .tile.kst1{--kst:max(var(--kst-min,1), calc(var(--ks,1) / 1.15));}
+  .tile.kst2{--kst:max(var(--kst-min,1), calc(var(--ks,1) / 1.32));}
+  .tile.kst3{--kst:max(var(--kst-min,1), calc(var(--ks,1) / 1.5));}
+  .tile .room{font-size:calc(var(--room-size,12px) * var(--ks,1));color:var(--muted);font-weight:400;letter-spacing:.06em;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;}
+  .tile .name{font-size:calc(var(--name-size,18px) * var(--kst,1));font-weight:var(--name-weight,450);color:var(--name-color,inherit);line-height:1.15;letter-spacing:-.01em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tile .sub{font-size:calc(var(--sub-size,15px) * var(--kst,1));color:var(--muted);font-weight:400;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:calc(4px * var(--ks,1));}
+  .tile.on .sub{color:var(--an-text,var(--glow));}
+  .tile.good{background:rgba(var(--good-rgb,82,184,129),var(--ov-fill,.16));
+    border:var(--ov-bw,1px) solid rgba(var(--good-rgb,82,184,129),var(--ov-bord,.55));}
+  .tile.good .ico,.tile.good .icowrap,.tile.good .sub{color:var(--good);}
+  .tile.crit{background:var(--crit-fill,rgba(var(--crit-rgb,226,107,95),var(--ov-fill,.16)));
+    border:var(--ov-bw,1px) solid rgba(var(--crit-rgb,226,107,95),var(--ov-bord,.55));}
+  .tile.crit .ico,.tile.crit .icowrap,.tile.crit .sub{color:var(--crit-ink,var(--crit));}
+  /* Gefuellte Stoerungskachel: dann tragen Name, Raumzeile und Pfeil die
+     Gegenfarbe. Ohne --crit-ink/--crit-muted aendert sich nichts. */
+  .tile.crit .name{color:var(--crit-ink,var(--name-color,inherit));}
+  .tile.crit .room,.tile.crit .chev{color:var(--crit-muted,var(--muted));}
+  .tctrls{display:flex;gap:calc(8px * var(--ks,1));justify-content:center;margin-top:calc(6px * var(--ks,1));}
+  /* Tasten sind Touch-Ziele: sie tragen den Faktor der SEITE (--ksg), auch
+     wenn die Kachel fuer sie ihren eigenen kleineren nimmt (tastenEinpassen),
+     und schrumpfen nie unter ihr Mass. */
+  .tctrls .tb{width:calc(34px * max(1, var(--ksg,1)));height:calc(34px * max(1, var(--ksg,1)));border-radius:50%;background:rgba(var(--wash,255,255,255),.10);
+    display:grid;place-items:center;color:var(--ink);flex:0 0 auto;}
+  .tctrls .tb:active{transform:scale(.92);background:rgba(var(--wash,255,255,255),.18);}
+  .tctrls .tb svg{width:calc(17px * max(1, var(--ksg,1)));height:calc(17px * max(1, var(--ksg,1)));}
+  /* Tasten nur, wenn die Kachel hoch genug ist (tastenEinpassen): sonst bleiben
+     sie weg, und der Tipp auf die Kachel oeffnet die Detailseite. display:flex
+     schlaegt das hidden-Attribut, darum ausdruecklich. */
+  .tctrls[hidden]{display:none;}
+  /* "nichts hier" im Kachelraster. Nur dort: ein globales .empty traf auch die
+     Leerfelder vor dem 1. im Monatskalender (fp-mon-c empty), die dann eine ganze
+     Zeile belegten - jeder Monat begann so am Montag. */
+  .grid>.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding-top:40px;font-size:15px;}
+  /* Listen-Layout (volle Breite): immer exakt 4 Zeilen sichtbar (fuellt die
+     Grid-Hoehe, egal wie hoch die Tab-Leiste ist -> kein 3,75-Zeilen-Rest). */
+  .grid.list{grid-template-columns:1fr;grid-auto-rows:calc((100% - 3*var(--gap)) / 4);}
+  .grid.list .tile{flex-direction:row;align-items:center;gap:14px;padding:0 18px;}
+  .grid.list .tile .head{flex:0 0 auto;}
+  .grid.list .tile .body{flex:1;min-width:0;}
+  .grid.list .tctrls{margin-top:0;}
+  /* Neuer Kachel-Aufbau (.lx, Standard; ui.tileLayout "classic" = der bisherige),
+     nach den Kacheln der Loxone-App: Raum klein oben rechts im Kopf statt in
+     Versalien ueber dem Namen, kein Pfeil, Text gleich unter dem Kopf, Tasten
+     als Leiste ueber die ganze Breite unten. Zustand vorn (.zv): der Zustand
+     steht gross, der Name klein darunter. Ein Messwert (Raumregelung, Sauna)
+     steht gross an Stelle des Symbols (.bigv). Das Raster bleibt, wie es ist;
+     die Listen-Ansicht behaelt ihren Aufbau. */
+  .grid.lx:not(.list) .tile{justify-content:flex-start;--kpad:calc(14px * var(--ks,1));padding:var(--kpad);}
+  .grid.lx:not(.list) .tile .head{gap:calc(8px * var(--ks,1));}
+  .grid.lx:not(.list) .tile .head .room{flex:1 1 auto;min-width:0;text-align:right;margin:2px 0 0;
+    font-size:calc(var(--room-size,13px) * var(--ks,1));text-transform:none;letter-spacing:0;}
+  .grid.lx:not(.list) .tile .tspark{order:2;margin:calc(8px * var(--ks,1)) 0 2px;}
+  /* Im Kopf (sparktight) fuellt der Verlauf die Kopfhoehe wie im klassischen
+     Aufbau: die Zeile darueber ist spezifischer als .tile.sparktight .head
+     .tspark und liesse ihm sonst die senkrechten Raender - mit Faktor 0,85
+     blieben von 36 px Kopf nur 27 px Kurve. Seitlich haelt der Kopf Abstand (gap). */
+  .grid.lx:not(.list) .tile.sparktight .head .tspark{margin:0;}
+  .grid.lx:not(.list) .tile .body{order:1;margin-top:calc(10px * var(--ks,1));display:flex;flex-direction:column;}
+  .grid.lx:not(.list) .tile .tsline{display:block;text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums;}
+  /* Haupttext (--name-size) und Zweittext (--sub-size) wie eingestellt; der
+     Server schickt fuer diesen Aufbau etwas kleinere Standardwerte. Lange
+     Woerter werden getrennt statt mit "..." abgeschnitten. Mehrteilige
+     Zustaende ("Soll 22,0° · heizt") stehen untereinander (subText). Farbe,
+     Fett und Kursiv aus "Kacheln gestalten" (--tile-txt/-fw/-fst) gelten fuer
+     den Haupttext, auch wenn er der Zustand ist. */
+  .grid.lx:not(.list) .tile .name{font-size:calc(var(--name-size,16px) * var(--kst,1));font-weight:max(500,var(--name-weight,450));
+    line-height:1.2;white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+    hyphens:auto;overflow-wrap:break-word;}
+  .grid.lx:not(.list) .tile .sub{font-size:calc(var(--sub-size,14px) * var(--kst,1));white-space:pre-line;
+    display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-height:1.2;
+    hyphens:auto;overflow-wrap:break-word;}
+  .grid.lx:not(.list) .tile.zv .sub{order:-1;margin-top:0;font-size:calc(var(--name-size,16px) * var(--kst,1));
+    font-weight:var(--tile-fw,max(500,var(--name-weight,450)));font-style:var(--tile-fst,normal);
+    color:var(--tile-txt,var(--name-color,inherit));}
+  .grid.lx:not(.list) .tile.zv .name{order:0;margin-top:3px;font-size:calc(var(--sub-size,14px) * var(--kst,1));font-weight:400;
+    color:var(--muted);-webkit-line-clamp:1;}
+  .grid.lx:not(.list) .tile.zv.on .sub{color:var(--an-text,var(--glow));}
+  .grid.lx:not(.list) .tile.zv.good .sub{color:var(--good);}
+  .grid.lx:not(.list) .tile.zv.crit .sub{color:var(--crit-ink,var(--crit));}
+  .grid.lx:not(.list) .tile.zv.crit .name{color:var(--crit-muted,var(--muted));}
+  .grid.lx:not(.list) .tile .bigv{font-size:calc(var(--big-size,36px) * var(--ks,1));font-weight:500;line-height:1;
+    letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--name-color,inherit);}
+  .grid.lx:not(.list) .tile .bigv small{font-size:.5em;font-weight:400;color:var(--muted);letter-spacing:0;}
+  .grid.lx:not(.list) .tile>.tctrls{order:3;margin-top:auto;padding-top:calc(10px * var(--ks,1));gap:calc(8px * var(--ks,1));}
+  /* Tasten sind Touch-Ziele: sie wachsen mit dem Faktor der Seite, schrumpfen aber nie */
+  .grid.lx:not(.list) .tile>.tctrls .tb{flex:1 1 0;width:auto;height:calc(44px * max(1, var(--ksg,1)));border-radius:calc(12px * var(--ks,1));}
+  .grid.lx:not(.list) .tile>.tctrls .tb svg{width:calc(19px * max(1, var(--ksg,1)));height:calc(19px * max(1, var(--ksg,1)));}
+  /* Breite Kachel mit Tasten (spielerKachel(), etwa Audio): die rechte Haelfte
+     ist die Spieler-Spalte - oben Sender-Logo bzw. Cover (it.cover), darunter
+     die Tasten; Kopf und Text stehen links. So brauchen die Tasten keine Hoehe
+     unter dem Text und haben auch auf der flachen 2x1-Kachel am 4"-Panel Platz.
+     Ohne Cover, oder wenn es zu klein wuerde (tastenEinpassen: .ohnecover),
+     stehen die Tasten mittig in der Spalte. */
+  .grid.lx:not(.list) .tile.spieler{position:relative;--spgap:calc(10px * var(--ks,1));}
+  .grid.lx:not(.list) .tile.spieler>.head,
+  .grid.lx:not(.list) .tile.spieler>.body,
+  .grid.lx:not(.list) .tile.spieler>.tspark{margin-right:calc(50% + var(--spgap));}
+  .grid.lx:not(.list) .tile.spieler>.tplay{position:absolute;top:var(--kpad);bottom:var(--kpad);right:var(--kpad);left:50%;
+    display:flex;flex-direction:column;justify-content:center;gap:var(--spgap);min-height:0;}
+  .grid.lx:not(.list) .tile.spieler .tcover{flex:1 1 0;min-height:0;max-width:100%;aspect-ratio:1/1;align-self:center;
+    object-fit:cover;border-radius:calc(var(--taste-radius,12px) * var(--ks,1));}
+  .grid.lx:not(.list) .tile.spieler.ohnecover .tcover{display:none;}
+  /* ... reicht die halbe Kachel nicht fuer die Tasten in Mindestgroesse,
+     wird die Spalte so breit wie noetig (--spw, spielerEinpassen) */
+  .grid.lx:not(.list) .tile.spieler.spbreit>.tplay{left:auto;width:var(--spw);}
+  .grid.lx:not(.list) .tile.spieler.spbreit>.head,
+  .grid.lx:not(.list) .tile.spieler.spbreit>.body,
+  .grid.lx:not(.list) .tile.spieler.spbreit>.tspark{margin-right:calc(var(--spw) + var(--spgap));}
+  .grid.lx:not(.list) .tile.spieler .tplay>.tctrls{margin:0;padding:0;gap:calc(8px * var(--ks,1));}
+  .grid.lx:not(.list) .tile.spieler .tplay>.tctrls .tb{flex:1 1 0;width:auto;height:calc(44px * max(1, var(--ksg,1)));border-radius:calc(12px * var(--ks,1));}
+  .grid.lx:not(.list) .tile.spieler .tplay>.tctrls .tb svg{width:calc(19px * max(1, var(--ksg,1)));height:calc(19px * max(1, var(--ksg,1)));}
+  /* Enge Kachel (etwa 3x3 auf dem 4"-Panel), gemessen in fitTile(): erst steht
+     der Text nur noch einzeilig (eng1), reicht das nicht, faellt die Angabe zum
+     Mini-Verlauf weg (eng2, der Verlauf selbst bleibt im Kopf), dann die zweite
+     Zeile (eng3) - der Name geht vor der Angabe. Ist die zweite Zeile nur eine
+     Beschreibung (.bi, etwa "Tuersprechanlage"), weicht sie zuerst und der Name
+     behaelt zwei Zeilen. */
+  .grid.lx:not(.list) .tile.eng1:not(.bi) .name,.grid.lx:not(.list) .tile.eng1:not(.bi) .sub,
+  .grid.lx:not(.list) .tile.eng3.bi .name{-webkit-line-clamp:1;}
+  .grid.lx:not(.list) .tile.eng1.bi .sub,.grid.lx:not(.list) .tile.eng2 .tsline,
+  .grid.lx:not(.list) .tile.eng3.zv .name,.grid.lx:not(.list) .tile.eng3:not(.zv) .sub{display:none;}
+  /* Kachel-Sets (ui.tileSet, theme_colors.KACHEL_SETS): ein fertiger Look.
+     Farben und Masse kommen als Variablen mit der theme-Nachricht, die Regeln
+     haengen an der Art des Sets, nie an seinem Namen: html[data-kachelset-
+     aufbau] (Kachel: lx, mitte, kreis) und html[data-kachelset-leiste]
+     (Tab-Leiste: pille, oben, links). Ohne Set fehlen beide Attribute.
+     Masse mit "-schmal" gelten auf schmalen Schirmen (.schmal am Kasten,
+     schmalEinrichten), die der Tab-Leiste auch auf niedrigen (.niedrig);
+     die --k-* am Kasten loesen das auf (ein Mass, das sich selbst als
+     Rueckfall naennte, waere ungueltig).
+     Jeder Aufbau: flache Kacheln ohne Rahmen und Verlauf (Radius und
+     Schatten --kachel-radius/--kachel-schatten), Abstand und Innenrand des
+     Rasters aus dem Set (autoRaster misst sie wie sonst), Symbole einfarbig
+     in der Schriftfarbe statt in der Kategoriefarbe (eine Farbe aus "Kacheln
+     gestalten" bleibt, --ico-fixed), aktive Kachel auf --kachel-an statt
+     getoent, Tasten auf --taste. Zustaende good/crit behalten ihre Regeln. */
+  html[data-kachelset-aufbau] .screen{box-shadow:none;
+    --k-abstand:var(--kachel-abstand,10px);--k-innen:var(--feld-innen,10px);
+    --k-tabs-h:var(--tabs-hoehe,auto);--k-tab-symbol:var(--tab-symbol,28px);--k-pille-h:var(--pille-h,43px);
+    --k-rahmen-seite:var(--rahmen-seite,0px);--k-rahmen-unten:var(--rahmen-unten,0px);--k-feld-radius:var(--feld-radius,0px);
+    --k-rail:var(--rail-breite,0px);--k-kreis:var(--kreis-d,52px);}
+  html[data-kachelset-aufbau] .screen.schmal{
+    --k-abstand:var(--kachel-abstand-schmal,var(--kachel-abstand,10px));--k-innen:var(--feld-innen-schmal,var(--feld-innen,10px));
+    --k-tabs-h:var(--tabs-hoehe-schmal,var(--tabs-hoehe,auto));--k-tab-symbol:var(--tab-symbol-schmal,var(--tab-symbol,28px));
+    --k-pille-h:var(--pille-h-schmal,var(--pille-h,43px));
+    --k-rahmen-seite:var(--rahmen-seite-schmal,var(--rahmen-seite,0px));--k-rahmen-unten:var(--rahmen-unten-schmal,var(--rahmen-unten,0px));
+    --k-feld-radius:var(--feld-radius-schmal,var(--feld-radius,0px));
+    --k-rail:var(--rail-breite-schmal,var(--rail-breite,0px));--k-kreis:var(--kreis-d-schmal,var(--kreis-d,52px));}
+  html[data-kachelset-aufbau] .screen.niedrig{
+    --k-tabs-h:var(--tabs-hoehe-schmal,var(--tabs-hoehe,auto));--k-tab-symbol:var(--tab-symbol-schmal,var(--tab-symbol,28px));
+    --k-pille-h:var(--pille-h-schmal,var(--pille-h,43px));}
+  html[data-kachelset-aufbau] .grid{--gap:var(--k-abstand,10px);--pad:var(--k-innen,10px);}
+  html[data-kachelset-aufbau] .tile:not(.on):not(.good):not(.crit){background:var(--tile);border-color:transparent;}
+  html[data-kachelset-aufbau] .tile{border-radius:calc(var(--kachel-radius,16px) * var(--ks,1));box-shadow:var(--kachel-schatten,none);}
+  html[data-kachelset-aufbau] .tile.on{background:var(--kachel-an,var(--tile));border-color:transparent;}
+  html[data-kachelset-aufbau] .tile:not(.on):not(.good):not(.crit) .ico,
+  html[data-kachelset-aufbau] .tile:not(.on):not(.good):not(.crit) .icowrap,
+  html[data-kachelset-aufbau] .kz-w:not(.on):not(.good):not(.crit) .ico,
+  html[data-kachelset-aufbau] .sv-st:not(.on):not(.good):not(.crit) .ico{color:var(--ico-fixed,var(--ink));}
+  html[data-kachelset-aufbau] .tile:not(.on):not(.good):not(.crit) .ico.img,
+  html[data-kachelset-aufbau] .kz-w:not(.on):not(.good):not(.crit) .ico.img,
+  html[data-kachelset-aufbau] .sv-st:not(.on):not(.good):not(.crit) .ico.img{background-color:var(--ico-fixed,var(--ink));}
+  html[data-kachelset-aufbau] .tctrls .tb{background:var(--taste,var(--tile));}
+  html[data-kachelset-aufbau] .tctrls .tb:active{background:var(--kachel-an,var(--tile));}
+  html[data-kachelset-aufbau] .grid.lx:not(.list) .tile>.tctrls .tb,
+  html[data-kachelset-aufbau] .grid.lx:not(.list) .tile.spieler .tplay>.tctrls .tb{border-radius:calc(var(--taste-radius,12px) * var(--ks,1));}
+  html[data-kachelset-aufbau] .btn{background:var(--taste,var(--tile));border-color:transparent;border-radius:var(--taste-radius,12px);}
+  html[data-kachelset-aufbau] .btn:active{background:var(--kachel-an,var(--tile));}
+  /* -/+ neben einem Schieber (Lautstaerke im Player) sind Tasten wie alle anderen */
+  html[data-kachelset-aufbau] .sbtn{background:var(--taste,var(--tile));border-color:transparent;color:var(--ink);}
+  html[data-kachelset-aufbau] .sbtn:active{background:var(--kachel-an,var(--tile));color:var(--kachel-an-ink,var(--ink));}
+  /* Aufbau "lx" und "kreis": Name und Zustand vorn kraeftiger, der Name
+     unter dem Zustand bleibt leicht (wie die Loxone-App). */
+  html[data-kachelset-aufbau="lx"] .grid.lx:not(.list) .tile.zv .sub,
+  html[data-kachelset-aufbau="lx"] .grid.lx:not(.list) .tile .name,
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.zv .sub,
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile .name{font-weight:var(--tile-fw,max(600,var(--name-weight,450)));}
+  html[data-kachelset-aufbau="lx"] .grid.lx:not(.list) .tile.zv .name,
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.zv .name{font-weight:400;}
+  /* Aufbau "kreis": wie lx, das Symbol steht in einem Kreis (--kreis-d, auf
+     schmalen Schirmen --kreis-d-schmal) auf der Tastenflaeche (render() legt
+     .kreis darum), das Symbol nimmt --kreis-anteil davon. Aktiv fuellt sich
+     der Kreis mit --glow, das Symbol wird --kreis-an-symbol, der Zustand
+     --an-text; die Kachel selbst bleibt (--kachel-an faellt auf --tile).
+     Zustand und Name stehen unten in der Kachel (ueber den Tasten, wo es
+     welche gibt); eine breite Kachel ohne Messwert stellt Kreis und Text
+     nebeneinander, die Tasten darunter. */
+  html[data-kachelset-aufbau="kreis"] .tile .kreis{display:inline-grid;place-items:center;flex:none;
+    width:var(--k-kreis,52px);height:var(--k-kreis,52px);border-radius:50%;background:var(--taste,var(--tile));}
+  html[data-kachelset-aufbau="kreis"] .tile .kreis .ico svg,
+  html[data-kachelset-aufbau="kreis"] .tile .kreis .ico .rawico,
+  html[data-kachelset-aufbau="kreis"] .tile .kreis .ico.img{
+    width:calc(var(--k-kreis,52px) * var(--kreis-anteil,.54));height:calc(var(--k-kreis,52px) * var(--kreis-anteil,.54));}
+  html[data-kachelset-aufbau="kreis"] .tile.on .kreis{background:var(--glow);}
+  html[data-kachelset-aufbau="kreis"] .tile.on .kreis .ico,
+  html[data-kachelset-aufbau="kreis"] .tile.on .kreis .icowrap{color:var(--kreis-an-symbol,var(--on-glow));}
+  html[data-kachelset-aufbau="kreis"] .tile.on .kreis .ico.img{background-color:var(--kreis-an-symbol,var(--on-glow));}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile>.body:last-child,
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.ohnetasten>.body{margin-top:auto;}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler){flex-direction:row;flex-wrap:wrap;
+    align-items:center;align-content:space-between;column-gap:calc(16px * var(--ks,1));}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.body{flex:1 1 0;min-width:0;margin-top:0;}
+  /* ... der Kopf loest sich dort auf: Kreis, Text und Raum stehen in einer
+     Zeile, der Raum rechts oben, der Text endet vor ihm */
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.head{display:contents;}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.head .room{order:2;flex:0 1 auto;
+    align-self:flex-start;max-width:35%;margin:0;}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.tspark{order:3;}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.tctrls{order:4;}
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.tspark,
+  html[data-kachelset-aufbau="kreis"] .grid.lx:not(.list) .tile.w2:not(.bigk):not(.spieler)>.tctrls{flex:0 0 100%;}
+  /* Aufbau "mitte": Symbol mittig, darunter der Haupttext (der Zustand, sonst
+     der Name) und eine Zeile "Name · Raum" (kachelTexte); kein Raum im Kopf.
+     Kopf und Text stehen mittig in der Flaeche ueber den Tasten. Die aktive
+     Kachel kippt ganz um: Flaeche --kachel-an, Schrift und Symbole
+     --kachel-an-ink, die Zweitzeile --kachel-an-muted. Ebenso die aktive
+     Zeile einer Liste (Stimmungen, Ausgaenge): ihre Flaeche ist dieselbe
+     --kachel-an, die Schrift darf nicht --ink bleiben (aktiv dunkel). */
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .name,
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .ico,
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .icowrap{color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .sub,
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .room{color:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
+  html[data-kachelset-aufbau="mitte"] .grid.list .tile.on .ico.img{background-color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile{align-items:center;text-align:center;}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile .head{justify-content:center;margin-top:auto;}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile .body{align-items:center;margin-bottom:auto;max-width:100%;}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile .name{white-space:pre-line;font-weight:var(--tile-fw,max(600,var(--name-weight,450)));}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile>.tctrls{align-self:stretch;}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .name,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .bigv,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .ico,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .icowrap{color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .sub,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .room,
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .bigv small{color:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .ico.img{background-color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .tspark .mm{fill:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
+  /* Leisten pille und oben: Hoehe und Symbole aus dem Set (--tabs-hoehe,
+     --tab-symbol); autoRaster misst die Leiste, rechnet also mit. Der
+     Zurueck-Knopf ist ein Symbol wie die Tabs (renderTabs). */
+  html[data-kachelset-leiste="pille"] #tabs,
+  html[data-kachelset-leiste="oben"] #tabs{height:var(--k-tabs-h,auto);align-items:stretch;}
+  html[data-kachelset-leiste="pille"] .tab,
+  html[data-kachelset-leiste="oben"] .tab{padding:0;}
+  html[data-kachelset-leiste="pille"] .tab svg,html[data-kachelset-leiste="pille"] .tab .tico,
+  html[data-kachelset-leiste="oben"] .tab svg,html[data-kachelset-leiste="oben"] .tab .tico,
+  html[data-kachelset-leiste="pille"] .tabback svg,html[data-kachelset-leiste="oben"] .tabback svg{
+    width:var(--k-tab-symbol,28px);height:var(--k-tab-symbol,28px);}
+  html[data-kachelset-leiste="pille"] .tabback,
+  html[data-kachelset-leiste="oben"] .tabback{flex:1;align-self:stretch;width:auto;height:auto;margin:0;border:0;border-radius:0;
+    background:transparent;}
+  /* Leiste "pille": unten, als Pille (--pille-h) mittig in der Leiste. Die
+     Pille ist nur ein ::before - die Leiste selbst hat ihre Hoehe. Breit je
+     Eintrag --pille-tab-breite (--tab-n aus renderTabs), hoechstens 560 px. */
+  html[data-kachelset-leiste="pille"] .tabs{position:relative;border-top-color:transparent;background:transparent;
+    --pille-rand:max(12px,calc(50% - min(280px, var(--tab-n,99) * var(--pille-tab-breite,999px) / 2)));
+    padding-left:var(--pille-rand);padding-right:var(--pille-rand);}
+  html[data-kachelset-leiste="pille"] .tabs::before{content:"";position:absolute;z-index:0;pointer-events:none;
+    top:calc((var(--k-tabs-h,55px) - var(--k-pille-h,43px) - env(safe-area-inset-bottom,0px)) / 2);
+    height:var(--k-pille-h,43px);
+    left:var(--pille-rand);right:var(--pille-rand);
+    border-radius:999px;background:var(--tabbar);}
+  html[data-kachelset-leiste="pille"] .tabs>*{position:relative;z-index:1;}
+  html[data-kachelset-leiste="pille"] .tab.active{color:var(--ink);}
+  html[data-kachelset-leiste="pille"] .tab.active .tico{background-color:var(--ink);}
+  html[data-kachelset-leiste="pille"] .tabback{color:var(--muted);}
+  html[data-kachelset-leiste="pille"] .tabback.on{color:var(--ink);}
+  html[data-kachelset-leiste="pille"] .screen.kopf .kopfzeile{background:transparent;border-bottom-color:transparent;}
+  /* Leiste "oben": die Tab-Leiste steht in der ersten Zeile des Kastens, nur
+     Symbole: aktiv --tab-an, sonst --tab-aus. Der Kasten ist der Rahmen
+     (--rahmen, --rahmen-seite und -unten), das Raster darin das Feld der Kacheln
+     (--screen, --feld-radius); autoRaster zieht den Rahmen ab. Die Uhr-Seite
+     liegt als Feld im selben Rahmen, ihr Text auf --bg. Kopfzeile,
+     Werteleiste und Widget stehen auf dem Rahmen, Schrift in den Farben der
+     Tabs. Jede Zeilen-Variante (kopf, leiste, split, hoch, Widget-Seite)
+     rueckt um eine Zeile nach unten. */
+  html[data-kachelset-leiste="oben"] .screen{background:var(--rahmen,var(--bg));
+    padding:0 var(--k-rahmen-seite,0px) var(--k-rahmen-unten,0px);}
+  html[data-kachelset-leiste="oben"] #grid{background:var(--screen);border-radius:var(--k-feld-radius,0px);}
+  html[data-kachelset-leiste="oben"] .saver{border-radius:var(--k-feld-radius,0px);
+    inset:var(--k-rahmen-seite,0px) var(--k-rahmen-seite,0px) var(--k-rahmen-unten,0px);}
+  html[data-kachelset-leiste="oben"] #tabs{border-top:0;background:transparent;
+    padding-bottom:0;padding-top:env(safe-area-inset-top,0px);}
+  html[data-kachelset-leiste="oben"] .tab{color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="oben"] .tab .tico{background-color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="oben"] .tab.active{color:var(--tab-an,var(--ink));}
+  html[data-kachelset-leiste="oben"] .tab.active .tico{background-color:var(--tab-an,var(--ink));}
+  html[data-kachelset-leiste="oben"] .tabback{color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="oben"] .tabback.on{color:var(--tab-an,var(--ink));}
+  html[data-kachelset-leiste="oben"] .screen.kopf .kopfzeile,
+  html[data-kachelset-leiste="oben"] .screen.leiste .werteleiste{background:transparent;border-bottom-color:transparent;
+    color:var(--tab-an,var(--ink));}
+  html[data-kachelset-leiste="oben"] .kz-uhr .d,html[data-kachelset-leiste="oben"] .kz-wx .m{color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="oben"] .kz-wx .m .c{color:var(--tab-an,var(--ink));}
+  html[data-kachelset-leiste="oben"] .kz-wx{border-left-color:transparent;}
+  html[data-kachelset-leiste="oben"] .screen.split #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split #frontpane{border-left-color:transparent;border-top-color:transparent;}
+  /* Pane 2 steht wie das Feld der Kacheln auf dem Rahmen. Ihre Seiten bekommen
+     deshalb dessen Flaeche (--screen, flach, sein Radius) statt des Verlaufs
+     von der Kachelfarbe ins Durchsichtige: auf dem dunklen Rahmen lief der nach
+     unten ins Dunkle, und Schrift und Zweitzeile des Sets (gegen Kachel und
+     Feld gerechnet) verschwanden darin. Oben und unten buendig mit dem Feld. */
+  html[data-kachelset-leiste="oben"] .screen.split #playerpane .fp-page,
+  html[data-kachelset-leiste="oben"] .screen.split #frontpane .fp-page,
+  html[data-kachelset-leiste="oben"] .screen.widgettab #playerpane .fp-page,
+  html[data-kachelset-leiste="oben"] .screen.widgettab #frontpane .fp-page{background:var(--screen);
+    border-color:transparent;border-radius:var(--k-feld-radius,0px);}
+  html[data-kachelset-leiste="oben"] .screen.split:not(.hoch) #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split:not(.hoch) #frontpane{padding:0 0 0 10px;scroll-padding-top:0;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #frontpane{padding:10px 0 0;scroll-padding-top:10px;}
+  html[data-kachelset-leiste="oben"] .screen.widgettab #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.widgettab #frontpane{padding:0;scroll-padding-top:0;}
+  html[data-kachelset-leiste="oben"] .screen{grid-template-rows:auto minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen #grid,
+  html[data-kachelset-leiste="oben"] .screen .verbindung,
+  html[data-kachelset-leiste="oben"] .screen.widgettab #frontpane,
+  html[data-kachelset-leiste="oben"] .screen.widgettab #playerpane{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.split{grid-template-rows:auto minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.split #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.split #grid,
+  html[data-kachelset-leiste="oben"] .screen.split .verbindung,
+  html[data-kachelset-leiste="oben"] .screen.split #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split #frontpane{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch{grid-template-rows:auto minmax(0,1fr) minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.auto{grid-template-rows:auto var(--auto-k,1fr) var(--auto-p,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #grid{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split.hoch #frontpane{grid-row:3;}
+  html[data-kachelset-leiste="oben"] .screen.kopf{grid-template-rows:auto auto minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.kopf #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.kopf .kopfzeile{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.kopf #grid,
+  html[data-kachelset-leiste="oben"] .screen.kopf .verbindung{grid-row:3;}
+  html[data-kachelset-leiste="oben"] .screen.leiste{grid-template-rows:auto auto minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.leiste #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.leiste .werteleiste{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.leiste #grid,
+  html[data-kachelset-leiste="oben"] .screen.leiste .verbindung{grid-row:3;}
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste{grid-template-rows:auto auto auto minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste .kopfzeile{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste .werteleiste{grid-row:3;}
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste #grid,
+  html[data-kachelset-leiste="oben"] .screen.kopf.leiste .verbindung{grid-row:4;}
+  html[data-kachelset-leiste="oben"] .screen.split.leiste:not(.hoch) #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split.leiste:not(.hoch) #frontpane{grid-row:2/4;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste{grid-template-rows:auto auto minmax(0,1fr) minmax(0,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.auto.leiste{grid-template-rows:auto auto var(--auto-k,1fr) var(--auto-p,1fr);}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste #tabs{grid-row:1;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste .werteleiste{grid-row:2;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste #grid{grid-row:3;}
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste #playerpane,
+  html[data-kachelset-leiste="oben"] .screen.split.hoch.leiste #frontpane{grid-row:4;}
+  /* Leiste "links": die Tab-Leiste ist eine Spalte am linken Rand (Breite
+     --rail-breite, auf schmalen Schirmen --rail-breite-schmal), mit Symbol und
+     Name; schmal nur das Symbol. Aktiv: Flaeche der Kachel, Symbol in der
+     Akzentfarbe; Zurueck steht unten. Der Kasten macht ihr mit padding-left
+     Platz, sie liegt absolut darin und belegt keine Zeile - jede
+     Zeilen-Variante (kopf, leiste, split, hoch) bleibt, nur ihre Tab-Zeile ist
+     leer. Ohne grid-row/-column waere die Leiste an diese leere Zeile gebunden
+     (Bezugsrahmen eines absoluten Rasterkinds), darum ausdruecklich auto, auch
+     gegen die Varianten. Das feste Raster wird um die Leiste breiter;
+     autoRaster() zieht sie von der Flaeche ab (railW). */
+  html[data-kachelset-leiste="links"] .screen{padding-left:var(--k-rail,0px);
+    max-width:calc(var(--cols,2) * 240px + var(--k-rail,0px));}
+  html[data-kachelset-leiste="links"] .screen.split{width:min(100vw, calc(var(--cols,2) * 480px + var(--k-rail,0px)));}
+  html[data-kachelset-leiste="links"] .screen.split.hoch{width:min(100vw, calc(var(--cols,2) * 240px + var(--k-rail,0px)));}
+  html[data-kachelset-leiste="links"] .screen.fill,
+  html[data-kachelset-leiste="links"] .screen.split.fill{max-width:none;width:100vw;}
+  html[data-kachelset-leiste="links"] #tabs{position:absolute;left:0;top:0;bottom:0;width:var(--k-rail,0px);
+    grid-row:auto !important;grid-column:auto !important;z-index:7;
+    flex-direction:column;align-items:stretch;gap:6px;overflow-x:hidden;overflow-y:auto;scrollbar-width:none;
+    padding:28px 14px calc(28px + env(safe-area-inset-bottom,0px));border-top:0;}
+  html[data-kachelset-leiste="links"] .screen.schmal #tabs{padding:12px 8px calc(12px + env(safe-area-inset-bottom,0px));}
+  html[data-kachelset-leiste="links"] #tabs::-webkit-scrollbar{display:none;}
+  html[data-kachelset-leiste="links"] .tab,
+  html[data-kachelset-leiste="links"] .tabback{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-start;
+    gap:14px;height:56px;padding:0 16px;border-radius:var(--taste-radius,12px);min-width:0;color:var(--muted);}
+  html[data-kachelset-leiste="links"] .screen.schmal .tab,
+  html[data-kachelset-leiste="links"] .screen.schmal .tabback{height:52px;justify-content:center;padding:0;}
+  html[data-kachelset-leiste="links"] .tab svg,html[data-kachelset-leiste="links"] .tab .tico,
+  html[data-kachelset-leiste="links"] .tabback svg{flex:none;width:24px;height:24px;}
+  html[data-kachelset-leiste="links"] .tab .tnm,
+  html[data-kachelset-leiste="links"] .tabback .tnm{font-size:17px;font-weight:500;color:inherit;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  html[data-kachelset-leiste="links"] .screen:not(.schmal) .tab .tlbl{display:none;}   /* der Name steht daneben (.tnm) */
+  html[data-kachelset-leiste="links"] .screen.schmal .tab .tnm,
+  html[data-kachelset-leiste="links"] .screen.schmal .tabback .tnm{display:none;}
+  html[data-kachelset-leiste="links"] .tab.active{background:var(--tile);color:var(--glow);}
+  html[data-kachelset-leiste="links"] .tab.active .tico{background-color:var(--glow);}
+  html[data-kachelset-leiste="links"] .tab.active .tnm{color:var(--ink);font-weight:600;}
+  html[data-kachelset-leiste="links"] .tabspacer{display:none;}
+  html[data-kachelset-leiste="links"] .tabback{margin:auto 0 0;width:auto;border:0;background:transparent;font-size:inherit;}
+  html[data-kachelset-leiste="links"] .tabback.on{color:var(--ink);}

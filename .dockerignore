@@ -3,8 +3,22 @@
 data
 config/loxpanel.cfg
 config/panels.json
+config/theme.json
 # Sicherungskopien vor dem Ueberschreiben (loxpanel.cfg.bak mit Kennwoertern)
 config/*.bak
 .env
 **/__pycache__
 *.pyc
+# Altlasten ohne Funktion (CLAUDE.md) und nur fuer Entwicklung/CI: nicht ins Image
+webfrontend/htmlauth
+config/visu.*
+daemon
+postinstall.sh
+apt
+plugin.cfg
+tests
+pytest.ini
+requirements-dev.txt
+# Vom LoxBerry-Plugin nur plugin.cfg: dort steht die Version (bin/version_info.py)
+loxberry-plugin/*
+!loxberry-plugin/plugin.cfg

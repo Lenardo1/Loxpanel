@@ -27,11 +27,8 @@
   },
 
   "ui": {
-    "_comment": "Sichtbare Tabs (Reihenfolge frei), Icon-/Schriftgrößen in px, optionale Schrift.",
+    "_comment": "Sichtbare Tabs (Reihenfolge frei), optionale Schrift. Icon-/Schriftgrößen in px (iconSize, nameSize, subSize, roomSize, bigSize) nur eintragen, wenn sie vom Standard abweichen sollen: der hängt vom Kachel-Aufbau ab, der Konfigurator zeigt ihn an.",
     "tabs": ["favoriten", "zentral", "raeume", "kategorien"],
-    "iconSize": 38,
-    "nameSize": 20,
-    "subSize": 15,
     "font": ""
   }
 }

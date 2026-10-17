@@ -7,9 +7,10 @@
 #   localhost:8099      -> Server laeuft auf dem Panel selbst (Variante A)
 SERVER=192.168.1.10:8099
 
-# Panel-Profil-ID (leer = Standardansicht). IDs anlegen/sehen auf der
-# Konfig-Seite:  http://<SERVER>/config     z. B. erdgeschoss
-PANEL=
+# Startansicht (Kennung einer Ansicht), nur bis der Server dem Geraet eine
+# Ansicht zuordnet - das macht der Konfigurator unter Geraete ("Ansicht
+# wechseln", "Geraet einrichten"). Leer = Standardansicht. Nicht mehr noetig.
+# PANEL=erdgeschoss
 
 # --- nur fuer den Panel-Agenten (agent/loxpanel-agent.py) ---
 # HTTP-Port des Agenten (Server steuert das Panel darueber). Default 8130.
@@ -24,7 +25,9 @@ AGENT_PORT=8130
 # Agent neu laden (Settings -> Displays -> Reload) bzw. neu booten.
 # X=-8
 # DPMS_OFF = Sekunden bis das Display komplett abschaltet (Backlight aus), wenn
-# nichts angetippt wird. 0 = nie. Antippen weckt es sofort. Default 180 (3 min).
+# nichts angetippt wird. 0 = nie. Antippen weckt es sofort. Gilt nur, solange
+# der Server keinen Wert schickt: "Display aus nach" steht im Konfigurator in
+# den Vorgaben und auf der Karte des Geraets (Zeile Display). Ohne beides 180.
 # Der Web-Screensaver (Uhr) erscheint schon nach 60 s; danach schaltet DPMS ab.
 # Bewaehrt am PX30-Wandpanel: 60 (schaltet zuegig ab, bleibt kuehl).
 # DPMS_OFF=60

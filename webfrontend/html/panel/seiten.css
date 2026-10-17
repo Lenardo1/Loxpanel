@@ -1,0 +1,956 @@
+/* LoxPanel-Visu, Stylesheet seiten.css: Detailseite, Spieler, Tabs, Verbindung und Einrichtung, Uhr-Seite, Wetter und Kalender, Hausuebersicht, Gesten. Geladen aus panel.html als /panel/seiten.css, in dieser Reihenfolge. */
+  /* Detail-Panel (z.B. Jalousie) */
+  .grid.panel{display:flex;flex-direction:column;gap:10px;align-items:stretch;grid-auto-rows:initial;}
+  /* Anlagenschema (SystemScheme): Titel oben, darunter ein Zoom-/Pan-Viewport.
+     .schemestage ist das Original-Koordinatensystem (schemeSize), per transform
+     skaliert/verschoben. Die Werte liegen absolut an ihren pos-Koordinaten. */
+  .grid.scheme{display:flex;flex-direction:column;gap:0;padding:0;grid-auto-rows:initial;overflow:hidden;}
+  .schemetitle{flex:0 0 auto;text-align:center;font-weight:600;font-size:16px;
+    padding:10px 12px 8px;border-bottom:1px solid var(--line);}
+  .schemeview{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:none;
+    background:var(--screen);}
+  .schemestage{position:absolute;top:0;left:0;transform-origin:0 0;will-change:transform;}
+  .schemeimg{position:absolute;top:0;left:0;width:100%;height:100%;user-select:none;-webkit-user-drag:none;}
+  .schemeval{position:absolute;display:flex;align-items:center;justify-content:center;
+    font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+    /* Bewusst KEINE --wash-Auflage: das Wertschild liegt ueber dem Schemabild,
+       nicht ueber dem Panelgrund. Es bringt seinen Hintergrund selbst mit und
+       muss hell bleiben, sonst steht die dunkle Schrift auf Schwarz. */
+    color:#12140f;background:rgba(255,255,255,.82);border-radius:6px;
+    box-shadow:0 1px 3px rgba(0,0,0,.25);padding:0 4px;overflow:hidden;white-space:nowrap;}
+  .schemeval span{overflow:hidden;text-overflow:ellipsis;}
+  .schemeval.on{background:rgba(var(--accent-rgb,82,184,129),.9);color:var(--on-accent,#08130c);}
+  .schemeval.crit{background:var(--crit-fill,rgba(226,105,95,.92));color:var(--crit-ink,#fff);}
+  .schemeval.tap{cursor:pointer;box-shadow:0 0 0 2px var(--accent),0 1px 3px rgba(0,0,0,.25);}
+  .schemehint{position:absolute;right:8px;bottom:6px;font-size:11px;color:var(--muted);
+    background:rgba(0,0,0,.35);border-radius:6px;padding:2px 7px;pointer-events:none;}
+  .hero{display:grid;place-items:center;padding:6px 0 2px;}
+  .hero .circle{width:84px;height:84px;border-radius:50%;background:var(--tile);
+    border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);}
+  .hero .circle svg{width:38px;height:38px;}
+  .hero .circle .himg{width:38px;height:38px;background-color:currentColor;
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .hero .circle .rawico{width:38px;height:38px;object-fit:contain;}
+  .status{text-align:center;color:var(--muted);font-size:14px;padding:2px 6px;}
+  /* Wecker-Status: moderat gross (nicht so riesig wie .pbig), Raum als Unterzeile */
+  .astat{text-align:center;font-size:30px;font-weight:600;line-height:1.18;letter-spacing:-.01em;padding:0 16px;}
+  .astat.crit{color:var(--crit);}
+  .astat .astatsub{font-size:15px;font-weight:400;color:var(--muted);margin-top:8px;letter-spacing:0;}
+  .pbar{background:var(--tile);border:1px solid var(--line);border-radius:12px;
+    padding:15px;text-align:center;font-weight:650;font-size:15px;}
+  .pbig{text-align:center;font-size:clamp(56px,15vw,84px);font-weight:600;letter-spacing:-.02em;line-height:1.06;
+    padding:8px 8px;word-break:break-word;}
+  .pbig.good{color:var(--good);} .pbig.crit{color:var(--crit);}
+  .grid.panel.bigpage{justify-content:center;gap:14px;}
+  /* Verlaufs-Diagramm (Block k:'chart'). Farben nur ueber Theme-Variablen. */
+  .chart{background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:8px 10px 6px;}
+  .chrng{display:flex;gap:6px;justify-content:center;margin-bottom:6px;}
+  .chrng .chip{font:inherit;font-size:13px;color:var(--muted);background:transparent;
+    border:1px solid var(--line);border-radius:999px;padding:4px 12px;cursor:pointer;}
+  .chrng .chip.on{color:var(--accent);border-color:var(--accent);background:rgba(var(--accent-rgb,82,184,129),.12);}
+  .chbody svg{display:block;width:100%;height:auto;}
+  .chbody .chax{fill:var(--muted);font-size:11px;font-variant-numeric:tabular-nums;}
+  .chbody .chgrid{stroke:var(--line);stroke-width:1;}
+  .chbody .chvgrid{stroke:var(--line);stroke-width:1;stroke-dasharray:2 4;}
+  .chmsg{color:var(--muted);font-size:14px;text-align:center;padding:26px 0;}
+  .chleg{display:flex;flex-wrap:wrap;gap:2px 14px;justify-content:center;font-size:12.5px;color:var(--muted);
+    margin-top:2px;font-variant-numeric:tabular-nums;}
+  .chleg .chdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;}
+  .chleg b{font-weight:600;color:var(--ink);}
+  /* Detailseite mit Diagramm: oben anfangen (eine zentrierte Spalte schnitte beim
+     Scrollen den Kopf ab), Deko-Kreis weg, Wert kleiner - so passt der Verlauf
+     auch auf 480x480 unter den aktuellen Wert. */
+  .grid.panel.chartpage{justify-content:flex-start;gap:10px;}
+  .grid.panel.chartpage .hero{display:none;}
+  .grid.panel.chartpage .pbig{font-size:clamp(40px,10vw,56px);padding:2px 8px;}
+  /* anchor:bottom (IRR/Klima): Anzeige oben zentriert, Bedienung unten fixiert.
+     Aufklappende Auswahl steht im .panbot VOR den festen Zeilen -> waechst nach oben. */
+  .grid.panel.anchorbot{justify-content:flex-start;gap:0;}
+  .grid.panel.anchorbot .pantop{flex:1 0 auto;min-height:0;display:flex;flex-direction:column;
+    justify-content:center;align-items:stretch;gap:10px;}
+  /* Hoeher als der Schirm (480x480 mit vielen Zeilen, panelEinpassen): Deko-Kreis
+     weg, grosser Wert kleiner wie bei Diagrammen. Reicht das nicht, scrollt die
+     Seite - .pantop schrumpft nicht unter seinen Inhalt, sonst ueberlappte er
+     die Bedienung darunter. */
+  .grid.panel.eng .hero{display:none;}
+  .grid.panel.eng .pbig{font-size:clamp(40px,10vw,56px);padding:2px 8px;}
+  .grid.panel.anchorbot .panbot{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;padding-top:8px;}
+  .brow{display:flex;gap:10px;}
+  .btn{flex:1;background:var(--tile);border:1px solid var(--line);border-radius:12px;
+    padding:17px 10px;text-align:center;font-weight:650;font-size:15px;cursor:pointer;
+    user-select:none;-webkit-user-select:none;touch-action:none;
+    transition:background .12s,transform .06s;}
+  .btn:active{transform:scale(.97);background:rgba(var(--wash,255,255,255),.09);}
+  .btn.on{background:linear-gradient(180deg,rgba(var(--on-rgb,224,162,77),.22),rgba(var(--on-rgb,224,162,77),.05));
+    border-color:rgba(var(--on-rgb,224,162,77),.55);color:var(--an-text,var(--glow));}
+  .intercom-talk{display:flex;flex:0 0 auto;flex-direction:column;gap:4px;}
+  .intercom-talk-button{width:100%;color:var(--ink);font-family:inherit;touch-action:manipulation;}
+  .intercom-talk-button:disabled{opacity:.4;cursor:default;}
+  .intercom-talk-status{color:var(--muted);font-size:12px;text-align:center;overflow-wrap:anywhere;}
+  .intercom-talk.error .intercom-talk-status{color:var(--crit);}
+  .grid.panel.intercom-page>.video,.campage.intercom-page>.video{flex:1 1 auto;min-height:0;}
+  /* Aufklappbare Auswahl (z.B. Klima Modus/Fan): Zeile per Toggle ein/aus */
+  .brow.collapsed{display:none;}
+  .brow.wraprow{flex-wrap:wrap;}
+  .brow.wraprow .btn{flex:1 1 28%;min-width:82px;}
+  .btn.toggler::after{content:'▾';margin-left:7px;opacity:.55;font-size:.82em;vertical-align:middle;}
+  /* Auswahl-Popup (Klima Modus/Fan) */
+  .menuov{position:absolute;inset:0;z-index:25;}
+  .menubox{position:absolute;background:var(--screen);border:1px solid var(--line);
+    border-radius:12px;padding:4px;min-width:150px;max-height:82%;overflow-y:auto;
+    box-shadow:0 14px 44px rgba(0,0,0,.65);display:flex;flex-direction:column;gap:1px;}
+  .menuitem{padding:7px 16px;border-radius:7px;font-size:15px;line-height:1.15;white-space:nowrap;
+    cursor:pointer;user-select:none;-webkit-user-select:none;color:var(--ink);}
+  .menuitem:active{background:rgba(var(--wash,255,255,255),.13);}
+  .menuitem.on{color:var(--an-text,var(--glow));background:rgba(var(--on-rgb,224,162,77),.15);}
+  /* Musik-Player */
+  /* Cover = zentriertes Quadrat, das in Breite UND Hoehe der Flaeche passt.
+     Ohne Hoehen-Cap ueberdeckt/verdraengt es auf flachen bzw. quadratischen
+     Displays (4-Zoll 480x480, Shelly X2) Titel/Interpret. */
+  .cover{position:relative;display:grid;place-items:center;padding:4px 0 2px;min-height:0;}
+  .cover .coverph,.cover img{width:auto;height:auto;
+    max-width:min(60%,210px);max-height:min(44vh,210px);aspect-ratio:1/1;border-radius:12px;}
+  .cover .coverph{position:absolute;width:120px;height:120px;
+    background:var(--tile);display:grid;place-items:center;color:var(--muted);}
+  .cover .coverph svg{width:44px;height:44px;}
+  .cover img{position:relative;object-fit:cover;opacity:0;transition:opacity .2s;
+    box-shadow:0 8px 24px rgba(0,0,0,.45);}
+  .webframe{width:100%;height:74vh;border-radius:12px;overflow:hidden;background:#000;}
+  .webframe iframe{width:100%;height:100%;border:0;display:block;}
+  .video{width:100%;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;
+    display:grid;place-items:center;}
+  .video img{width:100%;height:100%;object-fit:contain;}
+  .ptitle{text-align:center;font-size:19px;font-weight:550;padding:0 8px;letter-spacing:-.01em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ptitle .psub{font-size:15px;font-weight:400;color:var(--muted);margin-top:3px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brow.transport{justify-content:center;align-items:center;gap:18px;}
+  .btn.icon{flex:0 0 auto;width:58px;height:58px;display:grid;place-items:center;padding:0;
+    border-radius:50%;color:var(--ink);}
+  .btn.icon svg{width:24px;height:24px;}
+  .btn.icon.big{width:70px;height:70px;background:var(--glow);border-color:transparent;color:var(--on-glow,#181008);}
+  .btn.icon.big svg{width:30px;height:30px;}
+  .srow{display:flex;align-items:center;gap:10px;padding:4px 4px;}
+  .srow .sico{color:var(--muted);display:grid;place-items:center;}
+  .srow .sico svg{width:20px;height:20px;}
+  .srow .sval{font-family:var(--mono);font-size:12px;color:var(--muted);width:28px;text-align:right;}
+  .sbtn{flex:0 0 auto;width:32px;height:32px;border-radius:8px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--fg);font-size:20px;line-height:1;display:grid;
+    place-items:center;cursor:pointer;user-select:none;-webkit-user-select:none;}
+  .sbtn:active{background:var(--glow);color:var(--on-glow,#04121f);}
+  #playerpane .ppvol .sbtn{width:30px;height:30px;font-size:18px;}
+  /* Einheitliche Lautstaerke-/Wert-Leiste fuer BEIDE Player (Vollseite + Pane).
+     Fuellung ueber --p (Prozent, per JS gesetzt) statt natives accent-color,
+     damit sie auf jedem WebView gleich aussieht und der Track nie verschwindet.
+     Track ueber --wash getoent, damit er auf hellen Themes sichtbar bleibt. */
+  .sld{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:4px;cursor:pointer;
+    outline:none;background:linear-gradient(to right,
+      var(--glow) var(--p,0%),rgba(var(--wash,255,255,255),.22) var(--p,0%));}
+  .sld::-webkit-slider-runnable-track{-webkit-appearance:none;height:6px;border-radius:4px;background:transparent;}
+  .sld::-webkit-slider-thumb{-webkit-appearance:none;margin-top:-6px;width:18px;height:18px;border-radius:50%;
+    background:var(--glow);border:2px solid var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.5);cursor:pointer;}
+  .sld::-moz-range-track{height:6px;border-radius:4px;background:rgba(var(--wash,255,255,255),.22);}
+  .sld::-moz-range-progress{height:6px;border-radius:4px;background:var(--glow);}
+  .sld::-moz-range-thumb{width:16px;height:16px;border:2px solid var(--bg);border-radius:50%;
+    background:var(--glow);cursor:pointer;}
+  /* Aufbau "mitte": Hervorgehobenes kippt um wie die aktive Kachel. Die grosse
+     Taste (Play) nimmt deshalb deren Farben, der Schieber die Schrift. --glow
+     gehoert nicht zu seiner Farbsprache: das Set rechnet es nur fuer seine
+     hellen Flaechen nach (Farbton Lavendel: #553602, braun). Die -moz-Regeln
+     einzeln, ein unbekanntes Pseudo-Element verwirft sonst die ganze Liste. */
+  html[data-kachelset-aufbau="mitte"] .btn.icon.big{background:var(--kachel-an,var(--taste));
+    color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .sld{background:linear-gradient(to right,
+      var(--ink) var(--p,0%),rgba(var(--wash,255,255,255),.22) var(--p,0%));}
+  html[data-kachelset-aufbau="mitte"] .sld::-webkit-slider-thumb{background:var(--ink);}
+  html[data-kachelset-aufbau="mitte"] .sld::-moz-range-progress{background:var(--ink);}
+  html[data-kachelset-aufbau="mitte"] .sld::-moz-range-thumb{background:var(--ink);}
+  /* Schwebender Zurück-Pfeil (nur beim Reinnavigieren) */
+  .tabback{flex:0 0 auto;align-self:center;width:50px;height:50px;margin:0 14px;
+    display:grid;place-items:center;border-radius:50%;cursor:pointer;font-size:32px;line-height:1;
+    color:var(--muted);border:2px solid var(--line);background:rgba(var(--wash,255,255,255),.04);
+    transition:color .15s,border-color .15s,background .15s;}
+  /* Schrift wie auf der Leiste: --on-accent gilt nur auf vollem --accent, hier liegt eine Toenung */
+  .tabback.on{color:var(--ink);border-color:var(--accent);background:rgba(var(--accent-rgb,82,184,129),.14);}
+  .tabback:active{transform:scale(.94);}
+  .back:active{background:rgba(0,0,0,.65);}
+  /* Tabs */
+  .tabs{display:flex;border-top:1px solid var(--line);background:var(--tabbar,rgba(0,0,0,.25));}
+  .tab{flex:1;display:grid;place-items:center;padding:13px 0;color:var(--muted);cursor:pointer;}
+  .tabspacer{flex:1;pointer-events:none;}   /* leere Zelle, haelt den Zurueck-Button mittig */
+  .tab svg{width:28px;height:28px;}
+  /* Kategorie-Tab-Icon: Maskenfarbe DIREKT an die Theme-Variable haengen (nicht
+     an currentColor). Sonst loest die eingeschraenkte WebView (Shelly) currentColor
+     beim Farbschema-Wechsel nicht neu auf und das Icon bleibt an der Standardfarbe
+     haengen -> auf getoentem Theme kaum sichtbar. */
+  .tab .tico{display:inline-block;width:28px;height:28px;background-color:var(--muted);
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .tab.active{color:var(--accent);}
+  .tab.active .tico{background-color:var(--accent);}
+  /* Sprungmarke ohne Bild: der Name traegt die Unterscheidung. Vier gleiche
+     Symbole waeren wertlos - Raeume haben in Loxone meist kein Bild. */
+  /* 10px auf dem 4-Zoll-Panel (480 px): dort passt jeder Raumname der Anlage
+     ganz hinein, ohne mitten im Wort zu brechen - nachgemessen mit 21 echten
+     Namen. Auf breiteren Displays waechst die Schrift bis 13px mit. */
+  .tab .tlbl{font-size:clamp(10px,2vw,13px);line-height:1.15;font-weight:600;letter-spacing:.02em;
+    max-width:100%;padding:0 4px;text-align:center;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+    overflow-wrap:anywhere;}
+  .tab:active{transform:scale(.92);}
+  /* Verbindungsleiste (t:'verbindung', verbindungZeigen): fehlt die Verbindung
+     zum Server oder die des Servers zum Miniserver, steht sie oben in der Zeile
+     des Rasters ueber alle Spalten (im Split auch ueber dem Widget), unter der
+     Uhr-Seite (30) und den Karten (40). Flaeche und Schrift der gefuellten
+     Stoerungskachel (--crit-fill/-ink/-muted, gegen AAA/AA gerechnet); ohne
+     Grundfarbe und Set eine Auflage in --crit-rgb auf dem Kasten in --bg. */
+  .verbindung{grid-row:1;grid-column:1 / -1;place-self:start stretch;z-index:20;margin:8px;
+    border-radius:12px;overflow:hidden;background:var(--bg);box-shadow:0 6px 18px rgba(0,0,0,.35);}
+  .verbindung[hidden]{display:none;}
+  .verbindung .vb-flaeche{padding:8px 12px;text-align:center;line-height:1.3;
+    background:var(--crit-fill,rgba(var(--crit-rgb,226,107,95),.28));color:var(--crit-ink,var(--ink));}
+  .verbindung .vb-titel{display:block;font-size:15px;font-weight:700;}
+  .verbindung .vb-stand{display:block;font-size:13px;margin-top:2px;color:var(--crit-muted,var(--muted));}
+  /* ... und was darunter steht, ist nicht mehr bestaetigt: blass, die Bedienung
+     sperrt sendCmd() */
+  .screen.verbweg #grid,.screen.verbweg #playerpane,.screen.verbweg #frontpane,
+  .screen.verbweg .kopfzeile,.screen.verbweg .werteleiste{opacity:.55;filter:saturate(.4);}
+  /* Einrichtungshinweis (t:'einrichtung'), solange der Server keine Struktur vom
+     Miniserver hat: ueber der Uhr-Seite (30), unter Meldungen (50); laesst
+     Beruehrungen durch. */
+  .einrichtung{position:absolute;left:10px;right:10px;bottom:10px;z-index:40;padding:14px 16px;
+    border-radius:12px;border:1px solid var(--line);color:var(--ink);text-align:center;line-height:1.3;
+    background:linear-gradient(var(--tile),var(--tile)),var(--bg);   /* --tile ist nur ein Schleier */
+    box-shadow:0 8px 24px rgba(0,0,0,.45);pointer-events:none;}
+  .einrichtung.hidden{display:none;}
+  .einrichtung .ei-titel{font-size:17px;font-weight:700;}
+  .einrichtung .ei-grund{font-size:13px;color:var(--muted);margin-top:4px;word-break:break-word;}
+  .einrichtung .ei-hinweis{font-size:13px;margin-top:10px;}
+  .einrichtung .ei-url{font-size:20px;font-weight:700;margin-top:4px;color:var(--accent);word-break:break-all;}
+  /* Kopplungskarte (t:'kopplung'): Browser ohne Namen (?device=) und ohne ?panel= -
+     oben, damit sie neben dem Einrichtungshinweis stehen kann; ein Tipp
+     blendet sie bis zum naechsten Laden aus. */
+  .einrichtung.kopplung{top:10px;bottom:auto;pointer-events:auto;cursor:pointer;}
+  .einrichtung .ei-code{font-size:36px;font-weight:800;letter-spacing:.2em;margin:6px 0 2px;color:var(--accent);
+    font-variant-numeric:tabular-nums;}
+  .einrichtung .ei-weg{font-size:12px;color:var(--muted);margin-top:8px;}
+  /* Vorschau eines ungespeicherten Entwurfs (?entwurf=, t:'theme' entwurf): kleines
+     Etikett oben links ueber der Visu. Schwebt, nimmt keinen Platz und faengt
+     keine Beruehrung ab - das Raster misst sich wie ohne Etikett. */
+  .entwurfmarke{position:fixed;top:6px;left:6px;z-index:60;pointer-events:none;padding:3px 9px;border-radius:10px;
+    font-size:11px;font-weight:700;letter-spacing:.3px;background:var(--accent);color:var(--on-accent,var(--bg));opacity:.92;}
+  .entwurfmarke.hidden{display:none;}
+  .entwurfmarke.alt{background:var(--crit,#e2695f);color:#fff;}
+  .saver{position:absolute;inset:0;z-index:30;background:var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    cursor:pointer;user-select:none;-webkit-user-select:none;}
+  .saver.hidden{display:none;}
+  /* Nacht-Uhr: nachts nur die Uhrzeit, gedimmt auf Schwarz, oben die Symbole der
+     Gesten-Spalten (wie die Nachtanzeige der Loxone-Taster). --nu-hell ist die
+     Helligkeit aus den Einstellungen; die Uhr driftet gegen Einbrennen.
+     Grund und Schrift kommen aus dem Theme (theme_colors.NACHT_GRUND und
+     nacht_schrift): --ink allein waere in hellen Sets dunkel auf Schwarz. */
+  .saver.nacht{background:var(--nacht-grund);container-type:size;}
+  /* Die zweite Zeile schlaegt das Raster der geteilten Uhr-Seite
+     (.saver.split .sv-wrap.rich), sonst laege die Nacht-Uhr ueber Uhr, Wetter
+     und Terminen, statt sie zu ersetzen. */
+  .saver.nacht .sv-wrap,
+  .saver.split.nacht .sv-wrap.rich{display:none;}
+  .sv-nacht{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--nacht-ink,var(--ink));opacity:var(--nu-hell,.4);pointer-events:none;}
+  .sv-nacht[hidden]{display:none;}
+  .sv-nacht .nu-zeit{font-size:120px;font-size:min(30cqw,42cqh);font-weight:300;line-height:1;letter-spacing:1px;
+    font-variant-numeric:tabular-nums;animation:svdrift 90s linear infinite;}
+  .sv-nacht .nu-zonen{position:absolute;left:0;right:0;top:9%;}
+  .sv-nacht .nu-zonen span{position:absolute;top:0;transform:translateX(-50%);width:30px;height:30px;}
+  .sv-nacht .nu-zonen svg{width:100%;height:100%;}
+  .saver .sv-time{font-size:78px;font-weight:300;line-height:1;letter-spacing:1px;
+    font-variant-numeric:tabular-nums;color:var(--ink);}
+  .saver .sv-date{font-size:20px;color:var(--muted);margin-top:8px;text-transform:capitalize;}
+  .saver .sv-hint{margin-top:6px;font-size:13px;color:var(--muted);opacity:.5;}
+  /* Anti-Einbrennen: Inhalt driftet langsam ueber den Schirm. Kleinere Amplitude
+     als bei der reinen Uhr, damit Wetter/Termine nicht ueber den Rand wandern. */
+  .saver .sv-wrap{display:flex;flex-direction:column;align-items:center;gap:16px;
+    width:min(92%,440px);animation:svdrift 90s linear infinite;}
+  @keyframes svdrift{
+    0%{transform:translate(-14px,-5px);}   25%{transform:translate(14px,-5px);}
+    50%{transform:translate(14px,5px);}     75%{transform:translate(-14px,5px);}
+    100%{transform:translate(-14px,-5px);}
+  }
+  .sv-clock{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  /* Kompakte Front, sobald Wetter/Termine dazukommen (sonst passt es nicht aufs
+     480x480-Panel). Die reine Uhr (ohne Front-Daten) bleibt gross. */
+  .sv-wrap.rich{gap:9px;}
+  /* Mit Wetter/Terminen keine Anti-Einbrenn-Drift — der Inhalt soll ruhig stehen
+     (die reine Uhr weiter unten driftet weiterhin als Einbrennschutz). */
+  .saver .sv-wrap.rich{animation:none;transform:none;}
+  .sv-wrap.rich .sv-time{font-size:44px;}
+  .sv-wrap.rich .sv-date{font-size:15px;}
+  .sv-wrap.rich .sv-clock{margin:20px 0 6px;}   /* Uhr klar von der Wettervorschau darueber absetzen */
+  .sv-wrap.rich .sv-hint{display:none;}   /* bei voller Front kein Platz; nur-Uhr behaelt ihn */
+  /* Split-Panel: doppelte Breite nutzen. Uhr oben mittig ueber beide Spalten,
+     darunter Wetter links und Kalender rechts. Festes 2-Spalten-Grid (bricht
+     nicht um). Nur mit Front-Daten (rich); die reine Uhr bleibt zentriert. */
+  .saver.split .sv-wrap.rich{width:min(94%,820px);display:grid;
+    grid-template-columns:1fr 1fr;grid-template-areas:"clock clock" "wx cal";
+    column-gap:44px;row-gap:16px;align-items:start;}
+  .saver.split .sv-wrap.rich .sv-clock{grid-area:clock;justify-self:center;margin:0 0 4px;}
+  .saver.split .sv-wrap.rich .sv-wx{grid-area:wx;}
+  .saver.split .sv-wrap.rich .sv-cal,
+  .saver.split .sv-wrap.rich .sv-box{grid-area:cal;}
+  /* Steht rechts nichts (Einstellung "aus", oder es gibt schlicht nichts zu
+     zeigen): einspaltig weiterlaufen, statt die halbe Flaeche leer zu lassen. */
+  .saver.split .sv-wrap.rich.solo{grid-template-columns:1fr;
+    grid-template-areas:"clock" "wx";width:min(94%,620px);}
+  /* Energiefluss und Kamera rechts brauchen HOEHE. Ueber beiden Spalten nimmt
+     ihnen die Uhr ein Fuenftel davon: gemessen bei 960x480 blieb der Grafik
+     299 px, das 480er-SVG lief auf 62 % und die Knotennamen auf 7,5 px -
+     unlesbar. Hier steht die Uhr deshalb links ueber dem Wetter, und die rechte
+     Spalte bekommt die volle Hoehe.
+     Beide Spalten gleich breit: der Energiefluss ist durch die HOEHE begrenzt
+     (gemessen: 392 px bei 480 wie bei 444 px Spaltenbreite) - breiter machte
+     nur den leeren Rahmen neben ihm groesser und die Box wuchtiger. Die Kamera
+     (4:3, breitenbegrenzt) verliert dabei wenig: 454x341 -> 418x314.
+     Die Uhr sitzt unten in der oberen Zeile, das Wetter oben in der unteren -
+     so treffen sie sich auf der Mittellinie der rechten Grafik. */
+  .saver.split .sv-wrap.rich.tall{width:min(96%,920px);
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    grid-template-areas:"clock cal" "wx cal";grid-template-rows:1fr 1fr;
+    column-gap:32px;row-gap:14px;align-items:stretch;}
+  .saver.split .sv-wrap.rich.tall .sv-clock{align-self:end;margin:0 0 10px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx{align-self:start;gap:14px;}
+  /* Die linke Seite hat hier die volle Hoehe, nicht mehr nur eine Zeile ueber
+     beiden Spalten. Mit der Uhr aus dem alten Layout (60 px) nutzten Uhr und
+     Wetter nur 49 % der Hoehe der rechten Box, und die Grafik erschlug die
+     Uhr. Jetzt ist die Uhr wieder das, was man zuerst sieht (70 %). */
+  .saver.split .sv-wrap.rich.tall .sv-time{font-size:96px;}
+  .saver.split .sv-wrap.rich.tall .sv-date{font-size:21px;margin-top:10px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .now .ico{width:48px;height:48px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .now .t{font-size:36px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .now .cond{font-size:19px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .now .hl{font-size:15px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .fc{padding:11px 6px 12px;gap:5px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .fc .d{font-size:12.5px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .fc .ico{width:28px;height:28px;}
+  .saver.split .sv-wrap.rich.tall .sv-wx .fc .tt{font-size:15px;}
+  /* Ohne Wetter bliebe die untere linke Zelle leer und die Uhr saesse ueber der
+     Mitte (gemessen 53 px zu hoch). Dann ueber beide Zeilen und mittig. Das
+     Wetter steht im Markup direkt vor der Uhr - so geht es ohne :has(), das
+     aeltere Kiosk-WebViews nicht kennen. */
+  .saver.split .sv-wrap.rich.tall .sv-wx[hidden] + .sv-clock{grid-row:1 / span 2;align-self:center;margin:0;}
+  .saver.split .sv-wrap.rich .sv-time{font-size:60px;}
+  .saver.split .sv-wrap.rich .sv-date{font-size:18px;}
+  /* Hochkant (Klasse "hoch", gesetzt in applySaverSplit): Uhr, Wetter und die
+     zweite Flaeche UNTEREINANDER ueber die volle Breite - wie der Split
+     hochkant. Listen (Termine, Werte, Wetter-Details) wachsen nach unten, svFit
+     kuerzt sie notfalls. Energiefluss, Kamera und Verlauf (.tall) brauchen eine
+     feste Hoehe: der Kasten ist dann so hoch wie der Screensaver (--sv-frei),
+     und die untere Zeile bekommt, was unter Uhr und Wetter bleibt. Die Groessen
+     aus dem Querformat (.tall: Uhr links, grosse Schrift) gelten hier nicht. */
+  .saver.split.hoch .sv-wrap.rich,
+  .saver.split.hoch .sv-wrap.rich.tall{width:min(94%,680px);
+    grid-template-columns:minmax(0,1fr);grid-template-areas:"clock" "wx" "cal";
+    grid-template-rows:auto auto minmax(0,1fr);row-gap:18px;column-gap:0;align-items:stretch;}
+  .saver.split.hoch .sv-wrap.rich.solo{grid-template-areas:"clock" "wx";grid-template-rows:auto auto;}
+  .saver.split.hoch .sv-wrap.rich.tall{height:var(--sv-frei,auto);}
+  /* Verlauf: die Diagramme richten ihre Hoehe nach der Breite (festes
+     Seitenverhaeltnis), eine hoehere Box bliebe unten leer. Hier so hoch wie
+     der Inhalt und der ganze Block mittig; reicht der Platz nicht, schrumpft
+     die untere Zeile (minmax) und mit ihr die Diagramme (siehe Verlaufs-Pane). */
+  .saver.split.hoch .sv-wrap.rich.tall.verlauf{grid-template-rows:auto auto minmax(0,auto);align-content:center;}
+  .saver.split.hoch .sv-wrap.rich.tall.verlauf .sv-box.solo .fp-page{flex:0 1 auto;}
+  .saver.split.hoch .sv-wrap.rich .sv-clock,
+  .saver.split.hoch .sv-wrap.rich.tall .sv-clock,
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx[hidden] + .sv-clock{grid-row:auto;align-self:auto;justify-self:center;margin:0;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx{align-self:auto;gap:10px;}
+  .saver.split.hoch .sv-box.solo{height:auto;min-height:0;}
+  .saver.split.hoch .sv-wrap.rich .sv-time,
+  .saver.split.hoch .sv-wrap.rich.tall .sv-time{font-size:80px;}
+  .saver.split.hoch .sv-wrap.rich .sv-date,
+  .saver.split.hoch .sv-wrap.rich.tall .sv-date{font-size:20px;margin-top:8px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .now .ico{width:34px;height:34px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .now .t{font-size:26px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .now .cond{font-size:15px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .now .hl{font-size:13px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .fc{padding:6px 4px 7px;gap:3px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .fc .d{font-size:11px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .fc .ico{width:22px;height:22px;}
+  .saver.split.hoch .sv-wrap.rich.tall .sv-wx .fc .tt{font-size:12.5px;}
+  /* Wetter oben: aktuelle Lage + Vorschau-Streifen (je Tag Icon + Max/Min). */
+  .saver .sv-wx{display:flex;flex-direction:column;gap:10px;align-self:stretch;}
+  .sv-wx .now{display:flex;align-items:center;gap:12px;}
+  .sv-wx .now .ico{width:34px;height:34px;flex:none;}
+  .sv-wx .now .t{font-size:26px;font-weight:600;letter-spacing:-.02em;line-height:1;
+    font-variant-numeric:tabular-nums;}
+  .sv-wx .now .meta{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .sv-wx .now .cond{font-size:15px;font-weight:500;}
+  .sv-wx .now .hl{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .sv-wx .fore{display:grid;grid-template-columns:repeat(var(--fc,4),1fr);gap:8px;}
+  .sv-wx .fc{background:var(--tile);border:1px solid var(--line);border-radius:12px;
+    padding:6px 4px 7px;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .sv-wx .fc .d{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);}
+  .sv-wx .fc .ico{width:22px;height:22px;}
+  .sv-wx .fc .tt{font-size:12.5px;font-variant-numeric:tabular-nums;}
+  .sv-wx .fc .tt .mx{font-weight:600;} .sv-wx .fc .tt .mn{color:var(--muted);}
+  .sv-wx .ico{display:grid;place-items:center;color:var(--ink);}
+  .sv-wx .ico svg{width:100%;height:100%;}
+  .sv-wx .ico.sun{color:var(--glow);}
+  .sv-wx .ico.rain,.sv-wx .ico.drizzle,.sv-wx .ico.snow,.sv-wx .ico.storm{color:var(--cool,#7fb2e6);}
+  /* Termine unten: die naechsten Eintraege aus dem iCal-Abo. */
+  .saver .sv-cal{display:flex;flex-direction:column;gap:8px;align-self:stretch;}
+  .sv-cal .lbl{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);display:flex;align-items:center;gap:8px;}
+  .sv-cal .lbl::after{content:"";flex:1;height:1px;background:var(--line);}
+  .sv-ev{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;
+    background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:7px 11px;}
+  .sv-ev .when{display:flex;flex-direction:column;gap:1px;min-width:52px;}
+  .sv-ev .when .day{font-size:12px;color:var(--muted);}
+  .sv-ev .when .tm{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;}
+  .sv-ev .ttl{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  /* Ohne Toenung: --accent ist gegen --tile nachgerechnet, nicht gegen eine Auflage */
+  .sv-ev .tag{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);
+    border:1px solid rgba(var(--accent-rgb,82,184,129),.4);
+    border-radius:999px;padding:2px 8px;white-space:nowrap;}
+  /* Zweite Spalte, wenn dort nicht die Termine stehen: Wetter-Details,
+     Energiefluss, Kamera oder frei gewaehlte Bausteine. Eigener Container neben
+     .sv-cal — beide liegen im selben Rasterfeld, sichtbar ist immer nur einer. */
+  .saver .sv-box{display:flex;flex-direction:column;gap:8px;align-self:stretch;min-width:0;}
+  /* .fp-page ist sonst auf die Panes am Hauptschirm gemuenzt (#frontpane) und
+     braucht hier dieselbe Rahmung — aber ohne deren Seiten-Snapping. */
+  .saver .sv-box .fp-page{display:flex;flex-direction:column;gap:10px;padding:12px;
+    box-sizing:border-box;min-height:0;
+    background:linear-gradient(180deg,var(--tile),rgba(255,255,255,.015));
+    border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));border-radius:14px;}
+  .saver .sv-box .fp-page.solo{overflow:hidden;}
+  /* Energiefluss und Kamera sind EINE Seite, die eine Hoehe BRAUCHT: am
+     Hauptschirm gibt die Pane sie vor, hier die gemessene Hoehe des
+     Screensavers abzueglich Rand (--sv-frei, gesetzt in svFit; die Uhr steht
+     in diesem Fall links, siehe .tall). Mit dieser Hoehe laeuft innen alles wie
+     am Hauptschirm ueber Flex, und beide Grafiken zentrieren sich (SVG per
+     preserveAspectRatio, Bild per object-fit), statt zu strecken. Begrenzt
+     die Spaltenbreite (Energiefluss in hohen Fenstern, Kamera fast immer),
+     kuerzt svFit den Kasten auf seinen Inhalt (--sv-kasten, svKastenLeer),
+     statt leere Streifen darueber und darunter zu lassen. */
+  .saver .sv-box.solo{height:var(--sv-kasten,var(--sv-frei,auto));}
+  .saver .sv-box.solo .fp-page{flex:1 1 0;min-height:0;}
+  .saver .sv-box.solo .video{max-height:100%;}
+  /* Audio-Karte (Now Playing) in der Uhr-Spalte: Cover + Titel + Interpret, passiv. */
+  .svplayer{align-items:center;text-align:center;justify-content:center;}
+  .svplayer .svp-cover{width:100%;flex:1;min-height:0;display:grid;place-items:center;}
+  .svplayer .svp-cover img{max-width:min(100%,220px);max-height:100%;border-radius:12px;object-fit:contain;}
+  .svplayer .svp-cover .coverph{width:88px;height:88px;display:grid;place-items:center;color:var(--muted);}
+  .svplayer .svp-cover .coverph svg{width:52px;height:52px;}
+  .svplayer .svp-title{font-weight:650;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .svplayer .svp-sub{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  /* Kamera ist durch die Breite begrenzt (4:3): sie steht mittig in der Spalte,
+     statt oben zu kleben und unten einen leeren Streifen zu lassen. */
+  .saver .sv-box .campage{justify-content:center;}
+  /* Namen im Energiefluss: das SVG skaliert samt Text. Gemessen bei 960x480
+     standen die Namen bei 9,8 px, am Hauptschirm sogar bei 8,4 px. Die Uhr-Seite
+     wird aber aus Entfernung gelesen, nicht aus der Naehe bedient - deshalb hier
+     14 statt 12 Nutzereinheiten (~11 px am Schirm). NUR die Namen: die Werte
+     sind fett und schon ~13 px; groesser gemacht fressen sie bei den unteren
+     Knoten den festen Spalt zwischen Name und Wert (dort stehen beide dann
+     Rahmen an Rahmen). Nicht bei .dicht (ab 7 Knoten): dort laufen die Namen
+     schon in normaler Groesse in die Nachbarringe. */
+  .saver .sv-box .epane:not(.dicht) .enlab{font-size:14px;}
+  /* Frei gewaehlte Bausteine: Name/Raum links, Wert rechts. Zustandsfarben wie
+     auf einer Kachel, damit dasselbe Geraet nicht zweierlei Farbsprache hat. */
+  .sv-st{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:11px;
+    background:var(--tile);border:1px solid var(--line);border-radius:12px;padding:7px 11px;}
+  .sv-st .ico{width:22px;height:22px;flex:none;display:grid;place-items:center;color:var(--ico,var(--ink));}
+  .sv-st .ico svg{width:100%;height:100%;}
+  .sv-st .ico img{width:100%;height:100%;object-fit:contain;}
+  .sv-st .ico.img{display:inline-block;background-color:var(--ico,var(--ink));
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .sv-st .nm{font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .sv-st .nm .rm{display:block;font-size:11px;font-weight:400;color:var(--muted);}
+  .sv-st .vl{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .sv-st.on .ico{color:var(--ico-fixed,var(--glow));}
+  .sv-st.on .vl{color:var(--ico-fixed,var(--an-text,var(--glow)));}
+  .sv-st.good .ico,.sv-st.good .vl{color:var(--good);}
+  .sv-st.crit .ico,.sv-st.crit .vl{color:var(--crit-ink,var(--crit));}
+  .sv-st.on .ico.img{background-color:var(--ico-fixed,var(--glow));}
+  .sv-st.good .ico.img{background-color:var(--good);}
+  .sv-st.crit .ico.img{background-color:var(--crit-ink,var(--crit));}
+  /* Groessere Panels/Tablets/Browser: die Front nutzt den Platz statt als kleine
+     440px-Saeule in der Mitte zu haengen. Nur der Screensaver (.saver) skaliert
+     hoch — die reine 480x480-Ansicht bleibt unveraendert kompakt. */
+  @media (min-width:640px) and (min-height:560px){
+    .saver .sv-wrap{width:min(90%,680px);gap:24px;}
+    .sv-wrap.rich{gap:20px;}
+    .sv-wrap.rich .sv-time{font-size:76px;}
+    .sv-wrap.rich .sv-date{font-size:21px;}
+    .saver .sv-wx{gap:16px;}
+    .sv-wx .now{gap:16px;}
+    .sv-wx .now .ico{width:56px;height:56px;}
+    .sv-wx .now .t{font-size:42px;}
+    .sv-wx .now .cond{font-size:20px;}
+    .sv-wx .now .hl{font-size:15px;}
+    .sv-wx .fore{gap:12px;}
+    .sv-wx .fc{padding:13px 8px 14px;gap:6px;border-radius:14px;}
+    .sv-wx .fc .d{font-size:13px;}
+    .sv-wx .fc .ico{width:32px;height:32px;}
+    .sv-wx .fc .tt{font-size:16px;}
+    .saver .sv-cal{gap:11px;}
+    .sv-cal .lbl{font-size:12px;}
+    .sv-ev{padding:12px 18px;gap:18px;border-radius:14px;}
+    .sv-ev .when{min-width:70px;}
+    .sv-ev .when .day{font-size:14px;}
+    .sv-ev .when .tm{font-size:19px;}
+    .sv-ev .ttl{font-size:18px;}
+    .sv-ev .tag{font-size:12px;padding:3px 11px;}
+    .saver .sv-box{gap:11px;}
+    .sv-st{padding:12px 18px;gap:16px;border-radius:14px;}
+    .sv-st .ico{width:28px;height:28px;}
+    .sv-st .nm{font-size:18px;}
+    .sv-st .nm .rm{font-size:13px;}
+    .sv-st .vl{font-size:19px;}
+  }
+  /* ---- Ausfuehrliche "Wetter & Kalender"-Ansicht (eigene Seite / Split-Pane) ---- */
+  /* Kalender-/Wetter-Seite (renderFrontTab): fuellt die Kachelflaeche. Quer zwei
+     Spalten, die je fuer sich scrollen; hoch oder quadratisch untereinander, dann
+     scrollt die ganze Seite. Wetter groesser als in der halben Split-Pane. */
+  .grid.fronttab{display:block;overflow:hidden;}
+  .ft{height:100%;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;}
+  .ft-a,.ft-b{min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding-right:2px;}
+  .ft-leer{display:block;}
+  .ft-cal .fp-mon-c{min-height:44px;font-size:15px;}
+  /* Beschreibung unter Symbol und Temperatur statt gequetscht daneben */
+  .ft-wx .fp-now{flex-wrap:wrap;row-gap:6px;}
+  .ft-wx .fp-now .meta{flex-basis:100%;}
+  .ft-wx .fp-now .ico{width:84px;height:84px;}
+  .ft-wx .fp-now .t{font-size:72px;}
+  .ft-wx .fp-now .cond{font-size:21px;}
+  .ft-wx .fp-now .sub{font-size:15px;}
+  .ft-wx .fp-fc{padding:14px 4px 15px;gap:7px;}
+  .ft-wx .fp-fc .d{font-size:14px;}
+  .ft-wx .fp-fc .ico{width:34px;height:34px;}
+  .ft-wx .fp-fc .tt{font-size:15px;}
+  .ft-wx .fp-det>div{padding:12px 14px;}
+  .ft-wx .fp-det>div b{font-size:19px;}
+  @media (orientation:portrait){
+    .grid.fronttab{overflow-y:auto;}
+    .ft{height:auto;display:flex;flex-direction:column;}
+    .ft-a,.ft-b{overflow:visible;}
+  }
+  /* ---- Hausuebersicht (Tab "haus", renderHaus) ----
+     Ganze Flaeche ohne Kachelraster: Kopf (Uhr, Wetter, Termin, Energie),
+     "Gerade aktiv", Schnellaktionen, Raumkarten und der Spieler - quer als Spalte rechts,
+     hochkant als Leiste unten. --hk ist der Massstab der Seite (renderHaus,
+     aus der kleineren Seite der Flaeche). Farben wie die Kacheln: eine aktive
+     Karte bekommt --kachel-an (ohne Set getoent), ihr Zustand --an-text, das
+     Symbol --glow; Tasten sind .btn. Nichts scrollt waagerecht: dort blaettert
+     der Wisch die Seiten. Tasten nie unter 44 px. */
+  .grid.haus{display:block;overflow:hidden;--hk:1;--hs-g:calc(12px * var(--hk));--hs-t:max(44px, calc(56px * var(--hk)));}
+  .hs{height:100%;display:grid;grid-template-columns:minmax(0,1fr);gap:calc(16px * var(--hk));}
+  .hs.spalte{grid-template-columns:minmax(0,1fr) calc(280px * var(--hk));}
+  .hs-main{min-width:0;min-height:0;display:flex;flex-direction:column;gap:calc(14px * var(--hk));}
+  .hs-c{background:var(--tile);border:var(--tile-bw,1px) solid var(--tile-bord,var(--line));color:var(--ink);
+    border-radius:calc(var(--kachel-radius,16px) * var(--hk));box-shadow:var(--kachel-schatten,none);box-sizing:border-box;min-width:0;}
+  .hs-c.on{background:rgba(var(--on-rgb,224,162,77),var(--ov-fill,.16));border-color:rgba(var(--on-rgb,224,162,77),var(--ov-bord,.55));}
+  html[data-kachelset-aufbau] .hs-c{border-color:transparent;}
+  html[data-kachelset-aufbau] .hs-c.on{background:var(--kachel-an,var(--tile));}
+  button.hs-c{font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  button.hs-c:active{transform:scale(.98);}
+  .hs-i{width:calc(30px * var(--hk));height:calc(30px * var(--hk));flex:none;display:grid;place-items:center;color:var(--ink);}
+  .hs-i svg,.hs-i img{width:100%;height:100%;object-fit:contain;}
+  .hs-i.img{display:inline-block;background-color:currentColor;
+    -webkit-mask:var(--u) no-repeat center/contain;mask:var(--u) no-repeat center/contain;}
+  .hs-c.on .hs-i{color:var(--glow);}
+  .hs-i.ok{color:var(--good);}
+  .hs .tx{flex:1;min-width:0;display:flex;flex-direction:column;}
+  .hs .tx>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs .z{font-size:calc(18px * var(--hk));font-weight:600;line-height:1.2;}
+  .hs .w{font-size:calc(14px * var(--hk));color:var(--muted);line-height:1.3;}
+  .hs-c.on .z{color:var(--an-text,var(--glow));}
+  html[data-kachelset-aufbau="mitte"] .hs-c.on,html[data-kachelset-aufbau="mitte"] .hs-c.on .z,
+  html[data-kachelset-aufbau="mitte"] .hs-c.on .hs-i{color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .hs-c.on .w{color:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
+  .hs .btn.hs-b{flex:none;height:var(--hs-t);min-width:var(--hs-t);padding:0 calc(16px * var(--hk));display:inline-flex;align-items:center;
+    justify-content:center;gap:8px;font-size:calc(15px * var(--hk));color:var(--ink);touch-action:manipulation;}
+  .hs .btn.hs-b svg{width:calc(22px * var(--hk));height:calc(22px * var(--hk));flex:none;}
+  /* Kopf */
+  .hs-kopf{flex:none;display:flex;gap:var(--hs-g);height:calc(72px * var(--hk));}
+  .hs-uhr{flex:none;display:flex;flex-direction:column;justify-content:center;padding-right:calc(6px * var(--hk));}
+  .hs-uhr .t{font-size:calc(44px * var(--hk));font-weight:600;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;}
+  .hs-uhr .d{margin-top:4px;font-size:calc(15px * var(--hk));color:var(--muted);white-space:nowrap;}
+  .hs-k{flex:1;display:flex;align-items:center;gap:calc(10px * var(--hk));padding:0 calc(16px * var(--hk));}
+  .hs-k .z{font-size:calc(20px * var(--hk));}
+  /* Gerade aktiv */
+  .hs-zeile{flex:none;display:flex;align-items:center;gap:calc(10px * var(--hk));min-height:var(--hs-t);min-width:0;}
+  .hs-zeile h2{margin:0;font-size:calc(22px * var(--hk));font-weight:700;letter-spacing:-.01em;white-space:nowrap;}
+  .hs-zeile .n{font-size:calc(15px * var(--hk));color:var(--muted);white-space:nowrap;}
+  .hs .hs-zeile .btn.hs-b{background:var(--tile);}
+  .hs .hs-zeile .btn.hs-rund{padding:0;width:var(--hs-t);border-radius:50%;}
+  .hs-aktiv{flex:none;display:grid;grid-template-columns:repeat(var(--hs-sp,3),minmax(0,1fr));gap:var(--hs-g);}
+  .hs-a{height:max(64px, calc(80px * var(--hk)));display:flex;align-items:center;gap:calc(12px * var(--hk));
+    padding:0 calc(10px * var(--hk)) 0 calc(16px * var(--hk));}
+  .hs-mehr{justify-content:center;font-size:calc(17px * var(--hk));font-weight:600;}
+  .hs-mehr svg{width:calc(20px * var(--hk));height:calc(20px * var(--hk));}
+  .hs-liste{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:calc(10px * var(--hk));}
+  .hs-liste .hs-a{flex:none;}
+  /* Schnellaktionen: Zentral-Bausteine der Anlage, Flaeche und Radius der
+     Karten des Sets, rechts wie viele an sind (Zustandstext "an" wie auf
+     den Raumkarten: --glow, wo ein Set es nicht als --an-text nachschaerft) */
+  .hs-schnell{flex:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--hs-g);}
+  .hs-s{height:max(44px, calc(72px * var(--hk)));display:flex;align-items:center;gap:calc(12px * var(--hk));
+    padding:0 calc(18px * var(--hk));touch-action:manipulation;}
+  .hs-s .hs-i{width:calc(26px * var(--hk));height:calc(26px * var(--hk));}
+  .hs-s .z{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-s .n{flex:none;font-size:calc(15px * var(--hk));font-weight:600;color:var(--an-text,var(--glow));white-space:nowrap;}
+  /* Raumkarten */
+  .hs-raeume{flex:1;min-height:0;display:grid;grid-template-columns:repeat(var(--hs-rc,3),minmax(0,1fr));
+    grid-auto-rows:var(--hs-rh,minmax(0,1fr));gap:var(--hs-g);overflow-y:auto;overflow-x:hidden;}
+  .hs-r{min-height:0;overflow:hidden;padding:calc(16px * var(--hk)) calc(18px * var(--hk));display:flex;flex-direction:column;gap:2px;}
+  .hs-r>*{flex-shrink:0;}   /* nicht quetschen: passt der Inhalt nicht, wachsen die Reihen (renderHaus) */
+  .hs-r .kopf{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+  .hs-r .nm{font-size:calc(18px * var(--hk));font-weight:700;line-height:1.2;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .hs-r .chev{width:calc(20px * var(--hk));height:calc(20px * var(--hk));flex:none;color:var(--muted);}
+  .hs-r .chev svg{display:block;width:100%;height:100%;}   /* nicht in der Textzeile: sonst ragt er bei kleinem --hk heraus */
+  .hs-r .chev.rund{width:max(44px, calc(44px * var(--hk)));height:max(44px, calc(44px * var(--hk)));border-radius:50%;
+    display:grid;place-items:center;background:var(--taste,rgba(var(--wash,255,255,255),.07));color:var(--ink);}
+  .hs-r .chev.rund svg{width:45%;height:45%;}
+  .hs-r .kopf:has(.chev.rund) .nm{padding-top:calc(10px * var(--hk));}
+  .hs-r .wt{margin-top:2px;font-size:calc(36px * var(--hk));font-weight:500;letter-spacing:-.03em;line-height:1.15;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-r .wt.lang{font-size:calc(24px * var(--hk));}
+  .hs-r .sb{font-size:calc(14px * var(--hk));color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-r .sym{margin-top:auto;padding-top:calc(6px * var(--hk));display:flex;align-items:center;gap:calc(8px * var(--hk));min-width:0;}
+  /* In einer schmalen Karte werden die Symbole gemeinsam kleiner (rund
+     bleiben sie), statt mit "n an" aus der Karte zu laufen */
+  .hs-r .s{flex:0 1 calc(34px * var(--hk));min-width:0;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;
+    background:var(--taste,rgba(var(--wash,255,255,255),.07));color:var(--muted);}
+  .hs-r .s .hs-i{width:56%;height:56%;color:inherit;}
+  .hs-r .s.on{background:var(--kachel-an,rgba(var(--on-rgb,224,162,77),.2));color:var(--glow);}
+  html[data-kachelset-aufbau="kreis"] .hs-r .s.on{background:var(--glow);color:var(--kreis-an-symbol,var(--on-glow));}
+  html[data-kachelset-aufbau="mitte"] .hs-r .s.on{color:var(--kachel-an-ink,var(--ink));}
+  .hs-r .an{margin-left:auto;font-size:calc(14px * var(--hk));font-weight:600;color:var(--an-text,var(--glow));white-space:nowrap;}
+  /* Aufbau "raeume": die Karte selbst ist keine Taste, oben rechts oeffnet
+     der Pfeil den Raum, unten schalten runde Tasten direkt (Entwurf
+     "Hausübersicht C"): Kreis --taste, an --kachel-an mit Symbol --glow */
+  .hs-r.direkt{padding:calc(14px * var(--hk)) calc(14px * var(--hk)) calc(14px * var(--hk)) calc(18px * var(--hk));}
+  .hs-r.direkt .chev{border:0;padding:0;font:inherit;cursor:pointer;touch-action:manipulation;}
+  .hs-r.direkt .tasten{margin-top:auto;padding-top:calc(6px * var(--hk));display:flex;align-items:flex-end;gap:calc(6px * var(--hk));min-width:0;}
+  .hs-t{flex:0 1 calc(68px * var(--hk));min-width:44px;display:flex;flex-direction:column;align-items:center;gap:4px;
+    background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .hs-t .k{width:max(44px, calc(52px * var(--hk)));height:max(44px, calc(52px * var(--hk)));border-radius:50%;display:grid;place-items:center;
+    background:var(--taste,rgba(var(--wash,255,255,255),.07));color:var(--ink);}
+  .hs-t .k .hs-i{width:46%;height:46%;color:inherit;}
+  .hs-t .l{max-width:100%;font-size:calc(13px * var(--hk));font-weight:600;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-t:active .k{transform:scale(.94);}
+  .hs-t.on .k{background:var(--kachel-an,rgba(var(--on-rgb,224,162,77),.2));color:var(--glow);}
+  .hs-t.on .l{color:var(--an-text,var(--glow));}
+  html[data-kachelset-aufbau="kreis"] .hs-t.on .k{background:var(--glow);color:var(--kreis-an-symbol,var(--on-glow));}
+  html[data-kachelset-aufbau="mitte"] .hs-t.on .k{color:var(--kachel-an-ink,var(--ink));}
+  /* Rueckfrage: Ring um den Kreis, die Frage statt der Beschriftung */
+  .hs-t.arm .k{box-shadow:inset 0 0 0 2px var(--glow);}
+  .hs-t.arm .l{color:var(--ink);}
+  /* Aufbau "spalte": links Uhr mit Wetter, Energie, "Auf einen Blick" und
+     die Schnellaktionen (Entwurf "Großes Display", dort 440 px breit) */
+  .hs.links{grid-template-columns:calc(320px * var(--hk)) minmax(0,1fr);}
+  .hs.links.spalte{grid-template-columns:calc(320px * var(--hk)) minmax(0,1fr) calc(280px * var(--hk));}
+  .hs-links{min-width:0;min-height:0;display:flex;flex-direction:column;gap:calc(14px * var(--hk));}
+  .hs-luhr{flex:none;display:flex;flex-direction:column;padding:calc(4px * var(--hk)) calc(6px * var(--hk)) 0;min-width:0;}
+  .hs-luhr .t{font-size:calc(80px * var(--hk));font-weight:600;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums;}
+  .hs-luhr .d{margin-top:calc(8px * var(--hk));font-size:calc(16px * var(--hk));color:var(--muted);white-space:nowrap;}
+  .hs-luhr .wx{margin-top:calc(14px * var(--hk));display:flex;align-items:center;gap:calc(10px * var(--hk));min-width:0;}
+  .hs-luhr .wx .hs-i{width:calc(34px * var(--hk));height:calc(34px * var(--hk));}
+  .hs-luhr .wx .z{font-size:calc(32px * var(--hk));font-weight:600;white-space:nowrap;}
+  .hs-luhr .wx .w{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-len{flex:none;display:flex;flex-direction:column;gap:calc(10px * var(--hk));padding:calc(16px * var(--hk));}
+  .hs-len .kopf{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0;}
+  .hs-len .kopf b{font-size:calc(16px * var(--hk));}
+  .hs-len .kopf span{font-size:calc(14px * var(--hk));color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-len .werte{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(10px * var(--hk));}
+  .hs-len .wt{display:flex;flex-direction:column;padding:calc(12px * var(--hk));border-radius:calc(var(--taste-radius,12px) * var(--hk));
+    background:var(--taste,rgba(var(--wash,255,255,255),.05));min-width:0;}
+  .hs-len .wt .z{font-size:calc(24px * var(--hk));white-space:nowrap;}
+  /* Aufbau "mitte": --muted traegt auf der Tastenflaeche nicht (wie bei den Zonen) */
+  html[data-kachelset-aufbau="mitte"] .hs-len .wt .w{color:var(--ink);}
+  .hs-blick{flex:1;min-height:0;display:flex;flex-direction:column;padding:calc(16px * var(--hk)) calc(16px * var(--hk)) calc(6px * var(--hk));}
+  .hs-blick h2{flex:none;margin:0 0 calc(4px * var(--hk));font-size:calc(16px * var(--hk));font-weight:600;}
+  .hs-blick .liste{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;}
+  .hs-blick .liste>.w{padding:calc(10px * var(--hk)) 0;}
+  .hs-bz{flex:none;min-height:44px;display:flex;align-items:center;gap:calc(12px * var(--hk));padding:calc(10px * var(--hk)) 0;
+    background:none;border:0;border-bottom:1px solid var(--line);font:inherit;color:inherit;text-align:left;cursor:pointer;touch-action:manipulation;}
+  .hs-bz:last-child{border-bottom:0;}
+  .hs-bz:disabled{cursor:default;}
+  .hs-bz .hs-i{width:calc(24px * var(--hk));height:calc(24px * var(--hk));}
+  .hs-bz .z{font-size:calc(16px * var(--hk));}
+  /* Hinweise (Server: _haus_hinweise): als Leiste unter dem Kopf, auf ihrer
+     Unterseite und oben in "Auf einen Blick". Das Symbol steht in einem Kreis
+     auf der jeweils anderen Grundflaeche (Karte --tile auf dem Grund, in der
+     Spalte umgekehrt): auf beiden sind Schrift und Rollenfarben gerechnet
+     (theme_colors). Stufe "warnung" und "an" zeigt nur das Symbol (--warn,
+     --glow), "dringend" ist die gefuellte Stoerungskachel (--crit-fill/-ink/
+     -muted); "ok" ist "Alles in Ordnung", "termin" ein Termin von heute
+     oder morgen. */
+  .hs-hw{flex:none;display:grid;gap:var(--hs-g);}
+  .hs-h{min-width:0;min-height:max(52px, calc(60px * var(--hk)));display:flex;align-items:center;gap:calc(12px * var(--hk));
+    padding:calc(8px * var(--hk)) calc(14px * var(--hk)) calc(8px * var(--hk)) calc(10px * var(--hk));box-sizing:border-box;
+    background:var(--tile);color:var(--ink);border:0;border-radius:calc(var(--taste-radius,12px) * var(--hk) + 2px);
+    font:inherit;text-align:left;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  .hs-h:disabled,div.hs-h{cursor:default;}
+  button.hs-h:not(:disabled):active{transform:scale(.98);}
+  .hs-h .kr{flex:none;width:max(36px, calc(40px * var(--hk)));height:max(36px, calc(40px * var(--hk)));border-radius:50%;
+    display:grid;place-items:center;background:var(--screen);}
+  .hs-h .kr .hs-i{width:55%;height:55%;}
+  .hs .hs-h .z{font-size:calc(16px * var(--hk));font-weight:700;}
+  .hs .hs-h .w{font-size:calc(13px * var(--hk));}
+  .hs-hplus{flex-direction:row;justify-content:center;gap:6px;padding:0 calc(18px * var(--hk));font-size:calc(16px * var(--hk));font-weight:600;}
+  .hs-hplus svg{width:calc(18px * var(--hk));height:calc(18px * var(--hk));flex:none;}
+  .hs-liste .hs-h{flex:none;}
+  .hs-blick .kopf{flex:none;display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0;}
+  .hs-blick .kopf .n{font-size:calc(14px * var(--hk));color:var(--muted);white-space:nowrap;}
+  .hs-blick .hs-h{flex:none;margin-bottom:calc(8px * var(--hk));background:var(--screen);}
+  .hs-blick .hs-h .kr{background:var(--tile);}
+  .hs-blick .lbl{flex:none;margin:calc(8px * var(--hk)) 0 calc(2px * var(--hk));font-size:calc(12px * var(--hk));font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .hs-h.warnung .hs-i{color:var(--warn);}
+  .hs-h.an .hs-i{color:var(--glow);}
+  .hs .hs-h.dringend{background:var(--crit-fill,rgba(var(--crit-rgb,226,107,95),.28));color:var(--crit-ink,var(--ink));}
+  .hs .hs-h.dringend .kr{background:rgba(var(--wash,255,255,255),.12);}
+  .hs .hs-h.dringend .hs-i{color:var(--crit-ink,var(--ink));}
+  .hs .hs-h.dringend .w{color:var(--crit-muted,var(--muted));}
+  /* in der Spalte untereinander: nebeneinander reichte die halbe Breite nicht
+     fuer "Alle Lichter aus" und die Anzahl */
+  .hs-links .hs-schnell{grid-template-columns:minmax(0,1fr);}
+  /* Spieler: Spalte (quer) oder Leiste (hochkant) */
+  .hs-sp{min-height:0;display:flex;flex-direction:column;gap:var(--hs-g);padding:calc(18px * var(--hk));}
+  .hs-spk{display:flex;justify-content:space-between;align-items:baseline;gap:8px;min-width:0;}
+  .hs-spk b{font-size:calc(18px * var(--hk));}
+  .hs-spk span{font-size:calc(14px * var(--hk));color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* ⋮ zur Musikauswahl, rechts oben wie auf der Detailseite der Zone */
+  .hs-spk:has(.hs-drei){align-items:center;}
+  .hs-spk:has(.hs-drei) span{flex:1;min-width:0;text-align:right;}
+  .hs .btn.hs-drei{padding:0;width:var(--hs-t);border-radius:50%;}
+  .hs .btn.hs-drei svg{width:calc(20px * var(--hk));height:calc(20px * var(--hk));}
+  /* Was laeuft: Cover links, Titel und Zustand daneben (Entwurf "Variante
+     grosse Cover"), damit unter Transport und Lautstaerke die Sender Platz haben */
+  .hs-cv{flex:none;display:flex;align-items:center;gap:calc(14px * var(--hk));border-radius:calc(var(--taste-radius,12px) * var(--hk));
+    background:var(--taste,rgba(var(--wash,255,255,255),.05));padding:calc(16px * var(--hk));min-width:0;}
+  .hs-cv .cvt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .hs-cov{width:calc(72px * var(--hk));height:calc(72px * var(--hk));flex:none;border-radius:calc(14px * var(--hk));object-fit:cover;
+    display:grid;place-items:center;background:var(--tile);color:var(--muted);}
+  .hs-cov svg{width:46%;height:46%;}
+  /* Cover ueber dem Musik-Symbol: laedt es nicht, blendet hsCoverFehlt() es
+     aus und das Symbol bleibt (kein Zeichen fuer ein kaputtes Bild) */
+  .hs-cov,.hs-f .fc{position:relative;overflow:hidden;}
+  .hs-cov>img,.hs-f .fc>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .hs-sp .ti{font-size:calc(21px * var(--hk));font-weight:700;line-height:1.2;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .hs-sp .w{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs-sp.spielt:not(.leiste) .w.st{color:var(--an-text,var(--glow));}
+  /* Aufbau "mitte": die Leuchtfarbe traegt auf der Tastenflaeche nicht */
+  html[data-kachelset-aufbau="mitte"] .hs-sp.spielt:not(.leiste) .w.st{color:var(--ink);font-weight:700;}
+  /* Aufbau "mitte" kippt die ganze aktive Karte: Titel und Zustand stehen
+     dann auf ihr, nicht auf einer Tastenflaeche (dort traegt --kachel-an-ink nicht) */
+  html[data-kachelset-aufbau="mitte"] .hs-sp.on .hs-cv{background:transparent;}
+  .hs-tasten{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:calc(8px * var(--hk));}
+  .hs-tasten .btn.hs-b{width:100%;padding:0;}
+  .hs-tasten .btn.hs-b svg{width:calc(20px * var(--hk));height:calc(20px * var(--hk));}
+  .hs-laut{display:grid;grid-template-columns:var(--hs-t) minmax(0,1fr) var(--hs-t);gap:calc(8px * var(--hk));align-items:center;}
+  .hs-laut .btn.hs-b{padding:0;}
+  .hs-laut .v{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:calc(20px * var(--hk));font-weight:600;
+    font-variant-numeric:tabular-nums;min-width:0;}
+  .hs-laut .bar{width:100%;height:6px;border-radius:3px;background:var(--taste,rgba(var(--wash,255,255,255),.16));overflow:hidden;}
+  .hs-laut .bar i{display:block;height:100%;border-radius:3px;background:var(--ink);}
+  .hs-zonen{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:6px;}
+  .hs-zonen .lbl{font-size:calc(14px * var(--hk));color:var(--muted);}
+  .hs .btn.hs-zone{flex:none;justify-content:flex-start;text-align:left;padding:0 12px;height:auto;min-height:max(44px, calc(52px * var(--hk)));}
+  .hs .btn.hs-zone.akt{background:var(--kachel-an,rgba(var(--on-rgb,224,162,77),.2));box-shadow:inset 0 0 0 2px var(--glow);}
+  .hs .btn.hs-zone .w{font-size:calc(13px * var(--hk));}
+  /* Die Spieler-Karte ist "an", ihre Zonen-Tasten nicht: nur die Zone, die
+     spielt, zeigt ihr Symbol leuchtend */
+  .hs .btn.hs-zone .z{color:var(--ink);}
+  .hs .btn.hs-zone .w,.hs .btn.hs-zone .hs-i{color:var(--muted);}
+  .hs .btn.hs-zone .hs-i.wx{color:var(--glow);}
+  /* Aufbau "mitte": --muted traegt auf der Tastenflaeche nicht, die gewaehlte
+     Zone kippt wie eine aktive Kachel */
+  html[data-kachelset-aufbau="mitte"] .hs .btn.hs-zone .w{color:var(--ink);}
+  html[data-kachelset-aufbau="mitte"] .hs .btn.hs-zone.akt .z,
+  html[data-kachelset-aufbau="mitte"] .hs .btn.hs-zone.akt .hs-i{color:var(--kachel-an-ink,var(--ink));}
+  html[data-kachelset-aufbau="mitte"] .hs .btn.hs-zone.akt .w{color:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
+  /* Sender: die Favoriten der Zone als Cover-Kacheln (Server: _haus_sender),
+     ein Tipp spielt den Sender; der laufende wie die gewaehlte Zone mit
+     --kachel-an und Ring. Spalte: Kopfzeile mit "Alle" zur Musikauswahl und
+     drei Kacheln, Leiste: so viele, wie passen, dahinter "Mehr" */
+  .hs-fk{flex:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;}
+  .hs-fk .lbl{font-size:calc(14px * var(--hk));color:var(--muted);}
+  .hs .btn.hs-b.hs-alle{flex:none;height:44px;background:none;padding:0 4px;font-size:calc(14px * var(--hk));font-weight:600;gap:4px;}
+  .hs .btn.hs-b.hs-alle svg{width:calc(16px * var(--hk));height:calc(16px * var(--hk));}
+  .hs-fav{flex:none;display:grid;gap:calc(8px * var(--hk));min-width:0;}
+  .hs .btn.hs-b.hs-f{min-width:0;height:auto;flex-direction:column;align-items:center;justify-content:flex-start;gap:calc(6px * var(--hk));
+    padding:calc(8px * var(--hk)) calc(6px * var(--hk)) calc(10px * var(--hk));}
+  .hs-f .fc{width:min(100%, calc(72px * var(--hk)));aspect-ratio:1;flex:none;border-radius:calc(12px * var(--hk));object-fit:cover;
+    display:grid;place-items:center;background:var(--tile);color:var(--muted);}
+  .hs-sp.leiste .hs-f .fc{width:min(100%, calc(64px * var(--hk)));}
+  .hs-f .fc svg{width:46%;height:46%;}
+  .hs-f .n{max-width:100%;font-size:calc(13px * var(--hk));font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .hs .btn.hs-b.hs-f.akt{background:var(--kachel-an,rgba(var(--on-rgb,224,162,77),.2));box-shadow:inset 0 0 0 2px var(--glow);}
+  html[data-kachelset-aufbau="mitte"] .hs-f.akt .n{color:var(--kachel-an-ink,var(--ink));}
+  .hs .btn.hs-b.hs-fmehr{height:auto;flex-direction:column;gap:6px;font-size:calc(14px * var(--hk));}
+  .hs-sp.leiste{flex:none;padding:calc(14px * var(--hk)) calc(16px * var(--hk));}
+  .hs-sp.leiste .r1{display:flex;align-items:center;gap:calc(12px * var(--hk));min-width:0;}
+  .hs-sp.leiste .hs-cov{width:calc(64px * var(--hk));height:calc(64px * var(--hk));}
+  .hs-sp.leiste .ti{font-size:calc(20px * var(--hk));-webkit-line-clamp:1;}
+  .hs-sp.leiste .r2{display:flex;align-items:center;gap:calc(8px * var(--hk));min-width:0;}
+  .hs-sp.leiste .hs-tasten{flex:none;display:flex;}
+  .hs-sp.leiste .hs-tasten .btn.hs-b{width:var(--hs-t);}
+  .hs-sp.leiste .hs-laut{flex:0 1 calc(300px * var(--hk));margin-left:auto;min-width:0;}
+  .hs-sp.leiste .btn.hs-zw{max-width:40%;}
+  .hs-sp.leiste .btn.hs-zw span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .frontpage.hidden{display:none;}
+  .frontpage{position:absolute;inset:0;z-index:5;background:var(--screen);
+    display:flex;flex-direction:column;gap:14px;padding:16px;overflow-y:auto;}
+  .fp-h{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);display:flex;align-items:center;gap:8px;}
+  .fp-h::after{content:"";flex:1;height:1px;background:var(--line);}
+  .fp-now{display:flex;align-items:center;gap:18px;padding:2px 4px 6px;}
+  .fp-now .ico{width:72px;height:72px;flex:none;display:grid;place-items:center;color:var(--ink);}
+  .fp-now .ico svg{width:100%;height:100%;}
+  .fp-now .ico.sun{color:var(--glow);}
+  .fp-now .ico.rain,.fp-now .ico.drizzle,.fp-now .ico.snow,.fp-now .ico.storm{color:var(--cool,#7fb2e6);}
+  .fp-now .t{font-size:58px;font-weight:600;letter-spacing:-.02em;line-height:1;
+    font-variant-numeric:tabular-nums;color:var(--ink);}
+  .fp-now .meta{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .fp-now .cond{font-size:19px;font-weight:600;color:var(--ink);}
+  .fp-now .sub{font-size:13px;color:var(--muted);}
+  .fp-curve{width:100%;color:var(--accent);}
+  .fp-curve svg{width:100%;height:auto;display:block;}
+  .fp-curve .fpx{fill:var(--muted);font-size:11px;}
+  .fp-curve .fpt{fill:var(--ink);font-size:11px;font-weight:600;}
+  .fp-fore{display:grid;grid-template-columns:repeat(var(--fc,5),1fr);gap:8px;}
+  .fp-fc{background:var(--tile);border:1px solid var(--line);border-radius:12px;
+    padding:10px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .fp-fc .d{font-size:12px;color:var(--muted);}
+  .fp-fc .ico{width:26px;height:26px;display:grid;place-items:center;color:var(--ink);}
+  .fp-fc .ico svg{width:100%;height:100%;}
+  .fp-fc .ico.sun{color:var(--glow);}
+  .fp-fc .ico.rain,.fp-fc .ico.drizzle,.fp-fc .ico.snow,.fp-fc .ico.storm{color:var(--cool,#7fb2e6);}
+  .fp-fc .tt{font-size:13px;font-variant-numeric:tabular-nums;}
+  .fp-fc .tt .mx{font-weight:600;} .fp-fc .tt .mn{color:var(--muted);}
+  .fp-fc .pop{font-size:11px;color:var(--cool,#7fb2e6);}
+  .fp-cal{display:flex;flex-direction:column;gap:6px;}
+  .fp-day{font-size:13px;font-weight:600;color:var(--muted);margin-top:8px;}
+  .fp-ev{display:grid;grid-template-columns:70px 1fr;align-items:baseline;gap:12px;
+    background:var(--tile);border:1px solid var(--line);border-radius:10px;padding:8px 12px;}
+  .fp-ev .tm{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .fp-ev .tm.all{color:var(--muted);font-weight:500;font-size:12px;}
+  .fp-ev .ttl{font-size:15px;overflow:hidden;text-overflow:ellipsis;}
+  .fp-empty{color:var(--muted);font-size:14px;padding:6px 0;}
+  /* Wetter-Detailkacheln (Luftfeuchte, Wind, Sonne, UV, ...) */
+  .fp-det{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .fp-det>div{background:var(--tile);border:1px solid var(--line);border-radius:10px;
+    padding:8px 11px;display:flex;flex-direction:column;gap:2px;}
+  .fp-det>div span{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+  .fp-det>div b{font-size:15px;font-variant-numeric:tabular-nums;color:var(--ink);}
+  /* Monatsraster im Kalender-Pane — als eigene Karte */
+  .fp-mon{display:flex;flex-direction:column;background:var(--tile);
+    border:1px solid var(--line);border-radius:14px;padding:14px 14px 16px;
+    box-shadow:0 1px 4px rgba(0,0,0,.18);}
+  .fp-mon-h{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding-bottom:11px;margin-bottom:9px;border-bottom:1px solid var(--line);}
+  .fp-mtitle{font-size:15px;font-weight:700;text-transform:capitalize;color:var(--ink);
+    letter-spacing:.01em;text-align:center;flex:1;}
+  .fp-mnav{cursor:pointer;user-select:none;color:var(--muted);font-size:22px;line-height:1;
+    width:34px;height:34px;display:grid;place-items:center;border-radius:9px;}
+  .fp-mnav:active{background:rgba(var(--wash,255,255,255),.08);}
+  .fp-mon-g{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .fp-mon-wd{font-size:10px;font-weight:600;color:var(--muted);text-align:center;
+    text-transform:uppercase;letter-spacing:.06em;padding-bottom:5px;}
+  .fp-mon-wd.sun{color:var(--crit,#e2695f);}
+  .fp-mon-c{min-height:34px;padding:5px 0;display:grid;place-items:center;font-size:13px;
+    border-radius:9px;font-variant-numeric:tabular-nums;position:relative;color:var(--ink);cursor:pointer;}
+  .fp-mon-c.sat{color:var(--muted);}                 /* Samstag dezent */
+  .fp-mon-c.sun{color:var(--crit,#e2695f);}                       /* Sonntag + Feiertag rot */
+  .fp-mon-c.holi{font-weight:700;}                    /* Feiertag zusaetzlich fett */
+  .fp-mon-c.empty{visibility:hidden;}
+  .fp-mon-c.ev{font-weight:600;}
+  .fp-mon-c.ev::after{content:"";position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+    width:5px;height:5px;border-radius:50%;background:var(--accent);}
+  .fp-mon-c.holi.ev::after{background:var(--crit,#e2695f);}
+  .fp-mon-c.sel{outline:2px solid var(--accent);outline-offset:-2px;}
+  .fp-mon-c.today{background:var(--accent);color:var(--on-accent,#fff);font-weight:700;
+    box-shadow:0 2px 8px rgba(0,0,0,.28);}
+  .fp-mon-c.today.ev::after{background:var(--on-accent,#fff);}
+  /* Kalenderfarben: ein Punkt vor dem Titel sagt, aus welchem Abo der Termin
+     kommt. Schaltet die Einstellung sie ab, entfaellt der Punkt ersatzlos. */
+  .cdot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;
+    vertical-align:1px;flex:none;}
+  .fp-ev .note{font-size:12px;color:var(--muted);margin-left:8px;white-space:nowrap;}
+  .fp-ev .cal{font-size:11px;color:var(--muted);margin-left:8px;white-space:nowrap;
+    border:1px solid var(--line);border-radius:999px;padding:1px 7px;}
+  .fp-leg{display:flex;flex-wrap:wrap;gap:6px 14px;margin:2px 0 8px;}
+  .fp-mon + .fp-leg{margin-top:10px;justify-content:center;}
+  .fp-leg span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  .fp-leg i{width:8px;height:8px;border-radius:50%;flex:none;}
+  /* Monatsraster mit mehreren Kalendern: je Tag bis zu drei Farbpunkte statt
+     des einen Akzentpunkts aus .ev::after. */
+  .fp-mon-c .mdots{position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+    display:flex;gap:2px;pointer-events:none;}
+  .fp-mon-c .mdots i{width:5px;height:5px;border-radius:50%;background:var(--accent);}
+  .fp-mon-c.ev.dots::after{display:none;}
+  /* Auf dem Akzent-Hintergrund des heutigen Tages waeren farbige Punkte kaum
+     zu sehen — dort gewinnt die Lesbarkeit gegen die Inline-Farbe. */
+  .fp-mon-c.today .mdots i{background:var(--on-accent,#fff) !important;}
+  .fp-allbtn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:2px 4px;}
+  .fp-ev.holi .tm{color:var(--crit,#e2695f);}
+  .moreb{position:absolute;top:6px;right:8px;z-index:6;width:34px;height:34px;border-radius:50%;
+    display:grid;place-items:center;color:var(--muted);font-size:24px;line-height:1;cursor:pointer;
+    background:rgba(var(--wash,255,255,255),.06);}
+  .moreb:active{transform:scale(.92);}
+  .pinov{position:absolute;inset:0;z-index:20;background:rgba(0,0,0,.6);display:grid;place-items:center;}
+  /* Gesten (Loxone-Standard): Einblendung in der Mitte; beruehrt nichts, die Finger liegen darueber */
+  /* Hilfe des Hinweis-Symbols: ueber dem Kasten, unter der Uhr-Seite. Die drei
+     Gesten-Spalten genau dort, wo sie wirken (GESTE_SPALTEN), darunter Doppel-
+     und Dreifachtipp. Text nur auf Kachelflaeche (Schrift und Zweitzeile des
+     Themes tragen dort), nie auf dem abgedunkelten Grund. Die Kachelfarbe ist
+     ohne Set nur ein Schleier: darunter liegt deckend der Grund der Kacheln
+     (.gh-flaeche, --screen), wie sonst unter jeder Kachel. Ein Tipp schliesst. */
+  .ghilfe{position:absolute;inset:0;z-index:29;display:flex;flex-direction:column;justify-content:center;
+    gap:12px;padding:16px 0;background:rgba(0,0,0,.6);cursor:pointer;}
+  .ghilfe .gh-spalten{display:flex;}
+  .ghilfe .gh-sp{box-sizing:border-box;padding:0 8px;display:flex;}
+  .ghilfe .gh-flaeche{flex:1;display:flex;background:var(--screen);border-radius:14px;}
+  .ghilfe .gh-karte,.ghilfe .gh-tipps{flex:1;background:var(--tile);color:var(--ink);border-radius:14px;}
+  .ghilfe .gh-karte{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 10px;text-align:center;}
+  .ghilfe .gh-karte svg{width:32px;height:32px;}
+  .ghilfe .gh-titel{font-weight:650;font-size:17px;}
+  .ghilfe .gh-text{font-size:14px;color:var(--muted);}
+  .ghilfe .gh-unten{flex:0 0 auto;margin:0 8px;}
+  .ghilfe .gh-tipps{padding:12px 16px;display:flex;flex-direction:column;gap:4px;font-size:14px;}
+  .ghilfe .gh-tipps b{font-weight:650;}
+  .geste{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:40;min-width:180px;max-width:80%;
+    padding:16px 22px;border-radius:18px;background:var(--screen);border:1px solid var(--line);color:var(--ink);
+    box-shadow:0 20px 50px rgba(0,0,0,.6);text-align:center;pointer-events:none;
+    display:flex;flex-direction:column;gap:8px;}
+  .geste.hidden{display:none;}
+  .geste .gs-titel{font-size:14px;color:var(--muted);}
+  .geste .gs-wert{font-size:40px;font-weight:600;line-height:1.1;word-break:break-word;}
+  .geste .gs-balken{height:6px;border-radius:3px;background:rgba(var(--wash,255,255,255),.12);overflow:hidden;}
+  .geste .gs-balken i{display:block;height:100%;background:var(--accent);}
+  .geste .gs-balken[hidden]{display:none;}
+  .geste.fehl .gs-wert{font-size:18px;color:var(--crit);}
+  /* Im Dunkeln (Uhr-Seite, Nacht): schwach, damit das Panel nicht aufleuchtet */
+  .geste.leise{background:#000;border-color:transparent;box-shadow:none;opacity:.55;}
+  .pinbox{background:var(--screen);border:1px solid var(--line);border-radius:16px;padding:20px;width:78%;max-width:300px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:12px;}
+  .pinttl{font-weight:600;font-size:16px;text-align:center;}
+  .pinin{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:10px;
+    padding:12px;font-size:22px;text-align:center;letter-spacing:.3em;outline:none;}
+  .pinin:focus{border-color:var(--glow);}
+  .pinmsg{color:var(--crit);font-size:13px;text-align:center;min-height:16px;}
+  .pinrow{display:flex;gap:10px;}
+  .pinbtn{flex:1;text-align:center;padding:12px;border-radius:10px;cursor:pointer;user-select:none;font-weight:600;border:1px solid var(--line);}
+  .pinbtn.ok{background:var(--glow);color:var(--on-glow,#181008);border-color:transparent;}
+  .pinbtn:active{transform:scale(.97);}
+  .pindisp{font-size:26px;text-align:center;letter-spacing:.35em;min-height:38px;padding:8px 6px;
+    border:1px solid var(--line);border-radius:10px;background:var(--bg);}
+  .pinpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .pinkey{padding:15px 0;text-align:center;font-size:22px;border:1px solid var(--line);border-radius:12px;
+    cursor:pointer;user-select:none;background:var(--tile);}
+  .pinkey:active{background:rgba(var(--wash,255,255,255),.14);transform:scale(.97);}
+  .pinkey.ok{background:var(--glow);color:var(--on-glow,#181008);border-color:transparent;font-weight:700;}
+  .pinkey.del{font-size:20px;}

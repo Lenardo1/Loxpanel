@@ -3,21 +3,37 @@
 Der Loxone-Audioserver (Original ODER Nachbau wie Sonn/Audioserver4Home) sendet
 Now-Playing und Favoriten NICHT ueber die Miniserver-Struktur-States, sondern
 ueber einen eigenen Event-Kanal: die App verbindet sich direkt per WebSocket zum
-Audioserver (Port 7091, unverschluesselt, OHNE Auth) und bekommt beim Connect +
-bei jeder Aenderung `audio_event`-Push-Nachrichten fuer alle Zonen. So bekommen
-AudioZoneV2-Zonen im Panel Cover/Titel/Interpret/Status — universell, egal
-welcher Audioserver, mit Live-Push statt Polling.
+Audioserver (Port 7091, unverschluesselt) und bekommt beim Connect + bei jeder
+Aenderung `audio_event`-Push-Nachrichten fuer alle Zonen. So bekommen
+AudioZoneV2-Zonen im Panel Cover/Titel/Interpret/Status — mit Live-Push statt
+Polling.
 
-Nachrichtenformate (verifiziert gegen Sonn 4.0.0-beta.20 / LWSS API 1.6):
-  Banner (kein JSON):  "LWSS V 17.1.05.05 | ~API:1.6~ | Session-Token: ..."
+Verifiziert gegen den echten Loxone-Audioserver (LWSS 17.2, mit Miniserver
+gekoppelt) und gegen Sonn 4.0.0-beta.20 (LWSS API 1.6):
+  * Die WebSocket-Verbindung MUSS das Unterprotokoll "remotecontrol" anfordern
+    (wie beim Miniserver). Ohne Unterprotokoll nimmt der echte Audioserver die
+    Verbindung an, schweigt aber vollstaendig. Der Pfad ist egal.
+  * Ereignisse kommen ohne Anmeldung, sofort nach dem Connect fuer alle Zonen.
+  * Ein gekoppelter Audioserver beantwortet Befehle ohne Anmeldung per HTTP
+    mit {"error": "command not allowed when paired"} und schliesst den
+    WebSocket beim ersten Befehl. Deshalb wird der Kanal dort nur zum Hoeren
+    benutzt (self.paired); Nachbauten nehmen Befehle und getroomfavs an.
+
+Nachrichtenformate:
+  Banner (kein JSON):  "LWSS V 17.2.08.28 | ~API:1.6~ | Session-Token: ..."
   Push:  {"audio_event":[{playerid,name,title,artist,album,coverurl,station,
-                          mode(play/pause/stop),volume,plrepeat,plshuffle,...}]}
+                          mode(play/pause/stop),power,volume,plrepeat,plshuffle,
+                          audiopath,audiotype,qid,qindex,duration,...}]}
   Abruf: audio/<id>/status            -> {"status_result":[{...wie audio_event}]}
          audio/cfg/getroomfavs/<id>   -> {"getroomfavs_result":[{id,items:[
                                           {slot,name,title,coverurl,type,...}]}]}
+  HTTP:  audio/cfg/getkey             -> RSA-Public-Key des Audioservers (auch
+                                          gekoppelt), Ansatz fuer eine spaetere
+                                          Anmeldung.
 
-Steuerung (play/pause/next/volume/roomfav) laeuft weiter ueber den Miniserver
-(`sps/io/<uuid>/<cmd>` -> `audio/<id>/<cmd>`), nicht ueber dieses Modul.
+Steuerung (play/pause/next/volume) laeuft ueber den Miniserver
+(`sps/io/<uuid>/<cmd>`) bzw. bei Nachbauten direkt (audioserver.py), nicht
+ueber dieses Modul.
 """
 from __future__ import annotations
 
@@ -408,6 +424,11 @@ class AudioEventClient:
                 self._sofort_neu = False
                 continue
             await asyncio.sleep(self.neu_versuch_s)
+
+    @property
+    def verbunden(self) -> bool:
+        """Steht die Ereignis-Verbindung gerade (Diagnosepaket)?"""
+        return self._ws is not None and not self._ws.closed
 
     async def close(self) -> None:
         self._stop = True
