@@ -193,6 +193,8 @@
       "Mehr passt nicht auf die Seite.": "No more fit on the page.",
       "Werte unter dem Bild": "Values below the image",
       "Keine – das Bild steht allein.": "None – the image stands alone.",
+      "Weitere Kameras": "More cameras",
+      "Keine – eine Kamera ohne Blättern.": "None – one camera, no paging.",
       "Noch nichts gewählt – oben hinzufügen.": "Nothing selected yet – add above.",
       "Darstellung": "Layout",
       "Gestapelt (scrollen)": "Stacked (scroll)",

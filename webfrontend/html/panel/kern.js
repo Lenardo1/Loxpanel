@@ -73,6 +73,9 @@ let panesCfg = {}, themeFill = false, curPlayerZone = '', curEnergyUuid = '', cu
 // sind die Werte der frei gewaehlten Bausteine ({t:'svstatus'} vom Server).
 let svPaneCfg = '', svStatusData = null, curSvStatus = '';
 let cameraData = null;   // letzter {t:'camera'}-Push (Intercom-Bloecke) fuer die Kamera-Pane
+// Mehrere Kameras in einer Pane (camera:a,b,c) sind blaetterbare Seiten; dem
+// Server wird immer nur die sichtbare (camCamIdx) gemeldet.
+let camList = [], camCamIdx = 0;
 let energyData = null;   // letzter {t:'energy'}-Push fuer die Energiefluss-Pane
 let playerData = null;   // letzter {t:'player'}-Push (Player-Bloecke) fuer die Audio-Pane
 let playerSecured = false;   // Zone des Players ist gesichert (Visu-PIN)
