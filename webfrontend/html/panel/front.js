@@ -404,7 +404,8 @@ const EICONS={
   pv:'<circle cx="12" cy="8" r="3.2"/><path d="M12 1.6v1.6M6.7 3.3l1 1M17.3 3.3l-1 1M4.5 8h1.4M18.1 8h1.4"/><path d="M6 14l1.6 6.4h8.8L18 14z"/><path d="M7.4 17.2h9.2M11 14v6.4"/>',
   grid:'<path d="M12 2 5.5 22M12 2l6.5 20M8 15h8M9.3 9h5.4"/>',
   battery:'<rect x="2" y="7" width="16" height="11" rx="2.4"/><path d="M21 11v3"/>',
-  load:'<path d="M13 2 4 14h7l-1 8 10-12h-7z"/>'
+  load:'<path d="M13 2 4 14h7l-1 8 10-12h-7z"/>',
+  haus:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 9.6V20h13V9.6"/><path d="M10 20v-5.5h4V20"/>'
 };
 // Knoten-Icon: echtes Loxone-Icon (in Flussfarbe eingefaerbt), sonst das
 // eingebaute Symbol als Fallback. So gibt der Miniserver Icon UND Name vor
@@ -441,6 +442,15 @@ function efooter(tt){ const t=[];
   if(tt.prod!=null) t.push('Erzeugung <b>'+esc(fmtPower(tt.prod))+'</b>');
   if(tt.cons!=null) t.push('Verbrauch <b>'+esc(fmtPower(tt.cons))+'</b>');
   return t.join(' · '); }
+// Mitte des Radials: das Haus mit seinem Verbrauch (wie in der Loxone-App),
+// solange der Server ihn kennt (totals.cons); sonst der schlichte Punkt.
+function ehubMarkup(C,tt){
+  if(!tt || tt.cons==null) return '<circle class="ehub" cx="'+C+'" cy="'+C+'" r="13"/>';
+  return '<g class="ehaus"><circle class="ehub" cx="'+C+'" cy="'+C+'" r="50"/>'+
+    '<g class="eic haus" transform="translate('+(C-12)+','+(C-38)+')">'+EICONS.haus+'</g>'+
+    '<text class="ehv" data-hv="1" x="'+C+'" y="'+(C+9)+'">'+esc(fmtPower(tt.cons))+'</text>'+
+    '<text class="ehl" x="'+C+'" y="'+(C+27)+'">Haus</text></g>';
+}
 // Baut das Radial als HTML-String (fuer Pane UND Detailansicht). Knoten tragen
 // data-Attribute, damit updateEnergyPane() nur Werte/Farben aendert und die
 // Fluss-Punkte NICHT neu erzeugt werden (Animation laeuft sonst nie durch).
@@ -467,11 +477,12 @@ function energyInner(d){
   // Wer die Schrift vergroessert (Screensaver), muss diesen Fall aussparen.
   return '<div class="epane'+(N>6?' dicht':'')+'"><div class="etop"><span class="ettl">'+esc(d.name||'Energiefluss')+'</span></div>'+
     '<div class="ewrap"><svg viewBox="0 0 480 480" preserveAspectRatio="xMidYMid meet">'+
-    spokes.join('')+dots.join('')+'<circle class="ehub" cx="'+C+'" cy="'+C+'" r="13"/>'+ng.join('')+txts.join('')+
+    spokes.join('')+dots.join('')+ehubMarkup(C,d.totals)+ng.join('')+txts.join('')+
     '</svg></div><div class="ebot">'+efooter(d.totals||{})+'</div></div>';
 }
 // Struktur-Signatur: nur bei Aenderung (Knotensatz/Icons) neu zeichnen.
-function energySig(d){ return ((d.nodes||[]).map(n=>(n.name||'')+'§'+(n.icon||'')+'§'+(n.iconUrl||'')).join('¦'))+'#'+((d.nodes||[]).length); }
+function energySig(d){ return ((d.nodes||[]).map(n=>(n.name||'')+'§'+(n.icon||'')+'§'+(n.iconUrl||'')).join('¦'))+'#'+((d.nodes||[]).length)+
+  '#'+(d.totals && d.totals.cons!=null ? 'h' : '-'); }   // Haus in der Mitte ja/nein
 function updateEnergyPane(elc,d){
   (d.nodes||[]).slice(0,9).forEach((n,i)=>{
     const col=eColorCls(n), dir=eDirCls(n);
@@ -482,6 +493,7 @@ function updateEnergyPane(elc,d){
     for(let k=0;k<2;k++){ const dot=elc.querySelector('.edot[data-nd="'+i+'-'+k+'"]'); if(dot){ const w='edot '+col+dir; if(dot.getAttribute('class')!==w) dot.setAttribute('class',w); const disp=n.flow?'':'none'; if(dot.style.display!==disp) dot.style.display=disp; } }
   });
   const bot=elc.querySelector('.ebot'); if(bot){ const h=efooter(d.totals||{}); if(bot.innerHTML!==h) bot.innerHTML=h; }
+  const hv=elc.querySelector('[data-hv]'); if(hv && d.totals && d.totals.cons!=null){ const t=fmtPower(d.totals.cons); if(hv.textContent!==t) hv.textContent=t; }
 }
 // Zeichnet in elc: nur bei Strukturaenderung Neuaufbau, sonst in-place -> Punkte laufen weiter.
 function paintEnergy(elc,d){
