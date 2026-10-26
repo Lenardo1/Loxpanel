@@ -125,6 +125,12 @@
      fielen Diagramme mit flex-basis 0 auf 0px zusammen. */
   .screen.split #frontpane .fp-page.solo.cpage,
   .screen.widgettab #frontpane .fp-page.solo.cpage{overflow:hidden;gap:8px;display:flex;flex-direction:column;}
+  /* Blaetter-Modus (mehrere .solo-Seiten: chart:page:... ODER mehrere Kameras).
+     Jede fuellt die ganze Pane-Hoehe und rastet seitenweise ein (wie Wetter/
+     Kalender). Ohne das teilten sich die .solo-Seiten (flex:1 1 0) die Hoehe
+     -> alle Bausteine/Kameras gleichzeitig untereinander statt einer je Seite. */
+  .screen.widgettab #frontpane .fp-page.solo.paged,
+  .screen.split #frontpane .fp-page.solo.paged{flex:0 0 auto;min-height:100%;max-height:none;}
   #frontpane .fp-page.solo.cpage:not(.stack) .cpbody{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
   #frontpane .fp-page.solo.cpage:not(.stack) .cpsec{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
   #frontpane .fp-page.solo.cpage:not(.stack) .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
@@ -1367,7 +1373,7 @@ function renderChartPane(elc){ if(!elc) return;
     } else if(!charts.length){
       elc.innerHTML='<div class="fp-page cpage solo">'+rngRow+'<div class="cpbody"><div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div></div></div>';
     } else if(paged){   // je Baustein eine Seite, Zeitraum-Leiste auf jeder Seite
-      elc.innerHTML=charts.map(c=>'<div class="fp-page cpage solo">'+rngRow+'<div class="cpbody">'+sec(c)+'</div></div>').join('');
+      elc.innerHTML=charts.map(c=>'<div class="fp-page cpage solo paged">'+rngRow+'<div class="cpbody">'+sec(c)+'</div></div>').join('');
     } else {            // gestapelt (wie bisher): alle Bausteine in einer Seite
       elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+charts.map(sec).join('')+'</div></div>';
     }
@@ -2335,7 +2341,9 @@ function connect(){
       const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='energy') renderEnergyPane(fp); return; }   // Energiefluss-Pane
     if(msg.t==='camera'){ cameraData=msg;
       if(svSideOn()){ renderFront(); return; }
-      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='camera') renderCameraPane(fp); return; }   // Kamera-Pane (Intercom-Vollansicht)
+      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='camera'){ renderCameraPane(fp);
+        requestAnimationFrame(()=>syncPager(camPageTo)); }   // Punkte nach dem Kamera-Push neu aufbauen
+      return; }   // Kamera-Pane (Intercom-Vollansicht)
     if(msg.t==='scale'){ uiScaleCfg=scaleCfg(msg.scale); applyScale(); return; }   // Skalierung des Geraets geaendert (ohne Neuladen)
     if(msg.t==='svstatus'){ svStatusData=Array.isArray(msg.items)?msg.items:[];
       if(saverOn()){ renderFront(); return; }   // Uhr-Seite oben -> dort
@@ -2347,7 +2355,9 @@ function connect(){
       if(!(msg.controls||[]).every(u=>want.indexOf(u)>-1)) return;
       chartData=msg;
       if(svSideOn()){ renderFront(); return; }   // Screensaver oben -> als zweite Uhr-Spalte zeichnen
-      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='chart') renderChartPane(fp); return; }
+      const fp=el('frontpane'); if(fp && paneKind(paneRawNow())==='chart'){ renderChartPane(fp);
+        requestAnimationFrame(()=>syncPager(null)); }   // Punkte nach dem Daten-Push neu aufbauen (Seiten gibt es erst jetzt)
+      return; }
     if(msg.t==='switch'){ if(msg.panel!==undefined){ const u=new URL(location.href);
         if(msg.panel) u.searchParams.set('panel',msg.panel); else u.searchParams.delete('panel');
         location.replace(u.toString()); } return; }   // Betriebsmodus -> Profil live wechseln
@@ -2816,8 +2826,9 @@ function renderCameraPane(elc){ if(!elc) return;
   // neu bauen, sonst bleiben Scrollposition und laufender Stream erhalten.
   if(elc.dataset.camn!==String(n)){
     elc.dataset.camn=String(n);
+    const pcls=n>1?' paged':'';   // mehrere Kameras -> jede Seite volle Hoehe + einrasten (wie Verlauf-Blaettern)
     elc.innerHTML=Array.from({length:n},(_,i)=>
-      '<div class="fp-page solo campage" data-camidx="'+i+'"></div>').join('');
+      '<div class="fp-page solo campage'+pcls+'" data-camidx="'+i+'"></div>').join('');
   }
   const pages=[...elc.querySelectorAll('.campage')];
   // Nur die sichtbare Kamera streamt (Server = Single-Slot); die uebrigen Seiten
