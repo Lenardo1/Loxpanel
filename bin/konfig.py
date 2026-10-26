@@ -574,11 +574,22 @@ def _clean_camera(v: str) -> str:
     return kopf + cam + ("|" + ",".join(uu) if uu else "")
 
 
+def _chart_modus(rest: str) -> tuple[str, str]:
+    """Darstellung einer Verlaufs-Pane vom Rest hinter "chart:" trennen:
+    ("page:" | "stack:" | "", Bausteine). "page:" = je Baustein eine
+    blaetterbare Seite, "stack:" bzw. ohne Modus = gestapelt (wie bisher)."""
+    for m in ("page:", "stack:"):
+        if rest.startswith(m):
+            return m, rest[len(m):]
+    return "", rest
+
+
 def _clean_tabpane(v) -> str:
     """Split-Pane eines Tabs pruefen: "weather" | "calendar" | "player:<uuid>"
     | "energy:<uuid>" | "camera:<uuid>[|<uuid>,...]" (Kamera, dahinter optional
-    Werte unter dem Bild, _clean_camera) | "chart:<uuid>,<uuid>,..." (ein oder
-    mehrere Verlaufs-Bausteine mit Aufzeichnung, gestapelt) | "status:<uuid>,..."
+    Werte unter dem Bild, _clean_camera) | "chart:[page:|stack:]<uuid>,..." (ein
+    oder mehrere Verlaufs-Bausteine mit Aufzeichnung; ohne Modus bzw. mit
+    "stack:" gestapelt, mit "page:" je Baustein eine blaetterbare Seite) | "status:<uuid>,..."
     (frei gewaehlte Werte, wie auf der Uhr-Seite) | "header" bzw.
     "header:<uuid>,..." (Kopfzeile: Uhr, Wetter und bis zu SV_STATUS_MAX Werte
     in EINER Zeile ueber dem Kachelraster statt einer Pane daneben; ohne
@@ -597,11 +608,15 @@ def _clean_tabpane(v) -> str:
         for kopf in ("player:", "energy:"):
             if v.startswith(kopf) and len(v) > len(kopf):
                 return v
-        for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
-            if v.startswith(kopf):
-                uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
-                if uu:
-                    return kopf + ",".join(uu)
+        if v.startswith("chart:"):   # Verlauf: optional 'page:'/'stack:' + Bausteine
+            mode, rest = _chart_modus(v[len("chart:"):])
+            uu = [x.strip() for x in rest.split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return "chart:" + mode + ",".join(uu)
+        if v.startswith("status:"):   # mehrere Bausteine, komma-getrennt (Werte)
+            uu = [x.strip() for x in v[len("status:"):].split(",") if x.strip()][:SV_STATUS_MAX]
+            if uu:
+                return "status:" + ",".join(uu)
         if v.startswith("header:"):          # Kopfzeile mit Werten; ohne Werte nur Uhr und Wetter
             uu = [x.strip() for x in v[len("header:"):].split(",") if x.strip()][:SV_STATUS_MAX]
             return "header:" + ",".join(uu) if uu else "header"
@@ -687,11 +702,15 @@ def _clean_svpane(v) -> str:
     for kopf in ("player:", "energy:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v
-    for kopf in ("chart:", "status:"):   # mehrere Bausteine, komma-getrennt (Verlauf/Werte)
-        if v.startswith(kopf):
-            uu = [x.strip() for x in v[len(kopf):].split(",") if x.strip()][:SV_STATUS_MAX]
-            if uu:
-                return kopf + ",".join(uu)
+    if v.startswith("chart:"):   # Screensaver stapelt (keine Blaetter-Punkte) -> Modus abstreifen
+        _mode, rest = _chart_modus(v[len("chart:"):])
+        uu = [x.strip() for x in rest.split(",") if x.strip()][:SV_STATUS_MAX]
+        if uu:
+            return "chart:" + ",".join(uu)
+    if v.startswith("status:"):   # mehrere Bausteine, komma-getrennt (Werte)
+        uu = [x.strip() for x in v[len("status:"):].split(",") if x.strip()][:SV_STATUS_MAX]
+        if uu:
+            return "status:" + ",".join(uu)
     return ""
 
 

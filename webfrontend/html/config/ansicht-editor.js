@@ -657,7 +657,10 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     const camu=isC?camUuid(v):'', cwu=isC?camWerte(v):[];
     const suu=isS?v.slice(7).split(',').filter(Boolean):[];
     const huu=isH?v.slice(7).split(',').filter(Boolean):[];   // "header:" ist 7 Zeichen wie "status:"
-    const vuu=isV?v.slice(6).split(',').filter(Boolean):[];   // Verlauf: ein oder mehrere Bausteine, gestapelt
+    // Verlauf: ein oder mehrere Bausteine; Modus 'page:'/'stack:' optional vorangestellt
+    let vArg=isV?v.slice(6):'', vMode='stack';
+    { const vm=vArg.match(/^(page|stack):([\s\S]*)$/); if(vm){ vMode=vm[1]; vArg=vm[2]; } }
+    const vuu=vArg.split(',').filter(Boolean);
     let row='<div class="ccrow"><span class="ccnm">'+esc(label)+'</span>'+
       '<select data-pane="'+esc(tk)+'">'+
         '<option value=""'+(kind===''?' selected':'')+'>'+T('Kein Widget (Screen füllen)')+'</option>'+
@@ -713,7 +716,7 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
           : '<span class="none">'+T('Ohne Werte zeigt die Kopfzeile Uhr und Wetter.')+'</span>')+'</div>';
     }
-    if(isV){   // Verlauf = ein oder mehrere Bausteine, gestapelt (wie Werte)
+    if(isV){   // Verlauf = ein oder mehrere Bausteine; Darstellung stapeln ODER blaettern
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Bausteine')+'</span>'+
         '<select class="pchart-add" data-pk="'+esc(tk)+'">'+chartAddOptions()+'</select>'+
         ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
@@ -721,7 +724,14 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
           ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
               return '<span class="chip on" data-pk="'+esc(tk)+'" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
-          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+          : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>'+
+        (vuu.length>=2
+          ? '<div class="ccrow" style="margin:4px 0 0 0"><span class="ccnm">'+T('Darstellung')+'</span>'+
+            '<select class="pchart-mode" data-pk="'+esc(tk)+'">'+
+              '<option value="stack"'+(vMode==='stack'?' selected':'')+'>'+T('Gestapelt (scrollen)')+'</option>'+
+              '<option value="page"'+(vMode==='page'?' selected':'')+'>'+T('Blättern (Punkte)')+'</option>'+
+            '</select></div>'
+          : '');
     }
     return row;
   }).join('') || (leer?'<div class="ccmut">'+esc(leer)+'</div>':'');
@@ -764,13 +774,21 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     setPane(tk,kopfWert(uu.concat([u]))); renderPanes(p); });
   box.querySelectorAll('.chip[data-hu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
     setPane(tk, kopfWert(paneKopfUu(tk).filter(x=>x!==n.dataset.hu))); renderPanes(p); });
-  const paneChartUu=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||''; return cur.indexOf('chart:')===0?cur.slice(6).split(',').filter(Boolean):[]; };
+  // Verlauf-Wert zerlegen: Modus ('stack'|'page') + Bausteine. 'chart:a,b' =
+  // stack (Vorgabe), 'chart:page:a,b' = blaettern. Schreiben: Modus nur bei page.
+  const paneChartParse=tk=>{ const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
+    let a=cur.indexOf('chart:')===0?cur.slice(6):'', m='stack';
+    const mm=a.match(/^(page|stack):([\s\S]*)$/); if(mm){ m=mm[1]; a=mm[2]; }
+    return {mode:m, uu:a.split(',').filter(Boolean)}; };
+  const chartVal=(uu,mode)=> 'chart:'+(mode==='page'?'page:':'')+uu.join(',');
   box.querySelectorAll('.pchart-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
-    const uu=paneChartUu(tk); if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
-    setPane(tk,'chart:'+uu.concat([u]).join(',')); renderPanes(p); });
-  box.querySelectorAll('.chip[data-cu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
-    const rest=paneChartUu(tk).filter(x=>x!==n.dataset.cu);
-    setPane(tk, rest.length?('chart:'+rest.join(',')):'chart:'); renderPanes(p); });
+    const cp=paneChartParse(tk); if(!u||cp.uu.indexOf(u)>-1||(svMax()&&cp.uu.length>=svMax())) return;
+    setPane(tk, chartVal(cp.uu.concat([u]), cp.mode)); renderPanes(p); });
+  box.querySelectorAll('.chip[data-cu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk, cp=paneChartParse(tk);
+    const rest=cp.uu.filter(x=>x!==n.dataset.cu);
+    setPane(tk, rest.length?chartVal(rest,cp.mode):'chart:'); renderPanes(p); });
+  box.querySelectorAll('.pchart-mode').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, cp=paneChartParse(tk);
+    setPane(tk, chartVal(cp.uu, s.value)); renderPanes(p); });
   box.querySelectorAll('select[data-panez]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panez,'player:'+s.value);
   });

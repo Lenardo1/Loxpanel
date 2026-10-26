@@ -79,6 +79,10 @@ let playerSecured = false;   // Zone des Players ist gesichert (Visu-PIN)
 // Verlaufs-Pane (chart:<uuid>): gemeldeter Baustein|Zeitraum, letzter {t:'chart'}-Push,
 // in der Pane gewaehlter Zeitraum (gilt fuer alle Verlaufs-Panes dieses Panels).
 let curChartKey = '', chartData = null, chartRange = '24h';
+// Darstellung der Verlaufs-Pane: 'stack' (mehrere Bausteine gestapelt+scrollbar,
+// wie bisher) oder 'page' (ein Baustein je blaetterbarer Seite). Kodiert im
+// Pane-Wert: 'chart:a,b' = stack (rueckwaertskompatibel), 'chart:page:a,b' = page.
+let chartMode = 'stack';
 // Die Kennungen oben sind die zuletzt gemeldeten Abos (set*). Der Server fuehrt
 // sie je Verbindung und raeumt sie ab, wenn sie endet (ws_handler, _send_or_drop).
 // Nach jedem Verbindungsaufbau gelten sie darum als nicht gemeldet; der

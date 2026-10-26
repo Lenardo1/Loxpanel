@@ -203,6 +203,64 @@ function paneRawNow(){ if(view && view.widget) return view.widget;
 function paneKind(v){ if(!v) return null;
   for(const k of ['player','energy','camera','chart','status','header']) if(v.indexOf(k+':')===0) return k;
   return v; }
+// ---- Seiten-Indikator / Blaettern (Pager) ----
+// Blaetterbare Widgets bestehen aus mehreren .fp-page-Seiten im scroll-snap-
+// Container (#frontpane). syncPager() zeigt dafuer unten eine Punkt-Reihe,
+// haelt den aktiven Punkt per IntersectionObserver nach und laesst Tippen auf
+// einen Punkt zur Seite springen. onPage(idx) meldet jeden Seitenwechsel.
+// Verborgene Seiten (etwa die Wetter-Details, solange sie auf Seite 1 passen)
+// zaehlen nicht.
+let _pagerObs=null, _pagerOnPage=null, _pagerIdx=-1;
+function pagerContainer(){
+  const sc=document.querySelector('.screen'); if(!sc) return null;
+  const fp=el('frontpane'); if(!fp || fp.hidden) return null;
+  return (sc.classList.contains('split')||sc.classList.contains('widgettab')) ? fp : null;
+}
+function pagerPages(c){ return c ? [...c.children].filter(x=>x.classList&&x.classList.contains('fp-page')&&!x.hidden) : []; }
+function clearPager(){
+  if(_pagerObs){ _pagerObs.disconnect(); _pagerObs=null; }
+  _pagerOnPage=null; _pagerIdx=-1;
+  const d=el('paneDots'); if(d){ d.hidden=true; d.innerHTML=''; }
+}
+function setPagerPage(idx){
+  const c=pagerContainer(); if(!c) return;
+  const pg=pagerPages(c)[idx]; if(pg) pg.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function positionDots(c,d){
+  const sc=document.querySelector('.screen'); if(!sc) return;
+  const r=c.getBoundingClientRect(), sr=sc.getBoundingClientRect();
+  if(!r.width){ d.hidden=true; return; }
+  d.hidden=false;
+  d.style.left=(r.left-sr.left)+'px';
+  d.style.width=r.width+'px';
+  d.style.top=(r.bottom-sr.top-26)+'px';
+}
+function syncPager(onPage){
+  const d=el('paneDots'); if(!d) return;
+  const c=pagerContainer();
+  const pages=pagerPages(c);
+  if(!c || pages.length<2 || svSideOn()){ clearPager(); return; }
+  _pagerOnPage=onPage||null;
+  if(d.children.length!==pages.length){
+    d.innerHTML=pages.map((_,i)=>'<i data-pg="'+i+'"></i>').join('');
+    d.querySelectorAll('[data-pg]').forEach(dot=>dot.addEventListener('pointerdown',ev=>{
+      ev.preventDefault(); setPagerPage(parseInt(dot.dataset.pg)||0); }));
+    _pagerIdx=-1;
+  }
+  positionDots(c,d);
+  if(_pagerObs) _pagerObs.disconnect();
+  _pagerObs=new IntersectionObserver(ents=>{
+    let best=null,bestR=0;
+    ents.forEach(e=>{ if(e.intersectionRatio>bestR){ bestR=e.intersectionRatio; best=e.target; } });
+    if(!best) return;
+    const idx=pages.indexOf(best); if(idx<0||idx===_pagerIdx) return;
+    _pagerIdx=idx;
+    d.querySelectorAll('i').forEach((dot,i)=>dot.classList.toggle('on',i===idx));
+    if(_pagerOnPage) try{ _pagerOnPage(idx); }catch(e){}
+  },{root:c,threshold:[.5,.6]});
+  pages.forEach(p=>_pagerObs.observe(p));
+  if(_pagerIdx<0){ _pagerIdx=0; d.querySelectorAll('i').forEach((dot,i)=>dot.classList.toggle('on',i===0)); }
+}
 // ---- Kopfzeile (Widget "header") ----
 // Uhr, Wetter kurz und bis zu SV_STATUS_MAX Werte in einer Zeile ueber dem
 // Kachelraster. Kein Split: der Kasten bekommt nur eine Zeile mehr. Die Werte
@@ -345,7 +403,10 @@ function applyPane(){
   // Verlaufs-Pane: Baustein und gewaehlten Zeitraum melden (er pusht dann
   // {t:'chart'}). Wie bei Energie/Kamera zaehlt der Screensaver, wenn er oben
   // liegt (chart als zweite Uhr-Spalte), sonst die Pane des aktiven Tabs.
-  const chuid=qarg(qraw,'chart:');   // ein oder mehrere Bausteine, komma-getrennt
+  // "a,b" | "stack:a,b" | "page:a,b" - nur die Bausteine (ohne Modus) gehen an den Server
+  const chArg=qarg(qraw,'chart:'), chm=chArg.match(/^(page|stack):([\s\S]*)$/);
+  chartMode = chm ? chm[1] : 'stack';
+  const chuid = chm ? chm[2] : chArg;
   const chkey=chuid ? chuid+'|'+chartRange : '';
   if(chkey!==curChartKey){ curChartKey=chkey; chartData=null;   // alten Stapel verwerfen, bis der neue Push kommt
     try{ send({t:'setchart',uuid:chuid,range:chartRange}); }catch(e){} }
@@ -361,6 +422,8 @@ function applyPane(){
             : ((svKind(qraw)==='camera') ? camPaneWerte(svArg(qraw)) : '');
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
+  // Seiten-Indikator nachziehen (blaetterbare Widgets, s. syncPager)
+  requestAnimationFrame(()=>syncPager());
 }
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und
