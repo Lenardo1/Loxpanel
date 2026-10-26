@@ -7,8 +7,10 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
 import android.util.Log
@@ -73,6 +75,10 @@ class ServerService : Service() {
     /** Der Wächter dieses Dienstes; endet mit ihm (onDestroy). */
     private var waechter: ScheduledExecutorService? = null
 
+    /** Halten WLAN und CPU wach, solange der Server läuft (acquireLocks). */
+    private var wifiLock: WifiManager.WifiLock? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -87,6 +93,7 @@ class ServerService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        acquireLocks()
         // Die Anzeige startet der BootReceiver bzw. der Nutzer (KioskActivity);
         // der Dienst kümmert sich nur um den Server.
         val start = SystemClock.elapsedRealtime()
@@ -114,7 +121,38 @@ class ServerService : Service() {
     override fun onDestroy() {
         waechter?.shutdownNow()
         waechter = null
+        try { if (wakeLock?.isHeld == true) wakeLock?.release() } catch (e: Throwable) {}
+        try { if (wifiLock?.isHeld == true) wifiLock?.release() } catch (e: Throwable) {}
         super.onDestroy()
+    }
+
+    /**
+     * Hält WLAN und CPU wach, solange der Server läuft. Ohne das drosselt/trennt
+     * Android auf echten Tablets (z. B. Galaxy Tab S2) im Standby/Doze das WLAN,
+     * sobald das Display aus ist — und reißt damit die Dauer-WebSocket zum
+     * Miniserver ab. Auf dauergeladenen Wandpanels ist der Mehrverbrauch gewollt.
+     */
+    @Suppress("DEPRECATION")
+    private fun acquireLocks() {
+        try {
+            if (wifiLock == null) {
+                val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                wifiLock = wm.createWifiLock(
+                    WifiManager.WIFI_MODE_FULL_HIGH_PERF, "loxpanel:wifi"
+                ).apply { setReferenceCounted(false) }
+            }
+            if (wifiLock?.isHeld == false) wifiLock?.acquire()
+
+            if (wakeLock == null) {
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "loxpanel:cpu")
+                    .apply { setReferenceCounted(false) }
+            }
+            if (wakeLock?.isHeld == false) wakeLock?.acquire()
+            Log.i("LPSERVER", "WifiLock+WakeLock gehalten")
+        } catch (e: Throwable) {
+            Log.e("LPSERVER", "Locks konnten nicht geholt werden", e)
+        }
     }
 
     /** Prüft den Server ab [start] (elapsedRealtime) in festem Abstand und
