@@ -122,9 +122,12 @@
     box-shadow:0 8px 24px rgba(0,0,0,.45);}
   .webframe{width:100%;height:74vh;border-radius:12px;overflow:hidden;background:#000;}
   .webframe iframe{width:100%;height:100%;border:0;display:block;}
-  .video{width:100%;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;
+  .video{position:relative;width:100%;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;
     display:grid;place-items:center;}
-  .video img{width:100%;height:100%;object-fit:contain;}
+  /* Das Bild richtet sich nach dem Feld, nicht umgekehrt: ist das Feld flacher
+     als 4:3 (flache Bento-Zelle, Pane 2, Intercom-Seite), wird es eingepasst.
+     Im Fluss bestimmte seine eigene Hoehe die Zeile, und unten fehlte ein Teil. */
+  .video img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
   .ptitle{text-align:center;font-size:19px;font-weight:550;padding:0 8px;letter-spacing:-.01em;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .ptitle .psub{font-size:15px;font-weight:400;color:var(--muted);margin-top:3px;
