@@ -557,21 +557,28 @@ def _clean_screen(d) -> dict:
 
 
 def _clean_camera(v: str) -> str:
-    """Kamera-Widget pruefen: "camera:<uuid>" oder "camera:<uuid>|<uuid>,<uuid>,..."
-    Hinter dem senkrechten Strich stehen frei gewaehlte Werte (wie "status:"),
-    die das Panel unter dem Kamerabild zeigt - auf einem Tablet bleibt dort
-    sonst die halbe Pane leer. Die Liste wird je Eintrag getrimmt und auf
-    SV_STATUS_MAX begrenzt; ohne Eintraege faellt der Strich weg. "" = ungueltig."""
+    """Kamera-Widget pruefen: "camera:<uuid>[,<uuid>...]" oder dahinter
+    "|<uuid>,<uuid>,...". Mehrere Kameras zeigt das Panel als blaetterbare
+    Seiten (die Uhr-Seite nur die erste); sie werden getrimmt, doppelte
+    entfernt und auf SV_STATUS_MAX begrenzt. Hinter dem senkrechten Strich
+    stehen frei gewaehlte Werte (wie "status:"), die das Panel unter dem
+    Kamerabild zeigt - auf einem Tablet bleibt dort sonst die halbe Pane leer.
+    Die Liste wird je Eintrag getrimmt und auf SV_STATUS_MAX begrenzt; ohne
+    Eintraege faellt der Strich weg. "" = ungueltig."""
     kopf = "camera:"
     if not (isinstance(v, str) and v.startswith(kopf) and len(v) > len(kopf)):
         return ""
     rest = v[len(kopf):]
-    cam, _, werte = rest.partition("|")
-    cam = cam.strip()
-    if not cam:
+    cams, _, werte = rest.partition("|")
+    cc: list = []
+    for x in cams.split(","):
+        x = x.strip()
+        if x and x not in cc:
+            cc.append(x)
+    if not cc:
         return ""
     uu = [x.strip() for x in werte.split(",") if x.strip()][:SV_STATUS_MAX]
-    return kopf + cam + ("|" + ",".join(uu) if uu else "")
+    return kopf + ",".join(cc[:SV_STATUS_MAX]) + ("|" + ",".join(uu) if uu else "")
 
 
 def _chart_modus(rest: str) -> tuple[str, str]:
@@ -586,8 +593,8 @@ def _chart_modus(rest: str) -> tuple[str, str]:
 
 def _clean_tabpane(v) -> str:
     """Split-Pane eines Tabs pruefen: "weather" | "calendar" | "player:<uuid>"
-    | "energy:<uuid>" | "camera:<uuid>[|<uuid>,...]" (Kamera, dahinter optional
-    Werte unter dem Bild, _clean_camera) | "chart:[page:|stack:]<uuid>,..." (ein
+    | "energy:<uuid>" | "camera:<uuid>[,<uuid>...][|<uuid>,...]" (eine oder
+    mehrere Kameras, dahinter optional Werte unter dem Bild, _clean_camera) | "chart:[page:|stack:]<uuid>,..." (ein
     oder mehrere Verlaufs-Bausteine mit Aufzeichnung; ohne Modus bzw. mit
     "stack:" gestapelt, mit "page:" je Baustein eine blaetterbare Seite) | "status:<uuid>,..."
     (frei gewaehlte Werte, wie auf der Uhr-Seite) | "header" bzw.

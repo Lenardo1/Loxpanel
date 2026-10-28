@@ -654,7 +654,8 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     const isH=(v==='header'||v.indexOf('header:')===0);   // Kopfzeile: Uhr, Wetter, dazu Werte nach Wahl
     const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':(isH?'header':v))))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'';
     // Kamera: "camera:<uuid>|<uuid>,..." - Bild-UUID vor, Werte unter dem Bild hinter dem Strich
-    const camu=isC?camUuid(v):'', cwu=isC?camWerte(v):[];
+    // mehrere Kameras ("camera:a,b|...") = blaetterbare Seiten; die erste waehlt das Feld, weitere die Chips
+    const cams=isC?camUuids(v):[], camu=cams[0]||'', cwu=isC?camWerte(v):[];
     const suu=isS?v.slice(7).split(',').filter(Boolean):[];
     const huu=isH?v.slice(7).split(',').filter(Boolean):[];   // "header:" ist 7 Zeichen wie "status:"
     // Verlauf: ein oder mehrere Bausteine; Modus 'page:'/'stack:' optional vorangestellt
@@ -686,6 +687,17 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     row+='<div class="ccrow" style="margin:2px 0 0 0"><label class="chk" style="margin:0;font-size:13px">'+
       '<input type="checkbox" data-leiste="'+esc(tk)+'"'+(leiste.indexOf(tk)>-1?' checked':'')+'> '+
       T('Werte als Leiste über den Kacheln')+'</label></div>';
+    if(isC){   // weitere Kameras: blaetterbare Seiten mit Punkten, gestreamt wird nur die sichtbare
+      const frei=(META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type) && cams.indexOf(c.uuid)<0);
+      row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Weitere Kameras')+'</span>'+
+        (frei.length ? '<select class="pcams-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+
+          frei.map(c=>'<option value="'+esc(c.uuid)+'">'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('')+'</select>' : '')+
+        '</div><div class="picked" style="margin:6px 0 2px">'+(cams.length>1
+          ? cams.slice(1).map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+              return '<span class="chip on" data-pk="'+esc(tk)+'" data-camx="'+esc(u)+'">'+esc(c?c.name:u)+
+                '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
+          : '<span class="ccmut">'+T('Keine – eine Kamera ohne Blättern.')+'</span>')+'</div>';
+    }
     if(isC){   // Werte unter dem Kamerabild (Tablet: die Pane ist hoeher als das 4:3-Bild)
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Werte unter dem Bild')+'</span>'+
         '<select class="pcam-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -795,10 +807,19 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
   box.querySelectorAll('select[data-panee]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panee,'energy:'+s.value);
   });
-  box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{   // Bild wechseln, Werte behalten
+  box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{   // erste Kamera wechseln, weitere und Werte behalten
     const tk=s.dataset.panec, cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
-    setPane(tk, camPane(s.value, camWerte(cur)));
+    const rest=camUuids(cur).slice(1).filter(x=>x!==s.value);
+    setPane(tk, camPane([s.value].concat(rest).join(','), camWerte(cur)));
+    renderPanes(p);
   });
+  box.querySelectorAll('.pcams-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
+    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'', cc=camUuids(cur);
+    if(!u||cc.indexOf(u)>-1) return;
+    setPane(tk, camPane(cc.concat([u]).join(','), camWerte(cur))); renderPanes(p); });
+  box.querySelectorAll('.chip[data-camx][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
+    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
+    setPane(tk, camPane(camUuids(cur).filter(x=>x!==n.dataset.camx).join(','), camWerte(cur))); renderPanes(p); });
   box.querySelectorAll('.pcam-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
     const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'', uu=camWerte(cur);
     if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
@@ -807,8 +828,10 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
     setPane(tk, camPane(camUuid(cur), camWerte(cur).filter(x=>x!==n.dataset.cwu))); renderPanes(p); });
 }
-// Kamera-Widget: "camera:<uuid>" oder "camera:<uuid>|<uuid>,<uuid>" (Werte unter dem Bild)
+// Kamera-Widget: "camera:<uuid>[,<uuid>...]" oder dahinter "|<uuid>,<uuid>" (Werte unter
+// dem Bild). camUuid liefert alle Kameras als Text (fuer camPane), camUuids als Liste.
 function camUuid(v){ return (v||'').indexOf('camera:')===0 ? v.slice(7).split('|')[0] : ''; }
+function camUuids(v){ return camUuid(v).split(',').filter(Boolean); }
 function camWerte(v){ if((v||'').indexOf('camera:')!==0) return []; const r=v.slice(7), i=r.indexOf('|');
   return i<0?[]:r.slice(i+1).split(',').filter(Boolean); }
 function camPane(u,uu){ return 'camera:'+(u||'')+(uu&&uu.length?'|'+uu.join(','):''); }

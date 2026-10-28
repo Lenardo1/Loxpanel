@@ -207,7 +207,8 @@ function paneKind(v){ if(!v) return null;
 // Blaetterbare Widgets bestehen aus mehreren .fp-page-Seiten im scroll-snap-
 // Container (#frontpane). syncPager() zeigt dafuer unten eine Punkt-Reihe,
 // haelt den aktiven Punkt per IntersectionObserver nach und laesst Tippen auf
-// einen Punkt zur Seite springen. onPage(idx) meldet jeden Seitenwechsel.
+// einen Punkt zur Seite springen. onPage(idx) meldet jeden Seitenwechsel
+// (ohne Angabe bei der Kamera-Pane camPageTo).
 // Verborgene Seiten (etwa die Wetter-Details, solange sie auf Seite 1 passen)
 // zaehlen nicht.
 let _pagerObs=null, _pagerOnPage=null, _pagerIdx=-1;
@@ -240,7 +241,9 @@ function syncPager(onPage){
   const c=pagerContainer();
   const pages=pagerPages(c);
   if(!c || pages.length<2 || svSideOn()){ clearPager(); return; }
-  _pagerOnPage=onPage||null;
+  // ohne Angabe: die Kamera-Pane meldet den Seitenwechsel (sichtbare Kamera)
+  _pagerOnPage = (onPage!==undefined) ? (onPage||null)
+               : ((paneKind(paneRawNow())==='camera' && typeof camPageTo==='function') ? camPageTo : null);
   if(d.children.length!==pages.length){
     d.innerHTML=pages.map((_,i)=>'<i data-pg="'+i+'"></i>').join('');
     d.querySelectorAll('[data-pg]').forEach(dot=>dot.addEventListener('pointerdown',ev=>{
@@ -390,8 +393,13 @@ function applyPane(){
   const euid=qarg(qraw,'energy:');
   if(euid!==curEnergyUuid){ curEnergyUuid=euid; try{ send({t:'setenergy',uuid:euid}); }catch(e){} }
   // Kamera (Intercom) dem Server melden (er pusht dann {t:'camera'} mit Video+Buttons).
-  // "camera:<uuid>|<uuid>,..." - hinter dem Strich stehen Werte unter dem Bild
-  const camArg=qarg(qraw,'camera:'), cuid=camPaneUuid(camArg);
+  // "camera:<uuid>[,<uuid>...]|<uuid>,..." - mehrere Kameras sind blaetterbare
+  // Seiten (gemeldet wird nur die sichtbare, auf der Uhr-Seite die erste),
+  // hinter dem Strich stehen Werte unter dem Bild
+  const camArg=qarg(qraw,'camera:');
+  camList=camPaneUuids(camArg);
+  if(svSideOn() || camCamIdx>=camList.length) camCamIdx=0;
+  const cuid=camList[camCamIdx]||'';
   if(cuid!==curCameraUuid){ curCameraUuid=cuid; cameraData=null;
     if(fp){ delete fp.dataset.cam; delete fp.dataset.camsig; }
     const sb=el('svBox'); if(sb){ delete sb.dataset.cam; delete sb.dataset.camsig; }
@@ -423,7 +431,7 @@ function applyPane(){
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
   // Seiten-Indikator nachziehen (blaetterbare Widgets, s. syncPager)
-  requestAnimationFrame(()=>syncPager());
+  requestAnimationFrame(()=>syncPager(kind==='camera' ? camPageTo : null));
 }
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und
