@@ -104,32 +104,37 @@ function renderChartPane(elc){ if(!elc) return;
   const d=(chartData && Array.isArray(chartData.charts)) ? chartData : null;
   const charts=d ? d.charts : [];
   const multi=charts.length>1;
-  const sig=(d?d.controls.join(','):'-')+'|'+(d?d.range:'')+'|'+
+  const paged=(chartMode==='page' && multi);   // ein Baustein je blaetterbarer Seite
+  const sig=(paged?'p':'s')+'|'+(d?d.controls.join(','):'-')+'|'+(d?d.range:'')+'|'+
             charts.map(c=>(c.blocks||[]).length).join('.');
   let page=elc.querySelector('.fp-page.cpage');
-  if(!page || page.dataset.sig!==sig){
+  if(!page || elc.dataset.chsig!==sig){
+    elc.dataset.chsig=sig;
     const rngRow=(d && d.ranges && d.ranges.length)
       ? '<div class="chrng cpr">'+d.ranges.map(r=>'<button type="button" class="chip'+
           (r[0]===d.range?' on':'')+'" data-rng="'+esc(r[0])+'">'+esc(r[1])+'</button>').join('')+'</div>'
       : '';
-    const body=!d
-      ? '<div class="chmsg">Verlauf wird geladen …</div>'
-      : (charts.length
-        ? charts.map(c=>'<div class="cpsec"><div class="cphead"><div class="cpname"></div>'+
-            '<div class="cpval"></div></div>'+
-            (c.blocks||[]).map(b=>chartBoxHtml(b,false)).join('')+'</div>').join('')
-        : '<div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div>');
-    elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+body+'</div></div>';
-    page=elc.querySelector('.fp-page.cpage'); page.dataset.sig=sig;
-    page.querySelectorAll('.cpr [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
+    const sec=c=>'<div class="cpsec"><div class="cphead"><div class="cpname"></div>'+
+        '<div class="cpval"></div></div>'+(c.blocks||[]).map(b=>chartBoxHtml(b,false)).join('')+'</div>';
+    if(!d){
+      elc.innerHTML='<div class="fp-page cpage solo"><div class="cpbody"><div class="chmsg">Verlauf wird geladen …</div></div></div>';
+    } else if(!charts.length){
+      elc.innerHTML='<div class="fp-page cpage solo">'+rngRow+'<div class="cpbody"><div class="chmsg">Kein Baustein mit Aufzeichnung gewählt.</div></div></div>';
+    } else if(paged){   // je Baustein eine Seite, Zeitraum-Leiste auf jeder Seite
+      elc.innerHTML=charts.map(c=>'<div class="fp-page cpage solo paged">'+rngRow+'<div class="cpbody">'+sec(c)+'</div></div>').join('');
+    } else {            // gestapelt (wie bisher): alle Bausteine in einer Seite
+      elc.innerHTML='<div class="fp-page cpage solo'+(multi?' stack':'')+'">'+rngRow+'<div class="cpbody">'+charts.map(sec).join('')+'</div></div>';
+    }
+    elc.querySelectorAll('.cpr [data-rng]').forEach(btn=>btn.addEventListener('pointerdown',ev=>{ ev.preventDefault();
       chartRange=btn.dataset.rng; applyPane(); }));
+    if(paged) requestAnimationFrame(()=>syncPager());   // Punkte fuer die neuen Seiten
   }
   if(d){
-    const secs=page.querySelectorAll('.cpsec');
+    const secs=elc.querySelectorAll('.cpsec');
     charts.forEach((c,i)=>{ const s=secs[i]; if(!s) return;
       const nm=s.querySelector('.cpname'), vl=s.querySelector('.cpval');
       if(nm) nm.textContent=c.name||''; if(vl) vl.textContent=c.value||''; });
-    paintChartStack(page,charts);
+    paintChartStack(elc,charts);
   }
 }
 // Alle Diagramme des Stapels in DOM-Reihenfolge zeichnen (ein [data-chart]-Kasten

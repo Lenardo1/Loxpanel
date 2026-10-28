@@ -575,6 +575,8 @@ function fensterGeaendert(){
   panelEinpassen();
   kopfEinpassen();
   faktorNachziehen();   // Kachelbreite geaendert, Raster nicht: Inhalt nachziehen
+  // Seiten-Indikator neu ueber die Pane legen (Breite/Lage kann sich aendern)
+  const _d=el('paneDots'), _c=pagerContainer(); if(_c&&_d&&!_d.hidden) positionDots(_c,_d);
 }
 window.addEventListener('resize', fensterGeaendert);
 window.addEventListener('orientationchange', ()=>setTimeout(fensterGeaendert, 50));

@@ -129,6 +129,12 @@
      fielen Diagramme mit flex-basis 0 auf 0px zusammen. */
   .screen.split #frontpane .fp-page.solo.cpage,
   .screen.widgettab #frontpane .fp-page.solo.cpage{overflow:hidden;gap:8px;display:flex;flex-direction:column;}
+  /* Blaetter-Modus (chart:page:..., mehrere .solo-Seiten): jede fuellt die ganze
+     Pane-Hoehe und rastet seitenweise ein (wie Wetter/Kalender). Ohne das teilten
+     sich die .solo-Seiten (flex:1 1 0) die Hoehe -> alle Bausteine gleichzeitig
+     untereinander statt einer je Seite. */
+  .screen.widgettab #frontpane .fp-page.solo.paged,
+  .screen.split #frontpane .fp-page.solo.paged{flex:0 0 auto;min-height:100%;max-height:none;}
   #frontpane .fp-page.solo.cpage:not(.stack) .cpbody{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
   #frontpane .fp-page.solo.cpage:not(.stack) .cpsec{flex:1 1 0;min-height:0;display:flex;flex-direction:column;gap:8px;}
   #frontpane .fp-page.solo.cpage:not(.stack) .chart{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
@@ -145,6 +151,15 @@
   #frontpane .fp-page.solo.cpage.stack .cpsec .chart+.chart{margin-top:6px;}
   #frontpane .fp-page.solo.cpage.stack .chbody{display:block;}
   #frontpane .fp-page.solo.cpage.stack .chbody>svg{display:block;width:100%;height:auto;}
+  /* Seiten-Indikator (Punkte) fuer blaetterbare Widgets - Overlay unten mittig
+     ueber der Pane, scrollt NICHT mit. left/width/top setzt syncPager per JS. */
+  .pane-dots{position:absolute;z-index:6;display:flex;gap:9px;justify-content:center;
+    align-items:center;pointer-events:none;height:22px;}
+  .pane-dots[hidden]{display:none;}
+  .pane-dots i{width:8px;height:8px;border-radius:50%;background:var(--muted);
+    opacity:.32;transition:opacity .2s,transform .2s,background .2s;pointer-events:auto;
+    cursor:pointer;flex:0 0 auto;box-shadow:0 0 0 4px transparent;}
+  .pane-dots i.on{opacity:1;background:var(--accent);transform:scale(1.2);}
   /* Uhr-Seite: dort im Seitenverhaeltnis der Zeichnung (440:150), solange der
      Kasten reicht. Reicht er nicht (quer feste Hoehe, hochkant die Restflaeche
      unter Uhr und Wetter), schrumpfen die Diagramme, statt unten abgeschnitten

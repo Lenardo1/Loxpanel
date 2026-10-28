@@ -172,7 +172,8 @@ if(window.ResizeObserver){ const _s=document.querySelector('.screen'); if(_s) ne
 // Pane 2 passt ihren Inhalt an, sobald sich ihre Groesse aendert: Drehen, Split
 // an/aus, automatisches Raster, Einblenden nach der Uhr-Seite.
 function paneEinpassen(){ const fp=el('frontpane'); if(!fp || fp.hidden) return;
-  wetterEinpassen(fp); kalenderEinpassen(fp); werteEinpassen(fp); }
+  wetterEinpassen(fp); kalenderEinpassen(fp); werteEinpassen(fp);
+  syncPager(); }   // Seitenzahl/Lage kann sich geaendert haben (Wetter-Details auf Seite 2)
 if(window.ResizeObserver){ const _fp=el('frontpane'); if(_fp) new ResizeObserver(paneEinpassen).observe(_fp); }
 function applyDisplayCfg(msg){
   DISP.dpmsOff = (typeof msg.dpmsOff==='number' && msg.dpmsOff>0) ? msg.dpmsOff : 0;
