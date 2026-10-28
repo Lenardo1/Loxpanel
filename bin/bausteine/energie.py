@@ -62,6 +62,9 @@ def kachel_energiemanager(app, uuid, c, it):
     p = app._endlich(c, "Ppwr")
     if p is not None:
         bits.append("PV " + app._fmt_num(p, "%.2f kW"))
+    haus = app._em_hausverbrauch(uuid)
+    if haus is not None:
+        bits.append("Haus " + app._fmt_num(haus, "%.2f kW"))
     soc = app._endlich(c, "Ssoc")
     if soc is not None and (c.get("details") or {}).get("HasSsoc", True):
         bits.append("Speicher " + app._fmt_num(soc, "%.0f") + " %")
@@ -142,6 +145,9 @@ def detail_energiemanager(app, uuid, c, route):
     det = c.get("details") or {}
     p = app._endlich(c, "Ppwr")
     rows = []
+    haus = app._em_hausverbrauch(uuid)
+    if haus is not None:
+        rows.append({"k": "status", "text": f"Hausverbrauch {app._fmt_num(haus, '%.2f kW')}"})
     g = app._flow_text(app._state(c, "Gpwr"), "%.2f kW", "Netzbezug", "Einspeisung")
     if g:
         rows.append({"k": "status", "text": g})
@@ -290,6 +296,16 @@ class EnergieHelfer:
                 zustand += " (von Hand)"
             out.append({"name": label, "uuid": e.get("uuid") or "", "an": an, "zustand": zustand})
         return out
+
+    def _em_hausverbrauch(self, uuid: str) -> float | None:
+        """Hausverbrauch des Energiemanagers in kW. Der Baustein hat dafuer
+        keinen Eingang (nur Gpwr/Ppwr/Spwr/Ssoc); es ist die Bilanz aus dem
+        Energiefluss (energy_blocks: Netz + Erzeugung + Speicher). None,
+        solange ein Teil davon fehlt - keine erfundene Null."""
+        cons = ((self.energy_blocks(uuid) or {}).get("totals") or {}).get("cons")
+        if not isinstance(cons, (int, float)) or not math.isfinite(cons):
+            return None
+        return cons / 1000.0
 
     def _flow_text(self, value, fmt: str, pos: str, neg: str, zero: str | None = None) -> str:
         """Leistung mit Richtung: Vorzeichen -> Text (z.B. Bezug/Einspeisung).

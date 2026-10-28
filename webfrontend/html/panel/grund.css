@@ -255,6 +255,11 @@
   .epane .ebot b{color:var(--ink);font-weight:600;}
   .epane .spoke{stroke:var(--line);stroke-width:2;}
   .epane .ehub{fill:var(--screen);stroke:var(--line);stroke-width:1.5;}
+  /* Haus in der Mitte: Verbrauch des Hauses (Symbol, Wert, Beschriftung) */
+  .epane .ehaus .ehub{stroke:var(--ink);stroke-width:2;}
+  .epane .eic.haus{stroke:var(--ink);}
+  .epane .ehv{fill:var(--ink);font-size:17px;font-weight:700;text-anchor:middle;}
+  .epane .ehl{fill:var(--muted);font-size:11px;text-anchor:middle;}
   .epane .ering{fill:var(--screen);stroke-width:3;}
   .epane .ering.prod{stroke:var(--accent);} .epane .ering.cons{stroke:var(--glow);} .epane .ering.grid{stroke:var(--crit);}
   .epane .ering.idle{stroke:var(--muted);opacity:.55;}
