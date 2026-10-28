@@ -39,6 +39,7 @@ import front_info  # noqa: E402  # Kalender (iCal-Abos) + Wetter (Open-Meteo) fu
 import loxone_secure  # noqa: E402  # verschluesselte Befehle (gesicherte Details der Intercom)
 import audioserver_auth  # noqa: E402  # Audioserver-Anmeldung; hier nur HAVE_CRYPTO (_fehlende_pakete_melden)
 from intercom_talk import IntercomTalk  # noqa: E402
+from kamerastrom import Kameraverteiler  # noqa: E402  # ein Strom je Kamera fuer /mjpeg
 import diagnose  # noqa: E402  # Diagnosepaket (/api/diagnose) und Log-Puffer
 import konfig  # noqa: E402  # Konfigdateien: Pfade, Laden, Pruefen, Schreiben
 from konfig import (  # noqa: E402  # Konfigdateien: Pfade, Laden, Pruefen, Schreiben
@@ -193,6 +194,8 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
         # "user", "pass"} oder {"grund"}; gilt bis zur naechsten Struktur
         self.ms_video: dict[str, dict] = {}
         self._video_sperre = asyncio.Lock()
+        # /mjpeg: je Kamera EIN Strom, verteilt an alle Zuschauer (kamerastrom.py)
+        self.kamerastroeme = Kameraverteiler()
         self._auth_gen = 0               # zaehlt jede Anmeldung (-> _renew_token)
         self._auth_at = 0.0              # monotonic der letzten Anmeldung
         self._auth_lock = asyncio.Lock()
@@ -301,6 +304,7 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
         # vorschau_ende bleibt: eine schon beendete Vorschau kehrt weiter zur Ansicht davor zurueck
 
     async def close(self) -> None:
+        await self.kamerastroeme.schliessen()
         await self.intercom_talk.close()
         if self.ws:
             await self.ws.close()
@@ -339,6 +343,12 @@ async def on_startup(a: web.Application) -> None:
                   "audio": asyncio.create_task(app.audio_events_task()),
                   "front": asyncio.create_task(app.front_task())}
     a["started"] = time.monotonic()
+
+
+async def on_shutdown(a: web.Application) -> None:
+    # Vor dem Warten auf offene Antworten: Ein Kamerastrom (/mjpeg) endet nicht
+    # von selbst, aiohttp wartete bis zum Zeitlimit (60 s) auf ihn.
+    await a["app"].kamerastroeme.schliessen()
 
 
 async def on_cleanup(a: web.Application) -> None:
@@ -462,6 +472,7 @@ def main() -> None:
     a.router.add_get("/mjpeg", mjpeg_handler)
     a.router.add_get("/ws", ws_handler)
     a.on_startup.append(on_startup)
+    a.on_shutdown.append(on_shutdown)
     a.on_cleanup.append(on_cleanup)
     web.run_app(a, host="0.0.0.0", port=args.port)
 

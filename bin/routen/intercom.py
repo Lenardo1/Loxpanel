@@ -6,7 +6,6 @@ Die Handler holen die App aus request.app["app"]; main() in webvisu.py traegt
 sie in die Routentabelle ein. Importiert webvisu nicht (App nur als Typangabe)."""
 from __future__ import annotations
 
-import asyncio
 import hmac
 import ipaddress
 import logging
@@ -185,46 +184,18 @@ async def api_intercom_talk_stop(request: web.Request) -> web.Response:
 
 
 async def mjpeg_handler(request: web.Request) -> web.StreamResponse:
-    """Relais des MJPEG-Streams der Tuerstation (mit Auth) -> Browser. Die
-    Kamera kommt aus LoxPanel oder vom Miniserver (App.intercom_video).
-
-    Eigene ClientSession (nicht icon_session): mit dem SSL-Connector der
-    icon_session liefert die Mobotix nur ein Einzelbild statt des Streams.
-    """
+    """Kamerabild -> Browser. Die Kamera kommt aus LoxPanel oder vom Miniserver
+    (App.intercom_video); den Strom holt der Server je Kamera nur einmal und
+    verteilt ihn an alle Zuschauer (kamerastrom.py). 404 ohne Kamera, 502, wenn
+    sie nicht erreichbar ist oder ablehnt, 503 bei zu vielen Zuschauern."""
     app: App = request.app["app"]
     cam = await app.intercom_video(request.query.get("id", ""))
     if cam is None:
         return web.Response(status=404)
-    url = cam["url"]
-    # Session und Antwort der Kamera werden in jedem Fall freigegeben, auch
-    # wenn der Handler mitten im Verbindungsaufbau abgebrochen wird
-    # (Herunterfahren) - sonst bleiben Socket und Connector offen.
-    sess = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=None, sock_read=30))
-    upstream = None
+    strom = app.kamerastroeme.anmelden(cam)
+    if strom is None:
+        return web.Response(status=503, text="too many viewers")
     try:
-        try:
-            auth = aiohttp.BasicAuth(cam["user"], cam["pass"]) if cam["user"] else None
-            upstream = await sess.get(url, auth=auth)
-        except (aiohttp.ClientError, ValueError):
-            # ValueError: unbrauchbarer Host ("cam..lan") oder Benutzer, der nicht
-            # in den Basic-Auth-Kopf passt (Doppelpunkt, Zeichen ausserhalb Latin-1)
-            return web.Response(status=502, text="camera unreachable")
-        if upstream.status != 200:
-            return web.Response(status=502, text=f"camera status {upstream.status}")
-
-        ctype = upstream.headers.get("Content-Type", "multipart/x-mixed-replace")
-        resp = web.StreamResponse(status=200, headers={
-            "Content-Type": ctype, "Cache-Control": "no-cache, no-store"})
-        await resp.prepare(request)
-        try:
-            async for chunk in upstream.content.iter_any():
-                await resp.write(chunk)
-        except (aiohttp.ClientError, ConnectionResetError, asyncio.CancelledError):
-            pass
-        return resp
+        return await strom.senden(request)
     finally:
-        if upstream is not None:
-            upstream.release()
-        await sess.close()
-
-
+        app.kamerastroeme.abmelden(strom)
