@@ -13,7 +13,7 @@ DATADIR="$ARGV5/data/plugins/$ARGV3"
 RC=0
 
 # Docker-Repo vorbereiten, falls Docker noch fehlt (Installation der Pakete aus
-# dpkg/apt erledigt LoxBerry danach selbst; erst nach dem Reboot verfuegbar).
+# dpkg/apt erledigt LoxBerry danach selbst, noch vor postroot.sh).
 if ! which docker > /dev/null 2>&1; then
 	echo "<INFO> Bereite Docker-Installation vor (offizielles Docker-Repo)..."
 	install -m 0755 -d /etc/apt/keyrings
