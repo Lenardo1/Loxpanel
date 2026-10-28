@@ -6,13 +6,13 @@ die dieser Familie in der Klasse unten; App erbt sie ueber bausteine.BausteinHel
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from urllib.parse import quote, unquote
 
 from adapters import json_aus_text
 from bausteine import detail, kachel
 from bausteine.helfer import _json_fehler_melden
-from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, PROZENT_SCHRITT, STAT_WEEKDAYS
+from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC, PROZENT_SCHRITT, STAT_WEEKDAYS
 
 log = logging.getLogger("loxpanel.webvisu")   # derselbe Logger wie der Server: die Methoden gehoeren zu App
 
@@ -98,18 +98,19 @@ class WeckerHelfer:
 
     def _alarm_next_text(self, c: dict) -> str:
         """Naechste Weckzeit eines Weckers (AlarmClock) als Text. Loxone liefert
-        `nextEntryTime` in Sekunden seit dem 1.1.2009 (lokale Wanduhr); 0/leer =
-        kein aktiver Eintrag. Ausgabe z.B. 'Heute 06:30', 'Morgen 06:30',
-        'Mo 06:30' oder '24.12. 06:30'."""
-        v = self._state(c, "nextEntryTime")
+        `nextEntryTime` in Sekunden seit dem 1.1.2009 in UTC (LOX_EPOCH_UTC);
+        als Wanduhr gelesen stand die Kachel um den UTC-Abstand zu frueh (im
+        Forum gemeldet: 4:00 eingestellt, 3:00 angezeigt, die Liste darunter
+        richtig). Angezeigt in der Ortszeit des Servers wie die Eintraege der
+        Liste (alarmTime). 0/leer = kein aktiver Eintrag. Ausgabe z.B.
+        'Heute 06:30', 'Morgen 06:30', 'Mo 06:30' oder '24.12. 06:30'."""
+        ts = self._endlich(c, "nextEntryTime")
+        if ts is None or ts <= 0:
+            return ""
         try:
-            ts = int(float(v))
-        except (TypeError, ValueError):
+            dt = datetime.fromtimestamp(LOX_EPOCH_UTC + int(ts))
+        except (OverflowError, OSError, ValueError):   # ausserhalb dessen, was die Uhr kennt
             return ""
-        if ts <= 0:
-            return ""
-        # Wert als Wanduhr behandeln (TZ-neutral): 2009-Basis + Sekunden.
-        dt = datetime(2009, 1, 1) + timedelta(seconds=ts)
         today = datetime.now().date()
         d = (dt.date() - today).days
         hm = dt.strftime("%H:%M")

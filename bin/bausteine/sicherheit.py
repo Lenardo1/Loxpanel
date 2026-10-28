@@ -8,13 +8,12 @@ import time
 from datetime import datetime
 
 from bausteine import detail, kachel
-from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text
+from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC
 
 # Briefkasten (MailBox, Strukturdoku): so lange setzen die Tasten die
 # Benachrichtigungen aus (disableNotifications/{Sekunden}); 0 hebt die Pause auf.
+# disableEndTime zaehlt laut Strukturdoku Sekunden seit 1.1.2009 in UTC (LOX_EPOCH_UTC).
 BRIEFKASTEN_PAUSEN = (3600, 4 * 3600, 24 * 3600)
-# disableEndTime zaehlt laut Strukturdoku Sekunden seit 1.1.2009 in UTC
-LOX_EPOCH_UTC = 1230768000
 
 # Rauchmelder (SmokeAlarm, Strukturdoku): Bits von availableAlarms (details)
 # und alarmCause (State)

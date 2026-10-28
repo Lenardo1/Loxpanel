@@ -73,6 +73,12 @@ SPERRE_DURCH = {1: "über die Visualisierung", 2: "durch die Logik"}
 SPERRE_KURZ = "Gesperrt"
 # Zweitzeile einer Kachel, deren Bausteintyp LoxPanel nicht kennt
 TYP_UNBEKANNT = "Typ nicht unterstützt"
+# Zeitstempel der Bausteine zaehlen Sekunden seit dem 1.1.2009 in UTC
+# (Strukturdoku: Briefkasten disableEndTime, Strompreis-Optimierer cycleFrom);
+# beim Wecker (nextEntryTime) nennt die Doku keine Zeitbasis, eine Anlage
+# zeigte als Wanduhr gelesen genau den UTC-Abstand zu frueh. Unix-Zeit des
+# 1.1.2009 00:00 UTC; datetime.fromtimestamp(LOX_EPOCH_UTC + ts) ist die Ortszeit.
+LOX_EPOCH_UTC = 1230768000
 
 
 def _pos_pct(value) -> int | None:
