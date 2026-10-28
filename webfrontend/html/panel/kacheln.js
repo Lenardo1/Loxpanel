@@ -493,11 +493,11 @@ function renderPanel(blocks){
           (e.repeat?'<span class="arep">'+esc(e.repeat)+'</span>':'')+
         '</div>').join('')+'</div>';
     }
-    if(b.k==='stepper') return '<div class="stp"><div class="stpl">'+esc(b.label||'')+
+    if(b.k==='stepper') return '<div class="stp"'+(b.name?' data-f="'+esc(b.name)+'"':'')+'><div class="stpl">'+esc(b.label||'')+
         (b.sub?'<div class="stps">'+esc(b.sub)+'</div>':'')+'</div>'+
-        (b.cmd?'<button type="button" class="sbtn" data-st="-1">−</button>':'')+
+        ((b.cmd||b.name)?'<button type="button" class="sbtn" data-st="-1">−</button>':'')+
         '<span class="stpv">'+esc(stpText(b,b.value))+'</span>'+
-        (b.cmd?'<button type="button" class="sbtn" data-st="1">+</button>':'')+'</div>';
+        ((b.cmd||b.name)?'<button type="button" class="sbtn" data-st="1">+</button>':'')+'</div>';
     if(b.k==='field') return '<label class="fld">'+esc(b.label||'')+
         '<input type="text" autocomplete="off" data-f="'+esc(b.name)+'" value="'+esc(b.value||'')+'"></label>';
     if(b.k==='timepick'){ const z=(+b.value||0)%86400, p=n=>String(n).padStart(2,'0');

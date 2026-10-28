@@ -214,6 +214,10 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
         self.stat2_sem = asyncio.Semaphore(2)
         self.stat_gen = 0              # zaehlt jeden Abruf, Schluessel fuer stat_memo
         self.stat_memo: dict[tuple, list] = {}
+        # Prognose der Strompreis-Optimierer (getForecasts): uuid -> (forecastsTimestamp
+        # beim Abruf, monotonic, [(start, ende, wert, geplant)] oder None nach Abruffehler)
+        self.prognose_cache: dict[str, tuple[object, float, list | None]] = {}
+        self.prognose_pending: set[str] = set()
         self.theme = load_theme()
         self._cat_memo: tuple = (None, {})   # _cat_entry: (categories-Objekt, Name -> Eintrag)
         self._einspiel_sperre = asyncio.Lock()   # /api/restore: nur ein Einspielen zur Zeit

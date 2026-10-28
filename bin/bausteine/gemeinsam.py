@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import json
 import re
+from datetime import datetime
 
 from adapters import JalousieAdapter, LightControllerV2Adapter
 
@@ -134,6 +135,15 @@ def _dauer_text(sek) -> str:
         return f"{m} min" + (f" {r} s" if r else "")
     return f"{r} s"
 
+
+def _uhrzeit_text(dt: datetime) -> str:
+    """Zeitpunkt kurz: heute nur die Uhrzeit, morgen mit "morgen", sonst mit Datum."""
+    tage = (dt.date() - datetime.now().date()).days
+    if tage == 0:
+        return dt.strftime("%H:%M")
+    if tage == 1:
+        return "morgen " + dt.strftime("%H:%M")
+    return dt.strftime("%d.%m. %H:%M")
 
 # Schrittweite der -/+ Tasten fuer Dauern (Laufzeit einer Zone, Wecker-Dauern)
 # und Prozentwerte (Lautstaerke, Helligkeit)

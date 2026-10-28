@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 
 from bausteine import detail, kachel
-from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC, _nach_reihe
+from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC, _nach_reihe, _uhrzeit_text
 
 # Briefkasten (MailBox, Strukturdoku): so lange setzen die Tasten die
 # Benachrichtigungen aus (disableNotifications/{Sekunden}); 0 hebt die Pause auf.
@@ -280,16 +280,6 @@ def _pause_bis(app, c: dict) -> datetime | None:
         return None
     ende = LOX_EPOCH_UTC + ts
     return datetime.fromtimestamp(ende) if ts > 0 and ende > time.time() else None
-
-
-def _uhrzeit_text(dt: datetime) -> str:
-    """Zeitpunkt kurz: heute nur die Uhrzeit, morgen mit "morgen", sonst mit Datum."""
-    tage = (dt.date() - datetime.now().date()).days
-    if tage == 0:
-        return dt.strftime("%H:%M")
-    if tage == 1:
-        return "morgen " + dt.strftime("%H:%M")
-    return dt.strftime("%d.%m. %H:%M")
 
 
 @detail("MailBox")

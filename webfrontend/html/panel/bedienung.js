@@ -171,6 +171,7 @@ function formWerte(g){ const w={};
     if(e.tagName==='INPUT') w[n]=encodeURIComponent(e.value.trim());
     else if(e.classList.contains('tpk')) w[n]=String(+e.dataset.v||0);
     else if(e.classList.contains('chipset')) w[n]=[...e.querySelectorAll('.chp.on')].map(c=>c.dataset.v).join(',');
+    else if(e.classList.contains('stp')) w[n]=String(e._v);
   });
   return w; }
 function formBefehl(g,form){ const w=formWerte(g); let cmd=form.tmpl;
@@ -207,6 +208,9 @@ function formBind(g){
 // lang niemand tippt: Beim Durchtippen kommt so ein Befehl an statt zehn, und
 // kein Tipp geht verloren, weil die Antwort des Miniservers noch aussteht.
 // Bis STP_HALTEN_MS nach dem letzten Tipp zeigt sie ihren eigenen Wert.
+// Mit name statt cmd gehoert der Wert zu einem Formular (formWerte, etwa
+// Bedarf und Zeitraum beim Strompreis-Optimierer): er geht erst mit dessen
+// Taste los, und ein getippter Wert bleibt stehen, bis die Seite neu aufgebaut wird.
 const STP_SENDEN_MS = 900, STP_HALTEN_MS = 3000;
 function dauerText(s){ s=Math.max(0,Math.round(+s||0)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), r=s%60;
   if(!s) return '0 min'; if(h) return h+' h'+(m?' '+m+' min':''); if(m) return m+' min'+(r?' '+r+' s':''); return r+' s'; }
@@ -230,7 +234,7 @@ function stepperBind(e,b){ e._b=b; e._v=+b.value||0;
   }));
 }
 function stepperUpdate(e,b){ e._b=b;
-  if(e._senden || (e._lokal && Date.now()-e._lokal<STP_HALTEN_MS)) return;
+  if(e._senden || (e._lokal && (b.name || Date.now()-e._lokal<STP_HALTEN_MS))) return;
   e._v=+b.value||0; e.querySelector('.stpv').textContent=stpText(b,e._v); }
 // ---- Bild gross (verpasste Klingeln): Tippen schliesst ----
 function bildZeigen(it){ const s=document.querySelector('.screen'); if(!s) return;
@@ -280,7 +284,7 @@ function blockSig(blocks){
     : b.k==='favs' ? 'favs'+JSON.stringify((b.items||[]).map(f=>[f.label,f.cover,f.cmd]))
     : b.k==='alarmlist' ? 'alarm'+JSON.stringify(b.entries||[])
     : b.k==='astat' ? 'astat'+(b.sub?1:0)
-    : b.k==='stepper' ? 'stp'+(b.cmd?1:0)+(b.sub?1:0)
+    : b.k==='stepper' ? 'stp'+(b.cmd?1:0)+(b.sub?1:0)+(b.name||'')
     : b.k==='chips' ? 'chips'+(b.multi?'m':'')+(b.items?b.items.length:0)
     : b.k==='gallery' ? 'gal'+(b.items||[]).map(i=>i.src).join(',')
     : b.k==='intercom-talk' ? 'intercom-talk'+b.uuid

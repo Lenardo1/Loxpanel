@@ -6,11 +6,14 @@ Kacheln (it.spark).
 
 Die Methoden sind ein Mixin (Statistik): App erbt sie, sie arbeiten mit dem
 Zustand der App (stat_cache, stat2_cache, stat_memo, stat_pending, Client).
+Dazu die Prognose des Strompreis-Optimierers (getForecasts, prognose_cache)
+und ihre Diagramme.
 Importiert webvisu nicht."""
 from __future__ import annotations
 
 import asyncio
 import calendar
+import json
 import logging
 import math
 import re
@@ -36,6 +39,10 @@ STAT_REFRESH = 300       # Monatsdatei, die noch waechst, nach so vielen Sekunde
 STAT_RETRY = 60          # nach einem Abruffehler fruehestens wieder versuchen
 
 STAT_CACHE_MAX = 240     # Monatsdateien im Speicher (abgeschlossene Monate aendern sich nicht)
+
+# Strompreis-Optimierer: aendert sich einer dieser States, gilt die Prognose als
+# alt (strompreis_prognose) - neue Preise oder ein neuer Plan
+PROGNOSE_STAND = ("forecastsTimestamp", "cycleFrom", "cycleUntil", "demand", "period")
 
 # visuType der Statistik-Ausgaenge, wie an der Anlage beobachtet: 0 Analogwert
 # (Temperatur, Leistung ...), 1 Digitalwert (Regen, Sonnenschein), 2 Zaehlerstand
@@ -199,6 +206,33 @@ def _stat_bars(pts: list, edges: list) -> list:
             i += 1
         out.append((a, use))
     return out
+
+
+def _prognose_lesen(wert) -> list | None:
+    """Antwort von getForecasts (Strompreis-Optimierer, Strukturdoku 16.0): eine
+    JSON-Liste [{u, v, s, e, planned}] mit dem Wert je Intervall, Start und Ende
+    in Unix-UTC und planned, wenn der Baustein den Ausgang dann einschaltet;
+    als Text oder schon als Liste. -> [(start, ende, wert, geplant)] nach Start
+    sortiert; Eintraege ohne endliche Zahl oder mit Ende nicht nach dem Start
+    fallen weg. None, wenn die Antwort keine Liste ist."""
+    if isinstance(wert, str):
+        try:
+            wert = json.loads(wert)
+        except ValueError:
+            return None
+    if not isinstance(wert, list):
+        return None
+    out = []
+    for e in wert:
+        if not isinstance(e, dict):
+            continue
+        try:
+            s, en, v = int(e["s"]), int(e["e"]), float(e["v"])
+        except (KeyError, TypeError, ValueError, OverflowError):
+            continue
+        if math.isfinite(v) and en > s:
+            out.append((s, en, v, e.get("planned") is True))
+    return sorted(out)
 
 
 class Statistik:
@@ -561,3 +595,67 @@ class Statistik:
             self.stat_memo = {}
         self.stat_memo[mkey] = out
         return out
+
+    # ---- Prognose des Strompreis-Optimierers (SpotPriceOptimizer) ----------------
+    async def _prognose_load(self, uuid: str, ua: str, stand) -> None:
+        """Prognose eines Strompreis-Optimierers holen (sps/io/{uuidAction}/
+        getForecasts) und mit dem Stand von forecastsTimestamp ablegen, zu dem
+        sie gehoert; danach neu rendern lassen. Ein Abruffehler legt None ab."""
+        eintraege = None
+        try:
+            code, wert = await self._ms_jdev(f"sps/io/{ua}/getForecasts")
+            if code == "200":
+                eintraege = _prognose_lesen(wert)
+                if eintraege is None:
+                    log.info("Strompreis-Prognose %s: unbekannte Antwort %.200r", uuid, wert)
+            else:
+                log.info("Strompreis-Prognose %s: Code %s", uuid, code)
+        except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError) as err:
+            log.info("Strompreis-Prognose %s nicht abrufbar: %s", uuid, err)
+        finally:
+            self.prognose_pending.discard(uuid)
+        self.prognose_cache[uuid] = (stand, time.monotonic(), eintraege)
+        self._dirty = True
+
+    def strompreis_prognose(self, uuid: str, c: dict) -> tuple[list | None, bool]:
+        """Prognose eines Strompreis-Optimierers aus dem Cache -> (eintraege wie
+        _prognose_lesen oder None nach Abruffehler, laedt_noch). Laut Strukturdoku
+        neu holen, sobald sich forecastsTimestamp aendert; ebenso, wenn sich
+        Zyklus, Bedarf oder Zeitraum aendern, denn danach plant der Baustein
+        neu (planned), auch wenn die Preise bleiben. Die States werden hier
+        gelesen, eine Aenderung rendert die Seite also neu (Lesespur), und die
+        holt dann im Hintergrund nach. Bis dahin bleibt die alte Prognose; nach
+        einem Fehler fruehestens nach STAT_RETRY ein neuer Versuch. Gelesen ueber
+        _endlich: NaN waere sich selbst ungleich und holte bei jedem Takt neu."""
+        stand = tuple(self._endlich(c, s) for s in PROGNOSE_STAND)
+        ent = self.prognose_cache.get(uuid)
+        want = (ent is None or ent[0] != stand
+                or (ent[2] is None and time.monotonic() - ent[1] >= STAT_RETRY))
+        if want and uuid not in self.prognose_pending and c.get("uuidAction"):
+            self.prognose_pending.add(uuid)
+            self._spawn(self._prognose_load(uuid, c["uuidAction"], stand))
+        return (ent[2] if ent else None), ent is None
+
+    def prognose_bloecke(self, uuid: str, c: dict) -> list:
+        """Diagramme der Prognose eines Strompreis-Optimierers fuer die
+        Detailseite: der Preis je Intervall als Linie in Stufen (Anfang und Ende
+        jedes Intervalls) und, wenn der Baustein Zeiten eingeplant hat, wann er
+        den Ausgang einschaltet (digital). Zeiten als Wanduhr-Sekunden wie die
+        Verlaeufe. Ohne Prognose ein Hinweis statt leerer Diagramme."""
+        eintraege, laedt = self.strompreis_prognose(uuid, c)
+        if not eintraege:
+            return [{"k": "status", "text": "Prognose wird geladen …" if laedt else
+                     "Prognose nicht abrufbar" if eintraege is None else "Keine Prognose"}]
+        dec, unit = _stat_fmt((c.get("details") or {}).get("format"))
+
+        def uhr(t: int) -> int:
+            return calendar.timegm(time.localtime(t))
+        t0, t1 = uhr(eintraege[0][0]), uhr(eintraege[-1][1])
+        preis = [p for s, e, v, _ in eintraege for p in ([uhr(s), round(v, dec + 2)], [uhr(e), round(v, dec + 2)])]
+        bloecke = [{"k": "chart", "kind": "analog", "unit": unit, "t0": t0, "t1": t1, "state": "ok",
+                    "series": [{"name": "Preis", "dec": dec, "pts": preis}]}]
+        if any(g for *_, g in eintraege):
+            bloecke.append({"k": "chart", "kind": "digital", "unit": "", "t0": t0, "t1": t1, "state": "ok",
+                            "series": [{"name": "Eingeplant", "dec": 0,
+                                        "pts": [[uhr(s), 1 if g else 0] for s, _, _, g in eintraege]}]})
+        return bloecke

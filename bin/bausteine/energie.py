@@ -6,9 +6,11 @@ die dieser Familie in der Klasse unten; App erbt sie ueber bausteine.BausteinHel
 from __future__ import annotations
 
 import math
+import time
+from datetime import datetime
 
 from bausteine import detail, kachel
-from bausteine.gemeinsam import _clean, PROZENT_SCHRITT
+from bausteine.gemeinsam import _clean, LOX_EPOCH_UTC, PROZENT_SCHRITT, _uhrzeit_text
 
 # Energiemanager (EnergyManager2, Strukturdoku): Schritt fuer MaxSpwr (kW) und
 # die Befehle je Verbraucher ({uuid}/activate bzw. deactivate gelten bis
@@ -16,6 +18,15 @@ from bausteine.gemeinsam import _clean, PROZENT_SCHRITT
 EM_LEISTUNG_SCHRITT = 0.5
 EM_VERBRAUCHER_BEFEHLE = (("Ein bis Mitternacht", "activate"), ("Aus bis Mitternacht", "deactivate"),
                           ("Automatik", "automatic"))
+# Strompreis-Optimierer (SpotPriceOptimizer, Strukturdoku 16.0): start/{Bedarf}/
+# {Zeitraum} startet einen Zyklus, der den Ausgang im Zeitraum so lange wie der
+# Bedarf in den guenstigsten Intervallen einschaltet; gibt die Logik den Bedarf
+# vor, steht dort 0. cancel bricht ihn ab. Bedarf, Zeitraum und Mindestlaufzeit
+# zaehlen Stunden (Loxone-Wissensdatenbank); der Bedarf geht in Viertelstunden
+# wie die kuerzesten Marktintervalle (mindestens eine, 0 ist der Platzhalter der
+# Logik), der Zeitraum in ganzen Stunden.
+SPOT_BEDARF_SCHRITT = 0.25
+SPOT_ZEITRAUM_SCHRITT = 1
 
 
 @kachel("Fronius")
@@ -69,6 +80,14 @@ def kachel_pv_prognose(app, uuid, c, it):
               sublabel=" · ".join(bits) or "PV-Prognose")
     if not bits:
         it["subInfo"] = True
+
+
+@kachel("SpotPriceOptimizer")
+def kachel_strompreis_optimierer(app, uuid, c, it):
+    an = bool(app._state(c, "active"))
+    preis = app._fmt_num(app._endlich(c, "current"), (c.get("details") or {}).get("format"))
+    it.update(icon="central", on=an, nav={"view": "control", "id": uuid},
+              sublabel=" · ".join(t for t in ("Ein" if an else "", preis) if t) or "Aus")
 
 
 @detail("Fronius")
@@ -187,6 +206,65 @@ def detail_pv_prognose(app, uuid, c, route):
         {"k": "status", "text": "Erwartete Erzeugung heute"},
         *rows,
     ]}
+
+
+@detail("SpotPriceOptimizer")
+def detail_strompreis_optimierer(app, uuid, c, route):
+    """Strompreis-Optimierer (Strukturdoku SpotPriceOptimizer): aktueller Preis,
+    Ausgang, laufender Zyklus, naechster Einsatz und die Prognose (Preis und
+    eingeplante Zeiten, App.prognose_bloecke), dazu einen Zyklus starten -
+    Bedarf und Zeitraum waehlbar, ausser die Logik gibt sie vor - und
+    abbrechen. Die Mindestlaufzeit hat keinen Befehl und steht nur da."""
+    ua = c.get("uuidAction")
+    det = c.get("details") or {}
+    an = bool(app._state(c, "active"))
+    preis = app._fmt_num(app._endlich(c, "current"), det.get("format"))
+    blocks = [{"k": "hero", "icon": "central"},
+              {"k": "big", "text": preis or "–", **({"tone": "good"} if an else {})},
+              {"k": "status", "text": "Ausgang ein" if an else "Ausgang aus"}]
+    bis = app._spot_zyklus_bis(c)
+    if bis:
+        blocks.append({"k": "status", "text": f"Zyklus läuft bis {_uhrzeit_text(bis)}"})
+    einsatz = app._spot_naechster_einsatz(uuid, c)
+    if einsatz:
+        blocks.append({"k": "status", "text": einsatz})
+    blocks += app.prognose_bloecke(uuid, c)
+    # Bedarf und Zeitraum fuellen die Vorlage von "Zyklus starten" (Formular);
+    # gibt die Logik einen vor, steht sein Wert fest darin (beim Bedarf 0)
+    stufen, vorlage = [], {}
+    for name, label, wert, logik, schritt, minimum in (
+            ("bedarf", "Bedarf", app._endlich(c, "demand"), det.get("demandByLogic"), SPOT_BEDARF_SCHRITT,
+             SPOT_BEDARF_SCHRITT),
+            ("zeitraum", "Zeitraum", app._endlich(c, "period"), det.get("periodByLogic"),
+             SPOT_ZEITRAUM_SCHRITT, SPOT_ZEITRAUM_SCHRITT)):
+        if wert is None:
+            continue
+        b = {"k": "stepper", "label": label, "value": wert, "unit": "h"}
+        if logik:
+            b["sub"] = "von der Logik vorgegeben"
+            vorlage[name] = "0" if name == "bedarf" else f"{wert:g}"
+        else:
+            # nie unter dem Minimum: Bedarf 0 hiesse "von der Logik", Zeitraum 0 gaebe es nicht
+            b.update(name=name, value=max(wert, minimum), step=schritt, min=minimum)
+            vorlage[name] = "{" + name + "}"
+        stufen.append(b)
+    mrt = app._endlich(c, "minRuntime")
+    if mrt is not None:
+        stufen.append({"k": "stepper", "label": "Mindestlaufzeit", "value": mrt, "unit": "h",
+                       **({"sub": "von der Logik vorgegeben"} if det.get("minRuntimeByLogic") else {})})
+    cells = []
+    if "bedarf" in vorlage and "zeitraum" in vorlage:
+        cells.append({"label": "Zyklus starten",
+                      "form": {"uuid": ua, "tmpl": f"start/{vorlage['bedarf']}/{vorlage['zeitraum']}"}})
+    if bis:
+        cells.append({"label": "Zyklus abbrechen", "confirm": "Zyklus wirklich abbrechen?",
+                      "cmd": {"uuid": ua, "cmd": "cancel"}})
+    if stufen or cells:
+        blocks.append({"k": "head", "text": "Zyklus"})
+        blocks += stufen
+    if cells:
+        blocks.append({"k": "row", "cells": cells})
+    return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
 
 
 class EnergieHelfer:
@@ -378,3 +456,38 @@ class EnergieHelfer:
         return {"control": uuid, "name": _clean(c.get("name")) or "Energiefluss",
                 "nodes": nodes,
                 "totals": {"prod": prod_total, "cons": cons_total, "grid": g or 0.0}}
+
+    def _spot_zyklus_bis(self, c: dict) -> datetime | None:
+        """Bis wann der laufende Zyklus eines Strompreis-Optimierers geht (State
+        cycleUntil: Sekunden seit 2009 in UTC, auf Stunden gerundet) in
+        Ortszeit; None ohne laufenden Zyklus."""
+        ts = self._endlich(c, "cycleUntil")
+        if ts is None or ts <= 0 or LOX_EPOCH_UTC + ts <= time.time():
+            return None
+        try:
+            return datetime.fromtimestamp(LOX_EPOCH_UTC + ts)
+        except (OverflowError, OSError, ValueError):   # ausserhalb dessen, was die Uhr kennt
+            return None
+
+    def _spot_naechster_einsatz(self, uuid: str, c: dict) -> str:
+        """Naechster eingeplanter Einsatz aus der Prognose (App.strompreis_prognose):
+        aneinander anschliessende eingeplante Intervalle zaehlen als einer.
+        Laeuft er schon, "Eingeplant bis 05:00", sonst "Nächster Einsatz 02:00
+        bis 05:00"; leer ohne eingeplante Zeit, die noch nicht vorbei ist."""
+        jetzt = time.time()
+        von = bis = None
+        for s, e, _, geplant in self.strompreis_prognose(uuid, c)[0] or []:
+            if von is None:
+                if geplant and e > jetzt:
+                    von, bis = s, e
+            elif geplant and s <= bis:
+                bis = max(bis, e)
+            else:
+                break
+        if von is None:
+            return ""
+        a, z = datetime.fromtimestamp(von), datetime.fromtimestamp(bis)
+        if von <= jetzt:
+            return f"Eingeplant bis {_uhrzeit_text(z)}"
+        return f"Nächster Einsatz {_uhrzeit_text(a)} bis " + (z.strftime("%H:%M") if z.date() == a.date()
+                                                             else _uhrzeit_text(z))
