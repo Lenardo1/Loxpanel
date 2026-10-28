@@ -14,7 +14,8 @@ from urllib.parse import quote
 
 import bausteine
 from ansicht import _hex_rgb, _inactive_border, _overlay_alphas, _posring
-from bausteine.gemeinsam import _clean, SPERRE_KURZ, TYP_UNBEKANNT
+from bausteine.gemeinsam import _clean, _nach_reihe, SPERRE_KURZ, TYP_UNBEKANNT
+from bausteine.sicherheit import fenster_reihe
 from konfig import (
     _clean_widget_tab, FRONT_TABS, HAUS_TAB, _is_pick, _kachel_breite, _pick_index, _pick_tabs,
     STAT_RANGES, STAT_TILE_STYLES, SV_STATUS_MAX)
@@ -557,6 +558,11 @@ class Seiten:
             members = (c.get("details") or {}).get("controls") or []
             uuids = [m.get("uuid") for m in members
                      if m.get("uuid") in self.controls and self._shown(m.get("uuid"), prof)]
+            # Aktive zuerst (Licht an, Zone spielt, offen), in der Reihenfolge
+            # beim Aufruf der Seite (route reihe, aufruf_route): wer hier
+            # schaltet, sieht keine Kachel springen
+            reihe = route.get("reihe")
+            uuids = _nach_reihe(uuids, reihe if isinstance(reihe, list) else self._zentral_reihe(c))
             title = _clean(c.get("name")); tab = "zentral"
             if c.get("type") == "CentralAudioZone":
                 layout = "list"
@@ -567,8 +573,9 @@ class Seiten:
                 "layout": layout, "items": [self._control_item(u, prof, ohne_raum=ohne_raum) for u in uuids],
                 **self._leiste_items(leiste, prof, ohne_raum=ohne_raum)}
 
-    def _view_control(self, uuid: str, rng: str | None = None, prof: dict | None = None) -> dict:
-        v = self._view_control_inner(uuid)
+    def _view_control(self, uuid: str, rng: str | None = None, prof: dict | None = None,
+                      reihe: list | None = None) -> dict:
+        v = self._view_control_inner(uuid, reihe)
         c = self.controls.get(uuid, {})
         # Verlaufs-Diagramme unter die Detailseite haengen, wenn der Baustein eine
         # Aufzeichnung hat. Nur bei Block-Seiten; die Route traegt dann den Zeitraum.
@@ -621,18 +628,51 @@ class Seiten:
         return [{"k": "head", "text": "Verlinkte Objekte"},
                 {"k": "row", "id": f"links:{uuid}", "wrap": True, "cells": cells}]
 
-    def _view_control_inner(self, uuid: str) -> dict:
+    def _view_control_inner(self, uuid: str, reihe: list | None = None) -> dict:
         c = self.controls.get(uuid, {})
         t = c.get("type")
         route = {"view": "control", "id": uuid}
+        if reihe is not None:
+            route["reihe"] = reihe   # gemerkte Reihenfolge (aufruf_route), render() schickt sie nicht mit
         fn = bausteine.detail_fuer(t)
         if fn:
             return fn(self, uuid, c, route)
         return {"t": "view", "title": _clean(c.get("name")), "route": route,
                 "items": [self._control_item(uuid)]}
 
+    def aufruf_route(self, route: dict) -> dict:
+        """Route, mit der eine Verbindung eine Seite aufruft (nav). Seiten, die
+        ihre aktiven Mitglieder zuerst zeigen (Zentralbausteine,
+        Fenster-/Tuerueberwachung), merken sich dabei die Reihenfolge von jetzt
+        (reihe). Mit ihr rendert der Broadcaster die Seite, bis sie neu
+        aufgerufen wird (auch ein Neuverbinden ruft sie neu auf): Wer dort
+        schaltet, sieht keine Kachel springen, und die Visu muss das Raster
+        nicht neu aufbauen. Gemerkt wird erst, wenn Baustein und die States
+        aller seiner Mitglieder bekannt sind; kommt das nav vorher (Neustart des
+        Servers), traegt der Broadcaster die Reihenfolge nach. Eine reihe vom
+        Client gilt nie; render() schickt sie nicht mit. Wirft nie: Ohne
+        reihe ordnet die Seite beim Rendern selbst."""
+        r = {k: v for k, v in route.items() if k != "reihe"}
+        try:
+            uid = r.get("id")
+            c = self.controls.get(uid) if isinstance(uid, str) else None
+            reihe = None
+            if c and r.get("view") == "group" and r.get("kind") == "central" and self._zentral_stand_da(c):
+                reihe = self._zentral_reihe(c)
+            elif c and r.get("view") == "control" and c.get("type") == "WindowMonitor" \
+                    and self._state(c, "windowStates") is not None:
+                reihe = fenster_reihe(self, c)
+        except Exception:
+            log.exception("aufruf_route fehlgeschlagen fuer route %s", r)
+            reihe = None
+        if reihe is not None:
+            r["reihe"] = reihe
+        return r
+
     def render(self, route: dict, prof: dict | None = None) -> dict:
         out = self._render_seite(route, prof)
+        if isinstance(out.get("route"), dict) and "reihe" in out["route"]:
+            out["route"] = {k: v for k, v in out["route"].items() if k != "reihe"}   # bleibt beim Server
         # Seiten, auf denen Gesten wirken: was zwei Finger hier tun (Hinweis-Symbol)
         if (route or {}).get("view", "tab") in ("tab", "group"):
             hilfe = self.gesten_hilfe(route, prof)
@@ -661,7 +701,7 @@ class Seiten:
         if v == "group":
             return self._view_group(route, prof)
         if v == "control":
-            return self._view_control(route.get("id"), route.get("range"), prof)
+            return self._view_control(route.get("id"), route.get("range"), prof, route.get("reihe"))
         if v == "sources":
             return self._view_sources(route.get("id"))
         if v == "irrzone":

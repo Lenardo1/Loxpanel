@@ -8,7 +8,7 @@ import time
 from datetime import datetime
 
 from bausteine import detail, kachel
-from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC
+from bausteine.gemeinsam import _clean, DAUER_SCHRITT, _dauer_text, LOX_EPOCH_UTC, _nach_reihe
 
 # Briefkasten (MailBox, Strukturdoku): so lange setzen die Tasten die
 # Benachrichtigungen aus (disableNotifications/{Sekunden}); 0 hebt die Pause auf.
@@ -94,10 +94,36 @@ def kachel_postkasten(app, uuid, c, it):
         it["hinweis"] = {"stufe": "an", "symbol": "mail"}
 
 
+# Fenster-/Tuerueberwachung (WindowMonitor, Strukturdoku): windowStates haelt je
+# Fenster eine Bitmaske; gekippt (2) oder offen (4) heisst offen
+FENSTER_OFFEN = 2 | 4
+
+
+def _fenster_bits(app, c: dict) -> list[int]:
+    """Bitmaske je Fenster (details.windows) aus windowStates (mit Komma
+    getrennt); fehlt ein Wert oder ist er keine Zahl: 0."""
+    n = len((c.get("details") or {}).get("windows") or [])
+    codes = [x for x in str(app._state(c, "windowStates") or "").split(",") if x != ""]
+    bits = []
+    for i in range(n):
+        try:
+            bits.append(int(float(codes[i])) if i < len(codes) else 0)
+        except (ValueError, TypeError, OverflowError):
+            bits.append(0)
+    return bits
+
+
+def fenster_reihe(app, c: dict) -> list[int]:
+    """Reihenfolge der Seite einer Fenster-/Tuerueberwachung als Positionen in
+    details.windows: offene und gekippte zuerst (wie in der Loxone-App), sonst
+    und untereinander wie in der Struktur."""
+    bits = _fenster_bits(app, c)
+    return sorted(range(len(bits)), key=lambda i: not (bits[i] & FENSTER_OFFEN))
+
+
 @detail("WindowMonitor")
 def detail_fensterueberwachung(app, uuid, c, route):
     windows = (c.get("details") or {}).get("windows") or []
-    codes = [x for x in str(app._state(c, "windowStates") or "").split(",") if x != ""]
 
     def wtext(b):
         parts = []
@@ -113,17 +139,15 @@ def detail_fensterueberwachung(app, uuid, c, route):
             parts.append("offline")
         return ", ".join(parts) or "–"
 
-    items = []
-    for i, w in enumerate(windows):
-        try:
-            b = int(float(codes[i])) if i < len(codes) else 0
-        except (ValueError, TypeError):
-            b = 0
-        items.append({"id": f"{uuid}:{i}", "icon": "blind", "on": bool(b & 6),
-                      "label": _clean(w.get("name") or f"Fenster {i + 1}"),
-                      "sublabel": wtext(b)})
+    items = [{"id": f"{uuid}:{i}", "icon": "blind", "on": bool(b & FENSTER_OFFEN),
+              "label": _clean(w.get("name") or f"Fenster {i + 1}"), "sublabel": wtext(b)}
+             for i, (w, b) in enumerate(zip(windows, _fenster_bits(app, c)))]
+    # Offene zuerst, in der Reihenfolge beim Aufruf der Seite (route reihe,
+    # Seiten.aufruf_route): schliesst jemand ein Fenster, springt keine Zeile
+    reihe = route.get("reihe")
+    folge = _nach_reihe(list(range(len(items))), reihe if isinstance(reihe, list) else fenster_reihe(app, c))
     return {"t": "view", "title": _clean(c.get("name")), "route": route,
-            "layout": "list", "items": items}
+            "layout": "list", "items": [items[i] for i in folge]}
 
 
 @detail("SmokeAlarm")

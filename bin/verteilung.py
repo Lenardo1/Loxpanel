@@ -246,6 +246,12 @@ class Verteilung:
         if self.conn_route:
             jetzt = time.monotonic()
             for ws, route in list(self.conn_route.items()):
+                if "reihe" not in route:
+                    # Seite vor Struktur oder States aufgerufen (Neustart des
+                    # Servers): Reihenfolge nachtragen, sobald sie feststeht
+                    nachgetragen = self.aufruf_route(route)
+                    if "reihe" in nachgetragen:
+                        route = self.conn_route[ws] = nachgetragen
                 prof = self.conn_prof.get(ws)
                 schluessel = (dict(route), self.conn_player.get(ws), self.conn_energy.get(ws),
                               self.conn_chart.get(ws), self.conn_camera.get(ws), self.conn_status.get(ws))

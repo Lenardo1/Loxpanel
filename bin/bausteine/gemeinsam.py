@@ -142,3 +142,14 @@ DAUER_SCHRITT = 60
 PROZENT_SCHRITT = 5
 
 
+def _nach_reihe(werte: list, reihe) -> list:
+    """werte in der Folge von reihe, der Reihenfolge, die sich eine Seite beim
+    Aufruf gemerkt hat (Seiten.aufruf_route). Was reihe nicht kennt (seitdem
+    dazugekommen), steht dahinter in der bisherigen Folge. Ohne reihe (keine
+    Liste) unveraendert."""
+    if not isinstance(reihe, list):
+        return list(werte)
+    rang: dict = {}
+    for i, w in enumerate(reihe):
+        rang.setdefault(w, i)
+    return sorted(werte, key=lambda w: rang.get(w, len(reihe)))
