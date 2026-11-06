@@ -10,7 +10,7 @@
 // bzw. in den Feldern), nur Neuladen oder Schliessen der Seite fragt nach.
 const OFFEN=new Map();
 let OFFEN_NR=0;
-const BEREICH_NAME={geraete:'Geräte', nacht:'Nachtmodus', intercom:'Kamera / Türstation', audio:'Audio', kalender:'Kalender & Wetter'};
+const BEREICH_NAME={geraete:'Geräte', nacht:'Nachtmodus', intercom:'Kamera / Türstation', audio:'Audio', kalender:'Kalender & Wetter', grafana:'Grafana'};
 function markieren(k){
   OFFEN.set(k, ++OFFEN_NR);
   const t=$('#toast'); if(t){ t.className='toast'; t.textContent=''; }
@@ -60,7 +60,7 @@ async function speichernAlles(){
     // Ohne die Ansichten keine Geraete: der Server verwirft Betriebsmodi, deren Ansicht
     // er nicht kennt (etwa eine gerade neu angelegte), sie blieben dann still weg
     if(OFFEN.has('geraete') && ansichtenOk) erg.push(await geraeteSpeichern());
-    for(const [k,f] of [['nacht',nachtSpeichern],['intercom',intercomSpeichern],['audio',audioSpeichern],['kalender',kalenderSpeichern]]){
+    for(const [k,f] of [['nacht',nachtSpeichern],['intercom',intercomSpeichern],['audio',audioSpeichern],['kalender',kalenderSpeichern],['grafana',grafanaSpeichern]]){
       if(!OFFEN.has(k)) continue;
       const stand=offenStand(x=>x===k);
       const e=await einstellungSpeichern(k, f);

@@ -71,7 +71,7 @@ const VG_TABS=[{k:'appearance',label:'Darstellung'},{k:'catcolors',label:'Katego
 const SET_TABS=[
   {k:'miniserver',label:'Miniserver'},{k:'intercom',label:'Kamera / Türstation'},
   {k:'sip',label:'SIP'},{k:'audio',label:'Audio'},
-  {k:'calendar',label:'Kalender & Wetter'},{k:'backup',label:'Sicherung'}];
+  {k:'calendar',label:'Kalender & Wetter'},{k:'grafana',label:'Grafana'},{k:'backup',label:'Sicherung'}];
 
 async function load(){
   const r = await fetch('/api/meta'); META = await r.json();

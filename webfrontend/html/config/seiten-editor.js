@@ -245,7 +245,7 @@ function seInhaltHtml(w){
                    : '<select data-se-wneu="status"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>')+
       ((svMax()&&uu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+
       '<div class="picked">'+(uu.length
-        ? uu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+        ? uu.map(u=>{ const c=statCtrl(u);
             return '<span class="chip on" data-se-wweg="'+esc(u)+'">'+esc(c?c.name:u)+
               '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
         : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div></div>';

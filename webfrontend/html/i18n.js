@@ -675,6 +675,23 @@
       'Zielgerät': 'Target device',
       '🔊 Test-Ton senden': '🔊 Send test tone',
       'Alle Geräte': 'All devices',
+      // Grafana (Panels als Verlaufsquelle)
+      'Zeigt Panels aus deiner Grafana (z.B. der von Stats4Lox) als Verlauf in der Visu – im selben Stil wie die Loxone-Statistik. Danach stehen die Panels überall zur Wahl, wo es „Verlauf“ gibt.':
+        'Shows panels from your Grafana (e.g. the one from Stats4Lox) as history in the visu – in the same style as the Loxone statistics. The panels can then be picked wherever “History” is offered.',
+      'Adresse (IP:Port)': 'Address (IP:port)',
+      'Service-Account-Token': 'Service account token',
+      'In Grafana unter Administration → Benutzer und Zugriff → Service-Accounts einen Account mit der Rolle „Viewer“ anlegen und dort ein Token erzeugen. Alternativ Benutzer und Passwort eines Grafana-Kontos; ist anonymer Zugriff erlaubt, bleibt beides leer.':
+        'In Grafana, create a service account with the role “Viewer” under Administration → Users and access → Service accounts and generate a token there. Alternatively the user and password of a Grafana account; if anonymous access is allowed, leave both empty.',
+      'Token einfügen': 'Paste token',
+      'Grafana ist nicht eingerichtet.': 'Grafana is not set up.',
+      '{n} Panels verfügbar': '{n} panels available',
+      '{n} Dashboards': '{n} dashboards',
+      'Loxone-Statistik': 'Loxone statistics',
+      'Kein Baustein mit Aufzeichnung in der Anlage und kein Grafana-Panel.': 'No block with logging in the system and no Grafana panel.',
+      'Anmeldung abgelehnt (Token bzw. Benutzer prüfen)': 'Login rejected (check token or user)',
+      'Grafana leitet zur Anmeldung um (Token bzw. Benutzer prüfen)': 'Grafana redirects to its login (check token or user)',
+      'Keine Grafana unter dieser Adresse': 'No Grafana at this address',
+      'Adresse ungültig (z.B. 192.168.1.10:3000)': 'Invalid address (e.g. 192.168.1.10:3000)',
       // Kalender & Wetter (Front / Screensaver)
       'Kalender & Wetter': 'Calendar & weather',
       'Zeigt Termine aus deinen iCal-Abos und das Wetter auf der Uhr-Startseite (Screensaver) aller Geräte. Serverweit — der Server holt die Daten und schickt sie an die Geräte.':

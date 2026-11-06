@@ -121,6 +121,7 @@ async function loadSettings(){
       else ws.innerHTML='<span class="ccmut">'+T('Kein Standort konfiguriert.')+'</span>';
     }
   }
+  grafanaZeigen(SET.grafana||{});
   einrichtungAnwenden(SET);
 }
 
@@ -403,8 +404,47 @@ function kalenderSpeichern(){
     days:parseInt($('#cal_days').value)||14, fore_days:parseInt($('#cal_foredays').value)||4};
   return postJson('/api/settings/calendar', body);
 }
+// ---- Grafana (Panels als Verlaufsquelle) ----
+// Token und Passwort kommen nie zurueck: leer = gespeichertes bleibt (Platzhalter sagt es).
+function grafanaZeigen(g){
+  if(!$('#gf_url')) return;
+  if(!OFFEN.has('grafana')){
+    $('#gf_url').value=g.url||''; $('#gf_user').value=g.user||'';
+    $('#gf_token').value=''; $('#gf_pass').value='';
+  }
+  $('#gf_token').placeholder=g.hasToken?T('unverändert lassen'):T('Token einfügen');
+  $('#gf_pass').placeholder=g.hasPass?T('unverändert lassen'):'';
+  const st=$('#gf_status'); if(!st) return;
+  const k=(META&&META.grafana)||null;
+  if(!g.url) st.innerHTML='<span class="ccmut">'+T('Grafana ist nicht eingerichtet.')+'</span>';
+  else if(k&&k.ok) st.innerHTML='<b class="ok">'+T('{n} Panels verfügbar').replace('{n}',(k.panels||[]).length)+'</b>';
+  else if(k&&k.error) st.innerHTML='<b class="bad">'+T('Fehler:')+'</b> '+esc(k.error);
+  else st.innerHTML='';
+}
+function grafanaFormular(){
+  return {url:$('#gf_url').value.trim(), token:$('#gf_token').value.trim(),
+          user:$('#gf_user').value.trim(), pass:$('#gf_pass').value};
+}
+// Nach dem Speichern die Panel-Liste neu holen, damit die Verlauf-Auswahl sie ohne Neuladen anbietet
+async function grafanaSpeichern(){
+  const j=await postJson('/api/settings/grafana', grafanaFormular());
+  if(j.ok){
+    try{ const r=await fetch('/api/grafana/panels'); if(META) META.grafana=await r.json(); }catch(e){}
+  }
+  return j;
+}
+if($('#gf_test')) $('#gf_test').onclick=async()=>{
+  const b=$('#gf_test'); b.disabled=true;
+  try{
+    const j=await postJson('/api/grafana/pruefen', grafanaFormular());
+    if(j.ok) flash($('#gf_toast'),'✓ Grafana '+(j.version||'')+' · '+T('{n} Dashboards').replace('{n}',j.dashboards||0),true);
+    else flash($('#gf_toast'),T(j.error||'Fehler'),false);
+  }catch(e){ flash($('#gf_toast'),String(e),false); }
+  finally{ b.disabled=false; }
+};
+
 // Eingaben der Karten melden ihren Bereich bei der Speicherleiste
-[['#ic_list','intercom'],['#am_enabled','audio'],
+[['#ic_list','intercom'],['#am_enabled','audio'],['section.spane[data-sub="grafana"]','grafana'],
  ['section.spane[data-sub="calendar"]','kalender']].forEach(([sel,k])=>{
   const el=$(sel); if(!el) return;
   ['input','change'].forEach(ev=>el.addEventListener(ev, ()=>bereichOffen(k)));

@@ -1016,10 +1016,11 @@ def load_panels() -> dict:
     return load_panels_doc()[0]
 
 
-# Schluessel mit Kennwoertern: Miniserver und Kamera ("pass"), Display-Treiber
-# ("password"). /api/settings gibt sie nie heraus, das Backup auch nicht,
-# /api/meta nennt beim Display nur hasPass (_devices_export).
-_SECRET_KEYS = {"pass", "password"}
+# Schluessel mit Kennwoertern: Miniserver, Kamera und Grafana ("pass"),
+# Display-Treiber ("password"), Grafana-Token ("token"). /api/settings gibt sie
+# nie heraus, das Backup auch nicht, /api/meta nennt beim Display nur hasPass
+# (_devices_export).
+_SECRET_KEYS = {"pass", "password", "token"}
 
 
 def _cfg_datei() -> dict:

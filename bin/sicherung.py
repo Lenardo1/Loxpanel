@@ -160,7 +160,8 @@ _KENNWORT_ZIEL = ("host", "url", "user", "driver")
 
 # Wo LoxPanel Kennwoerter fuehrt ("*" = jeder Schluessel). Bei einer aelteren
 # Sicherung ohne Vermerk gelten nur hier leere Kennwoerter als entfernt.
-_KENNWORT_ORTE = {"loxpanel.cfg": (("miniserver", "pass"), ("intercom", "*", "pass")),
+_KENNWORT_ORTE = {"loxpanel.cfg": (("miniserver", "pass"), ("intercom", "*", "pass"),
+                                   ("grafana", "token"), ("grafana", "pass")),
                   "panels.json": (("devices", "*", "display", "password"),)}
 
 # Groesste ganze Zahl in einer Sicherung (in JavaScript noch genau). Groessere
@@ -175,6 +176,7 @@ _CFG_TYPEN = {
     "audiometa": {"enabled": bool},
     "intercom": {},
     "night": {"control": (str, type(None))},
+    "grafana": {"url": str, "token": str, "user": str, "pass": str},
     "calendar": {"sources": list, "ical_url": (str, type(None)), "holiday_url": (str, type(None)),
                  "name": (str, type(None)), "colors": bool, "days": int, "sv_events": int,
                  "fore_days": int, "lat": (int, float, type(None)), "lon": (int, float, type(None))},
@@ -431,6 +433,8 @@ def _kennwort_ziel(datei: str, pfad: tuple, namen: dict) -> dict:
         return {"art": "miniserver"}
     if datei == "loxpanel.cfg" and len(pfad) == 3 and pfad[0] == "intercom":
         return {"art": "kamera", "name": namen.get(pfad[1], str(pfad[1]))}
+    if datei == "loxpanel.cfg" and len(pfad) == 2 and pfad[0] == "grafana":
+        return {"art": "sonst", "name": "Grafana"}
     if datei == "panels.json" and len(pfad) == 4 and pfad[0] == "devices" and pfad[2] == "display":
         return {"art": "display", "name": str(pfad[1])}
     return {"art": "sonst", "name": f"{datei}: {_pfad_text(pfad)}"}
@@ -611,6 +615,7 @@ async def _sicherung_schreiben(app: "App", plan: dict) -> dict:
         app._front_good = {}          # Wetter/Feiertage vom alten Ort nicht als "stale" zeigen
         app._front_refresh.set()
         app.audiometa_cfg = _audiometa_config()
+        app.grafana_neu()
     if "panels.json" in geschrieben:
         app.panels, app.devices = dateien["panels.json"]
     if "theme.json" in geschrieben:
