@@ -23,6 +23,7 @@ from diagnosedaten import VERSION
 from konfig import (
     _audiometa_config, _calendar_config, _CFGDIR, _config, _load_cfg, _ms_zugang, _night_config,
     _write_cfg)
+from grafana import gf_url
 from miniserver import _ms_unerreichbar
 from routen.gemeinsam import _NOCACHE
 from sicherung import _backup_zip, _sicherung_lesen, _sicherung_pruefen, _sicherung_schreiben
@@ -116,6 +117,7 @@ async def api_settings(request: web.Request) -> web.Response:
             # Auto-Standort vom Miniserver (Fallback, wenn keine Koordinaten gesetzt)
             "ms_lat": app.ms_lat, "ms_lon": app.ms_lon, "ms_location": app.ms_location,
         },
+        "grafana": _grafana_settings(cfg),
         "night": {"control": (app.night_cfg or {}).get("control") or "",
                   "options": app.night_control_options()},
         "connected": app.client is not None,
@@ -344,3 +346,82 @@ async def api_settings_calendar(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+
+
+def _grafana_settings(cfg: dict) -> dict:
+    """Grafana-Zugang fuer die Einstellungsseite, ohne Token und Passwort."""
+    g = cfg.get("grafana") if isinstance(cfg.get("grafana"), dict) else {}
+    return {"url": str(g.get("url") or ""), "user": str(g.get("user") or ""),
+            "hasToken": bool(g.get("token")), "hasPass": bool(g.get("pass"))}
+
+
+def _grafana_eingabe(data: dict, alt: dict) -> dict:
+    """Formular -> Zugang. Leeres Token/Passwort heisst "unveraendert". Es gilt
+    eine Anmeldung: ein neues Token verdraengt Benutzer/Passwort, ein neues
+    Passwort das Token. clear_token/clear_pass entfernen das Gespeicherte."""
+    neu = {"url": gf_url(data.get("url")), "user": str(data.get("user") or "").strip()[:100],
+           "token": str(alt.get("token") or ""), "pass": str(alt.get("pass") or "")}
+    token = str(data.get("token") or "").strip()[:400]
+    pw = str(data.get("pass") or "")[:200]
+    if token:
+        neu["token"], neu["user"], neu["pass"] = token, "", ""
+    elif pw:
+        neu["token"], neu["pass"] = "", pw
+    if data.get("clear_token"):
+        neu["token"] = ""
+    if data.get("clear_pass") or not neu["user"]:
+        neu["pass"] = ""
+    return neu
+
+
+async def api_settings_grafana(request: web.Request) -> web.Response:
+    """Grafana-Zugang speichern (Einstellungen -> Grafana). Leere Adresse
+    entfernt den ganzen Zugang samt Token."""
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    if not isinstance(data, dict):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    cfg = _load_cfg()
+    alt = cfg.get("grafana") if isinstance(cfg.get("grafana"), dict) else {}
+    if not str(data.get("url") or "").strip():
+        cfg.pop("grafana", None)
+    else:
+        neu = _grafana_eingabe(data, alt)
+        if not neu["url"]:
+            return web.json_response({"ok": False, "error": "Adresse ungültig (z.B. 192.168.1.10:3000)"},
+                                     status=400)
+        cfg["grafana"] = {k: v for k, v in neu.items() if v}
+    try:
+        _write_cfg(cfg)
+    except OSError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=500)
+    app.grafana_neu()
+    log.info("Grafana-Zugang %s", "gespeichert" if cfg.get("grafana") else "entfernt")
+    return web.json_response({"ok": True})
+
+
+async def api_grafana_pruefen(request: web.Request) -> web.Response:
+    """Zugang aus dem Formular testen, ohne zu speichern. Leere Felder fuer
+    Token/Passwort nehmen die gespeicherten."""
+    app: App = request.app["app"]
+    try:
+        data = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    if not isinstance(data, dict):
+        return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
+    cfg = _load_cfg()
+    alt = cfg.get("grafana") if isinstance(cfg.get("grafana"), dict) else {}
+    zugang = _grafana_eingabe(data, alt)
+    if not zugang["url"]:
+        return web.json_response({"ok": False, "error": "Adresse ungültig (z.B. 192.168.1.10:3000)"})
+    return web.json_response(await app.grafana_pruefen(zugang))
+
+
+async def api_grafana_panels(request: web.Request) -> web.Response:
+    """Grafana-Panels fuer die Verlaufs-Auswahl im Konfigurator (frisch geholt)."""
+    app: App = request.app["app"]
+    return web.json_response(await app.grafana_katalog(frisch=True), headers=_NOCACHE)

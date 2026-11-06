@@ -96,6 +96,13 @@ im Browser – ganz ohne Programmierung und ohne die Loxone-App.
 - **Intercom** (z. B. Mobotix T25): Live-Bild (MJPEG mit Auth), Tür öffnen &
   Außenlicht, Klingel-Popup (der Server erkennt den `bell`-State und schiebt die
   Ansicht aufs Panel). Gegensprechen (SIP) folgt.
+- **Verläufe aus Grafana:** neben der Loxone-Statistik auch Panels aus einer
+  Grafana-Installation (z. B. der von Stats4Lox) als Verlauf zeigen – im selben
+  Stil, mit 24 h / 7 Tage / 30 Tage. Zugang unter *Einstellungen → Grafana*
+  (IP:Port und Service-Account-Token mit Rolle „Viewer“), danach stehen die
+  Panels überall zur Wahl, wo es „Verlauf“ gibt. LoxPanel lässt Grafana die
+  Abfragen des Panels ausführen (`/api/ds/query`), funktioniert also mit jeder
+  Datenquelle (InfluxDB, Prometheus, SQL …).
 - **Theming:** Kategorie-Farben, Zustandsfarben, Icon-/Schriftgrößen, sichtbare
   Tabs und Schrift zentral einstellbar.
 - **Sicherung an Bord:** Backup & Wiederherstellung der kompletten Konfiguration

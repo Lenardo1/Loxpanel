@@ -520,13 +520,25 @@ function energyControlOptions(sel){
   return (META.controls||[]).filter(c=>c.type==='EFM'||c.type==='EnergyManager2')
     .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
 }
+// Verlaufsquellen: Bausteine mit Aufzeichnung, dahinter die Panels aus Grafana
+// (Einstellungen -> Grafana; uuid "gf:<dashboard>:<panel>", roomName "Grafana · <Dashboard>").
+function grafanaPanels(){ return ((META.grafana||{}).panels||[]); }
 function statControls(){
   return (META.controls||[]).filter(c=>c.stat)
-    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'));
+    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'))
+    .concat(grafanaPanels());
 }
+// Eintrag einer Verlaufs-Auswahl (Baustein oder Grafana-Panel) fuer die Chips
+function statCtrl(u){ return (META.controls||[]).find(x=>x.uuid===u) || grafanaPanels().find(x=>x.uuid===u); }
 function chartControlOptions(sel){
-  return statControls()
-    .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
+  const o=c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>';
+  const lox=(META.controls||[]).filter(c=>c.stat)
+    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'));
+  const gf=grafanaPanels();
+  if(!gf.length) return lox.map(o).join('');
+  return (lox.length?'<optgroup label="'+esc(T('Loxone-Statistik'))+'">'+lox.map(o).join('')+'</optgroup>':'')+
+    '<optgroup label="Grafana">'+gf.map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+
+      esc(c.name)+' ('+esc((c.roomName||'').replace(/^Grafana · /,''))+')</option>').join('')+'</optgroup>';
 }
 function chartAddOptions(){   // Dropdown zum Hinzufuegen: nur Bausteine mit Aufzeichnung
   return '<option value="">'+T('＋ hinzufügen …')+'</option>'+chartControlOptions('');
@@ -733,7 +745,7 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
         '<select class="pchart-add" data-pk="'+esc(tk)+'">'+chartAddOptions()+'</select>'+
         ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
         '<div class="picked" style="margin:6px 0 2px">'+(vuu.length
-          ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+          ? vuu.map(u=>{ const c=statCtrl(u);
               return '<span class="chip on" data-pk="'+esc(tk)+'" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
           : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>'+
@@ -894,9 +906,9 @@ function renderSvPane(p){
     h+='<div class="ccrow" style="margin-top:8px"><span class="ccnm">'+T('Bausteine')+'</span>'+
        '<select id="fSvChartAdd">'+chartAddOptions()+'</select>'+
        ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':
-         (statControls().length?'':'<span class="ccmut">'+T('Kein Baustein mit Aufzeichnung in der Anlage.')+'</span>'))+'</div>';
+         (statControls().length?'':'<span class="ccmut">'+T('Kein Baustein mit Aufzeichnung in der Anlage und kein Grafana-Panel.')+'</span>'))+'</div>';
     h+='<div class="picked" style="margin-top:8px">'+(vuu.length
-      ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+      ? vuu.map(u=>{ const c=statCtrl(u);
           return '<span class="chip on" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
             '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
       : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';

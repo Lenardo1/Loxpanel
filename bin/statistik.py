@@ -455,11 +455,14 @@ class Statistik:
         """Inhalt der Verlaufs-Pane im Split-Layout (panes "chart:<uuid>"): Name,
         aktueller Wert wie auf der Detailseite und die Diagramme aus
         _stat_blocks (dieselben Abrufe, Caches und Zustaende). None, wenn der
-        Baustein fehlt oder nichts aufzeichnet."""
+        Baustein fehlt oder nichts aufzeichnet. "gf:<dashboard>:<panel>" ist
+        ein Grafana-Panel (grafana_chart)."""
+        rng = rng if rng in STAT_RANGES else STAT_DEFAULT_RANGE
+        if str(uuid).startswith("gf:"):        # Grafana-Panel statt Baustein (grafana.py)
+            return self.grafana_chart(uuid, rng)
         c = self.controls.get(uuid)
         if not c or not (c.get("statistic") or c.get("statisticV2")):
             return None
-        rng = rng if rng in STAT_RANGES else STAT_DEFAULT_RANGE
         v = self._view_control_inner(uuid)
         big = next((b.get("text") or "" for b in v.get("blocks") or [] if b.get("k") == "big"), "")
         return {"control": uuid, "name": _clean(c.get("name")), "value": big,
