@@ -143,6 +143,7 @@ class IntercomRtpDevice(context: Context, private val ui: Handler,
                 count += n
             }
             if (!alive.get()) return
+            Pegel.verstaerken(samples, Pegel.MIKROFON)
             val packet = RtpAudio.packet(G711.encode(samples, media.codec), media.payloadType, sequence, timestamp, ssrc)
             socket.send(DatagramPacket(packet, packet.size))
             sequence = (sequence + 1) and 0xffff
@@ -164,6 +165,7 @@ class IntercomRtpDevice(context: Context, private val ui: Handler,
             // Keine Duplikate oder alten Pakete abspielen; neue SSRC startet neu.
             if (!order.accept(rtp.sequence, rtp.ssrc)) continue
             val samples = G711.decode(rtp.payload, media.codec)
+            Pegel.verstaerken(samples, Pegel.LAUTSPRECHER)
             var count = 0
             while (count < samples.size && alive.get()) {
                 val n = player?.write(samples, count, samples.size - count, AudioTrack.WRITE_BLOCKING) ?: return
