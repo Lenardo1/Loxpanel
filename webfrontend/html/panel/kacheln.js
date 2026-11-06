@@ -55,7 +55,9 @@ function paintChart(box,b){
   tk.ticks.forEach(t=>{ const x=X(t), a=x<pL+18?'start':(x>W-pR-18?'end':'middle');
     s+='<line class="chvgrid" x1="'+f(x)+'" x2="'+f(x)+'" y1="'+pT+'" y2="'+(H-pB)+'"/>'+
        '<text class="chax" x="'+f(x)+'" y="'+(H-6)+'" text-anchor="'+a+'">'+chTime(t,tk.day?Infinity:0)+'</text>'; });
-  const leg=[];
+  // Viele Reihen (Grafana-Sammel-Panels): knappe Legende mit dem letzten Wert,
+  // sonst braucht sie mehrere Zeilen und staucht das Diagramm.
+  const leg=[], viele=b.series.length>4;
   b.series.forEach((se,si)=>{
     const col=CH_COLORS[si%CH_COLORS.length], p=se.pts; if(!p.length) return;
     let info='';
@@ -80,11 +82,12 @@ function paintChart(box,b){
       s+='<polyline points="'+line+'" style="fill:none;stroke:'+col+';stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/>';
       const q=p[p.length-1]; s+='<circle cx="'+f(X(q[0]))+'" cy="'+f(Y(q[1]))+'" r="3.5" style="fill:'+col+'"/>';
       const vs=p.map(q=>q[1]);
-      info='min <b>'+chNum(Math.min(...vs),se.dec)+'</b> · max <b>'+chNum(Math.max(...vs),se.dec)+unit+'</b>';
+      info=viele ? '<b>'+chNum(q[1],se.dec)+unit+'</b>'
+                 : 'min <b>'+chNum(Math.min(...vs),se.dec)+'</b> · max <b>'+chNum(Math.max(...vs),se.dec)+unit+'</b>';
     }
     leg.push('<span><span class="chdot" style="background:'+col+'"></span>'+esc(se.name)+' · '+info+'</span>');
   });
-  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg">'+leg.join('')+'</div>';
+  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg'+(viele?' viele':'')+'">'+leg.join('')+'</div>';
 }
 // Rahmen eines Diagramms (Detailseite und Verlaufs-Pane); die Zeitraum-Knoepfe
 // traegt nur das erste Diagramm einer Seite (b.ranges).
