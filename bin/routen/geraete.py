@@ -414,7 +414,9 @@ async def api_testtone(request: web.Request) -> web.Response:
     for ws, prof in list(app.conn_prof.items()):
         if target and (prof or {}).get("id") != target:
             continue
-        if await app._send_or_drop(ws, {"t": "testtone"}):
+        # art "klingel": den Klingelton statt der Pieptoene (Vorgaben -> Verhalten)
+        nachricht = {"t": "testtone", "art": "klingel"} if d.get("art") == "klingel" else {"t": "testtone"}
+        if await app._send_or_drop(ws, nachricht):
             n += 1
     return web.json_response({"ok": True, "sent": n})
 

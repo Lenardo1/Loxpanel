@@ -157,6 +157,45 @@ function stopAlarmTone(){
   if(_alarmTimer){ clearInterval(_alarmTimer); _alarmTimer=null; }
   clearTimeout(_alarmFailsafe); _alarmFailsafe=null;
 }
+// ---- Klingelton (Vorgaben -> Verhalten): zweimal Ding-Dong, wenn es klingelt ----
+// klingelTon aus der theme-Nachricht: "" aus, "app" nur in der LoxPanel-App
+// (window.LoxKiosk), "alle" auf jedem Display. Synthetisch per Web Audio wie der
+// Weckton; eine Oktave hoeher und ueber einen Kompressor, damit er auch aus dem
+// kleinen Lautsprecher eines Wandpanels laut genug kommt, ohne zu uebersteuern.
+// Zwei Klingeln innerhalb von 5 s klingen nur einmal.
+let klingelTon='', _klingelBis=0;
+function klingelTonGilt(){ return klingelTon==='alle' || (klingelTon==='app' && !!window.LoxKiosk); }
+function playKlingelTon(test){
+  if(!test && !klingelTonGilt()) return;
+  const jetzt=Date.now(); if(!test && jetzt<_klingelBis) return;
+  _klingelBis=jetzt+5000;
+  try{
+    _actx = _actx || new (window.AudioContext||window.webkitAudioContext)();
+    const spielen=()=>{
+      const t0=_actx.currentTime+0.05;
+      const komp=_actx.createDynamicsCompressor();
+      komp.threshold.value=-18; komp.knee.value=6; komp.ratio.value=12;
+      komp.attack.value=0.003; komp.release.value=0.25;
+      const vor=_actx.createGain(); vor.gain.value=2.5;
+      vor.connect(komp); komp.connect(_actx.destination);
+      const ton=(f,t,dauer)=>{
+        // Grundton mit Obertoenen, weich abklingend wie ein Gong
+        [[f,0.7],[f*2,0.25],[f*3,0.1]].forEach(([fr,laut])=>{
+          const o=_actx.createOscillator(), g=_actx.createGain();
+          o.type='sine'; o.frequency.value=fr;
+          g.gain.setValueAtTime(0.0001,t);
+          g.gain.exponentialRampToValueAtTime(laut,t+0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001,t+dauer);
+          o.connect(g); g.connect(vor);
+          o.start(t); o.stop(t+dauer+0.05);
+        });
+      };
+      [0,1.6].forEach(d=>{ ton(1318.5,t0+d,1.1); ton(1046.5,t0+d+0.55,1.3); });   // E6 - C6
+      setTimeout(()=>{ try{ vor.disconnect(); komp.disconnect(); }catch(e){} }, 4500);
+    };
+    if(_actx.state==='suspended') _actx.resume().then(spielen,spielen); else spielen();
+  }catch(e){}
+}
 // Sichtbarer Hinweis oben am Panel — bestaetigt, dass ein Test-Ton-Event
 // tatsaechlich ankam, und meldet den AudioContext-Status. So laesst sich
 // "Push kommt nicht an" von "Audio-Ausgabe stumm" trennen.

@@ -625,6 +625,12 @@
       'vorhanden': 'present',
       'keins': 'none',
       'Verbindung prüfen': 'Check connection',
+      'Klingelton': 'Doorbell sound',
+      'Wenn es an einer Intercom klingelt, schaltet das Display ein und zeigt die Türstation. Dazu kann es zweimal Ding-Dong spielen. Im Browser spielt der Ton nur, wenn der Browser Audio ohne Antippen erlaubt; die LoxPanel-App und Fully Kiosk tun das.':
+        'When someone rings at an intercom, the display turns on and shows the door station. It can also play a ding-dong twice. In a browser the sound only plays if the browser allows audio without a tap; the LoxPanel app and Fully Kiosk do.',
+      'Nur in der LoxPanel-App': 'Only in the LoxPanel app',
+      'Auf allen Displays': 'On all displays',
+      'Klingelton auf allen offenen Displays testen': 'Test the doorbell sound on all open displays',
       'Prüfe …': 'Checking …',
       'Die Türstation antwortet und nimmt die Anmeldung an.': 'The door station answers and accepts the login.',
       'Die Türstation antwortet und verlangt keine Anmeldung.': 'The door station answers and requires no login.',
