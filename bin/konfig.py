@@ -378,13 +378,17 @@ KAMERA_MAX = 4
 # Grenzen stehen nur hier, der Konfigurator liest sie ueber /api/meta.
 SCALE_MIN, SCALE_MAX = 0.5, 2.0
 
+# Klingelton bei einer Klingel (Vorgaben -> Verhalten): wo er spielt. Fehlt = aus.
+KLINGELTON_WERTE = ("app", "alle")
+
 # Keys der globalen ui (theme.json), die der Konfigurator unter Vorgaben
 # (Darstellung, Verhalten) setzt. Einzige Liste: _write_theme() schreibt genau
 # diese, /api/meta liefert genau diese; was _sanitize_theme_ui() neu erlaubt,
 # muss auch hier stehen, sonst geht es beim Speichern still verloren.
 THEME_UI_KEYS = ("iconSize", "nameSize", "subSize", "roomSize", "bigSize", "font", "textColor",
                  "baseColor", "bold", "lang", "scale", "nightDim", "nightWake", "dpmsOff", "reloadHours",
-                 "gesten", "gestenHinweis", "hausAus", "raumVerlassen", "nightClock", "nightClockBright")
+                 "gesten", "gestenHinweis", "hausAus", "raumVerlassen", "nightClock", "nightClockBright",
+                 "klingelTon")
 
 # Groessen (px), wenn weder das Panel noch die globale Darstellung eine setzt,
 # je Kachel-Aufbau. Der neue stellt meist den Zustand gross und den Namen klein
@@ -1495,6 +1499,10 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     _rv = _clean_raum_verlassen(ui.get("raumVerlassen"))
     if _rv:
         out["raumVerlassen"] = _rv
+    # Klingelton, wenn es an einer Intercom klingelt: "app" nur in der
+    # LoxPanel-App, "alle" auf jedem Display; fehlt = aus
+    if ui.get("klingelTon") in KLINGELTON_WERTE:
+        out["klingelTon"] = ui["klingelTon"]
     return out
 
 
