@@ -30,14 +30,26 @@ function chTicks(t0,t1){
   return {ticks:[t0,t1], day:true};
 }
 let chSeq=0;
-function paintChart(box,b){
+function paintChart(box,b,nochmal){
   box.querySelectorAll('[data-rng]').forEach(c=>c.classList.toggle('on',c.dataset.rng===b.range));
   const body=box.querySelector('.chbody'); if(!body) return;
   if(b.state!=='ok'){
     body.innerHTML='<div class="chmsg">'+(b.state==='loading'?'Verlauf wird geladen …'
       :b.state==='error'?'Verlauf nicht abrufbar':'Keine Aufzeichnung in diesem Zeitraum')+'</div>';
     return; }
-  const W=440,H=150,pL=36,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
+  // In der Verlaufs-Pane (eine Seite, Diagramm fuellt die Hoehe) in echten
+  // Pixeln zeichnen: ein festes 440x150 mit preserveAspectRatio="none" wuerde
+  // Linien und Schrift mit der Pane-Hoehe in die Laenge ziehen.
+  const fill=!!body.closest('.fp-page.solo.cpage:not(.stack)');
+  let W=440, H=150;
+  if(fill && nochmal){ W=nochmal[0]; H=nochmal[1]; }
+  else if(fill){
+    body.innerHTML='<svg></svg>'+chLegend(b);
+    const sv=body.firstChild, w=Math.round(sv.clientWidth||0), h=Math.round(sv.clientHeight||0);
+    if(w>40 && h>40){ W=w; H=h; }
+    chBeobachten(body,box,b);
+  }
+  const pL=36,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
   const unit=b.unit?(' '+b.unit):'', dec=Math.max(0,...b.series.map(s=>s.dec||0));
   const vals=b.series.flatMap(s=>s.pts.map(p=>p[1]));
   let lo=vals.length?Math.min(...vals):0, hi=vals.length?Math.max(...vals):1, mn, mx;
@@ -88,6 +100,29 @@ function paintChart(box,b){
     leg.push('<span><span class="chdot" style="background:'+col+'"></span>'+esc(se.name)+' · '+info+'</span>');
   });
   body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg'+(viele?' viele':'')+'">'+leg.join('')+'</div>';
+  if(fill && !nochmal){   // echte Legende braucht mehr/weniger Platz: einmal nachziehen
+    const sv=body.firstChild, w=Math.round(sv.clientWidth||0), h=Math.round(sv.clientHeight||0);
+    if(w>40 && h>40 && (Math.abs(w-W)>2 || Math.abs(h-H)>2)) paintChart(box,b,[w,h]);
+  }
+}
+// Legende vorab (gleiche Zeilenzahl wie die echte), damit das Diagramm vor dem
+// Zeichnen die Hoehe kennt, die ihm neben der Legende bleibt.
+function chLegend(b){
+  const viele=b.series.length>4, u=b.unit?(' '+esc(b.unit)):'';
+  return '<div class="chleg'+(viele?' viele':'')+'">'+b.series.filter(se=>se.pts.length).map(se=>
+    '<span><span class="chdot"></span>'+esc(se.name)+' · '+(viele?'<b>00,0'+u+'</b>':'min <b>00,0</b> · max <b>00,0'+u+'</b>')+'</span>').join('')+'</div>';
+}
+// Groesse der Pane aendert sich (Drehen, Blaettern, Split): neu zeichnen.
+const chRO=window.ResizeObserver ? new ResizeObserver(es=>es.forEach(e=>{
+  const body=e.target, k=body._chSize, w=Math.round(e.contentRect.width), h=Math.round(e.contentRect.height);
+  if(!body.isConnected || !body._chB) return;
+  if(k && Math.abs(k[0]-w)<3 && Math.abs(k[1]-h)<3) return;
+  body._chSize=[w,h];
+  if(k) paintChart(body._chBox, body._chB);
+})) : null;
+function chBeobachten(body,box,b){
+  body._chB=b; body._chBox=box;
+  if(chRO && !body._chObs){ body._chObs=true; chRO.observe(body); }
 }
 // Rahmen eines Diagramms (Detailseite und Verlaufs-Pane); die Zeitraum-Knoepfe
 // traegt nur das erste Diagramm einer Seite (b.ranges).
