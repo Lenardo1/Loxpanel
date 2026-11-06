@@ -206,7 +206,8 @@ function svWeatherHTML(w){
 }
 // Frei gewaehlte Bausteine: Name, Raum, Wert — nur lesen. Die Kacheln baut der
 // Server ueber dieselbe Kette wie jede andere Kachel (status_blocks).
-function renderSvStatus(box){ box.innerHTML='<div class="lbl">Werte</div>'+svStatusZeilen(); }
+// Ohne Ueberschrift: die Zeilen nennen ihre Bausteine selbst (Wunsch Marco)
+function renderSvStatus(box){ box.innerHTML=svStatusZeilen(); }
 // Werte als Pane 2: gerahmt wie die anderen Widgets, die Zeilen teilen sich die
 // Hoehe. Sind es wenige, wachsen Symbol und Schrift mit (--zh = Zeilenhoehe,
 // werteEinpassen); reicht die Hoehe nicht, scrollt die Pane wie bisher.
