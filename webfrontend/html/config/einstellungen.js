@@ -226,7 +226,7 @@ function intercomSpeichern(){
 // Anfrage an den Miniserver, darum nie zwei Ladevorgaenge gleichzeitig.
 let SIP_LAEUFT=null;
 function loadSip(){
-  if(!SIP_LAEUFT) SIP_LAEUFT=sipLaden().finally(()=>{ SIP_LAEUFT=null; });
+  if(!SIP_LAEUFT) SIP_LAEUFT=Promise.all([sipLaden(), sipGeraeteLaden()]).finally(()=>{ SIP_LAEUFT=null; });
   return SIP_LAEUFT;
 }
 async function sipLaden(){
@@ -261,6 +261,31 @@ async function sipLaden(){
       (info?'<span class="sipgeraet">'+info+'</span>':'')+'</div>'+rumpf+'</div>';
   }).join('');
   box.querySelectorAll('.sip_pruefen').forEach(b=>b.onclick=()=>sipPruefen(b));
+}
+// Displays im Netz (LoxPanel-App mit Server im Netz): wartende freigeben, freigegebene
+// sperren oder entfernen. Der Server nennt nur eine Kennung, nie den Schluessel.
+async function sipGeraeteLaden(j){
+  const box=$('#sip_geraete'); if(!box) return;
+  try{ if(!j) j=await (await fetch('/api/intercom/geraete')).json(); }
+  catch(e){ box.innerHTML='<div class="muted"><b class="bad">'+esc(T('Fehler'))+'</b> '+esc(String(e))+'</div>'; return; }
+  const liste=j.geraete||[];
+  if(!liste.length){ box.innerHTML='<div class="muted">'+esc(T('Noch kein Display hat Gegensprechen angefragt.'))+'</div>'; return; }
+  const zeit=s=>s?new Date(s*1000).toLocaleString(undefined,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  box.innerHTML=liste.map(g=>{
+    const frei=g.status==='frei';
+    const knopf=(a,txt,cls)=>'<button class="btn'+(cls===undefined?' ghost':cls)+' sipg" data-id="'+esc(g.id)+'" data-aktion="'+a+'">'+esc(T(txt))+'</button>';
+    return '<div class="ic sip"><div class="icname">'+esc(g.name||g.ip||g.id)+
+      '<span class="sipgeraet">'+[g.name?g.ip:'', T('zuletzt')+' '+zeit(g.zuletzt)].filter(Boolean).map(esc).join(' · ')+'</span></div>'+
+      '<p class="sipfehl">'+(frei?'<b class="ok">'+esc(T('Freigegeben'))+'</b>':'<b class="bad">'+esc(T('Wartet auf Freigabe'))+'</b>')+'</p>'+
+      '<div class="actions">'+(frei?knopf('sperren','Sperren'):knopf('freigeben','Freigeben',''))+knopf('entfernen','Entfernen')+'</div></div>';
+  }).join('');
+  box.querySelectorAll('.sipg').forEach(b=>b.onclick=async()=>{
+    b.disabled=true;
+    try{ const r=await fetch('/api/intercom/geraete',{method:'POST',headers:{'Content-Type':'application/json'},
+                       body:JSON.stringify({id:b.dataset.id, aktion:b.dataset.aktion})});
+         await sipGeraeteLaden(r.ok?await r.json():null); }
+    catch(e){ b.disabled=false; }
+  });
 }
 // Aufbau der gesicherten Details, wenn kein SIP-Zugang darin steht: nur Feldnamen
 // und ob sie gefuellt sind (Werte schickt der Server nicht)

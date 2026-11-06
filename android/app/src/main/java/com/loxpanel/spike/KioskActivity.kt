@@ -324,11 +324,11 @@ class KioskActivity : Activity(), SensorEventListener {
     private fun intercomBruecke(v: WebView) {
         val capability = JSONObject.quote(intercomPageCapability ?: return)
         val origin = JSONObject.quote(Visu.basis(this).removeSuffix("/"))
-        // Gegensprechen läuft über den Gesprächsdienst des eigenen Servers
-        // (IntercomCallClient, Prozess-Token). Mit einem Server im Netz fehlt
-        // er, dann bekommt die Visu die Sprechfunktionen nicht und zeigt
-        // keine Sprechbedienung (intercomNative() in panel.html).
-        val sprechen = Visu.eigenerServer(this)
+        // Gegensprechen läuft über den Gesprächsdienst des eingestellten
+        // Servers (IntercomCallClient): der eigene mit Prozess-Token, einer im
+        // Netz mit Geräteschlüssel nach Freigabe im Konfigurator. Ohne
+        // Freigabe meldet der Server das, die Visu zeigt es am Sprechen-Knopf.
+        val sprechen = true
         v.evaluateJavascript("""
             (function(n, key, sprechen) {
               if (window !== window.top || location.origin !== $origin || location.pathname !== '/') return;
