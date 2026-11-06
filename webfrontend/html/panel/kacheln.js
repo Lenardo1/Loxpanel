@@ -8,7 +8,10 @@
 // formatiert zeigt jedes Panel dieselbe Uhrzeit wie der Miniserver, egal in
 // welcher Zeitzone der Browser laeuft. Farben per style, weil var() in
 // SVG-Praesentationsattributen nicht ueberall greift.
-const CH_COLORS=['var(--accent)','var(--glow)','var(--crit)','var(--muted)'];
+// Die ersten vier aus dem Theme, danach feste, gut unterscheidbare Farben
+// fuer Diagramme mit vielen Reihen (Grafana-Sammel-Panels, bis 12 Linien).
+const CH_COLORS=['var(--accent)','var(--glow)','var(--crit)','var(--muted)',
+  '#4fa3e0','#e8a33d','#3fb68b','#9b6fd6','#e0679a','#c9c23a','#5bc0c8','#d9734a'];
 function chNum(v,dec){ return (+v).toFixed(dec).replace('.',','); }
 function chTime(t,span){ const d=new Date(t*1000), p=n=>String(n).padStart(2,'0');
   return span<=129600 ? p(d.getUTCHours())+':'+p(d.getUTCMinutes()) : p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'; }
