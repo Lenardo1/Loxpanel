@@ -168,9 +168,18 @@ function renderFront(){
 // applySaverSplit) — einspaltig (4"-Panel) gibt es keine Flaeche, die
 // ungenutzt bliebe, dort bleibt es bei Wetter/Uhr/Terminen.
 function svKind(v){ const i=v.indexOf(':'); return i>0?v.slice(0,i):v; }
-// Kamera-Widget: "camera:<uuid>[,<uuid>...]|<uuid>,<uuid>" - Kameras vor (mehrere =
-// blaetterbare Seiten), Werte hinter dem Strich
-function camPaneUuids(arg){ return (arg||'').split('|')[0].split(',').map(x=>x.trim()).filter(Boolean); }
+// Kamera-Widget: "camera:[page:|stack:]<uuid>[,<uuid>...]|<uuid>,<uuid>" - Kameras vor
+// (mehrere: gestapelt oder mit "page:" blaetterbar, wie beim Verlauf), Werte hinter dem Strich
+function camPaneModus(arg){ const m=/^(page|stack):/.exec(arg||''); return m ? m[1] : 'stack'; }
+function camPaneUuids(arg){ return (arg||'').replace(/^(page|stack):/,'').split('|')[0].split(',').map(x=>x.trim()).filter(Boolean); }
+// Blaettern nur in der Pane bzw. Widget-Seite und nur mit mehreren Kameras; die
+// Uhr-Seite stapelt immer (keine Punkte dort)
+function camBlaettern(){ return camMode==='page' && camList.length>1 && !svSideOn(); }
+// Daten EINER Kamera aus dem letzten Push: {uuid, name, blocks, secured} oder null.
+// Aeltere Server schicken nur blocks/secured der einen Kamera.
+function camDaten(uuid){ const d=cameraData; if(!d) return null;
+  if(Array.isArray(d.cams)) return d.cams.find(c=>c.uuid===uuid)||null;
+  return (d.blocks && uuid===camList[camBlaettern()?camCamIdx:0]) ? d : null; }
 function camPaneWerte(arg){ const i=(arg||'').indexOf('|'); return i<0?'':arg.slice(i+1); }
 function svArg(v){ const i=v.indexOf(':'); return i>0?v.slice(i+1):''; }
 function svSideOn(){ const s=el('saver');   // Nacht-Uhr: die zweite Spalte ruht (keine Kamera die ganze Nacht)
@@ -515,16 +524,21 @@ function renderEnergyPane(elc){ if(!elc) return;
 // wird wie beim Baustein direkt geladen (kein onload-Gate -> zeigt auch in Browsern, die
 // ein nacktes MJPEG-<img> nicht rendern). Struktur nur bei Änderung neu bauen, sonst nur
 // Buttons/Klingel in-place aktualisieren -> der Video-Stream läuft ununterbrochen weiter.
-// Mehrere Kameras (camera:a,b,c) in der Pane: je Kamera eine blaetterbare Seite.
-// Der Server streamt je Verbindung nur EINE Kamera, darum zeigt nur die sichtbare
-// (camCamIdx) Bild, Tasten und Werte; die uebrigen Seiten sind Platzhalter. Auf
-// der Uhr-Seite (svBox) gibt es kein Blaettern, dort steht die erste.
+// Mehrere Kameras (camera:a,b,c) in der Pane, wie beim Verlauf:
+// - gestapelt (Vorgabe, auch immer auf der Uhr-Seite): EINE Seite, darin je
+//   Kamera ein Abschnitt (.camsec) mit Name, Bild und Tasten; alle laufen, die
+//   Werte unter dem Bild stehen einmal am Ende.
+// - blaettern ("page:"): je Kamera eine Seite. Dem Server ist nur die sichtbare
+//   (camCamIdx) gemeldet, nur sie zeigt Bild, Tasten und Werte; die uebrigen
+//   Seiten sind Platzhalter.
 function camPageTo(idx){ if(idx===camCamIdx) return; camCamIdx=idx; applyPane(); }
 function renderCameraPane(elc){ if(!elc) return;
-  const n=(elc.id==='frontpane' && !svSideOn()) ? Math.max(1,camList.length) : 1;
+  const werte=!!camPaneWerte(qargCamNow());
+  if(camList.length>1 && !camBlaettern()){ renderCameraStapel(elc, werte); return; }
+  const n=(elc.id==='frontpane' && camBlaettern()) ? camList.length : 1;
   // Geruest nur bei geaenderter Anzahl neu bauen, sonst bleiben Scrollposition
   // und laufender Stream erhalten
-  let pages=[...elc.children].filter(x=>x.classList.contains('campage'));
+  let pages=[...elc.children].filter(x=>x.classList.contains('campage') && !x.classList.contains('camstack'));
   if(pages.length!==n || elc.dataset.camn!==String(n)){
     elc.dataset.camn=String(n);
     elc.innerHTML=Array.from({length:n},(_,i)=>'<div class="fp-page solo campage'+(n>1?' paged':'')+'" data-camidx="'+i+'"></div>').join('');
@@ -538,21 +552,44 @@ function renderCameraPane(elc){ if(!elc) return;
   pages.forEach((pg,i)=>{ if(i!==idx && pg.dataset.cam!=='idle'){
     pg.dataset.cam='idle'; delete pg.dataset.camsig; pg.className='fp-page solo campage paged';
     pg.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera '+(i+1)+'</span></div>'; } });
-  renderCameraSeite(elc, pages[idx], n>1);
+  const cls='fp-page solo campage'+(n>1?' paged':'');
+  renderCameraSeite(elc, pages[idx], camDaten(camList[n>1?idx:0]), {cls:cls, werte:werte});
 }
-// Inhalt EINER Kamera-Seite (der sichtbaren): Zustand je Seite in page.dataset
-function renderCameraSeite(elc, page, paged){ if(!page) return;
-  const cls='fp-page solo campage'+(paged?' paged':'');
-  const blocks=cameraData&&cameraData.blocks ? intercomBlocks(cameraData.blocks) : null;
+// Gestapelt: eine Seite, je Kamera ein Abschnitt; jeder haelt seinen Zustand
+// selbst (dataset), damit ein Push die laufenden Bilder nicht neu startet
+function renderCameraStapel(elc, werte){
+  const form='s'+camList.join(',')+(werte?'|w':'');
+  let page=elc.firstElementChild;
+  if(!page || !page.classList.contains('camstack') || elc.dataset.camn!==form){
+    elc.dataset.camn=form;
+    elc.innerHTML='<div class="fp-page solo campage camstack">'+
+      camList.map((u,i)=>'<div class="camsec" data-camidx="'+i+'"></div>').join('')+
+      (werte?'<div class="camwerte werte"></div>':'')+'</div>';
+    page=elc.firstElementChild;
+    if(elc.id==='frontpane') requestAnimationFrame(()=>syncPager(null));   // eine Seite -> keine Punkte
+  }
+  if(elc.dataset.camsig===undefined){ page.querySelectorAll('.camsec').forEach(sec=>{ delete sec.dataset.cam; delete sec.dataset.camsig; }); elc.dataset.camsig='1'; }
+  elc.dataset.cam='1';
+  page.querySelectorAll('.camsec').forEach((sec,i)=>renderCameraSeite(elc, sec, camDaten(camList[i]), {name:true, nr:i+1}));
+  renderCameraWerte(elc);
+}
+// Inhalt EINER Kamera (Seite oder Abschnitt): Zustand in box.dataset.
+// opt.cls: Klassen der Seite (gestapelte Abschnitte behalten ihre), opt.werte:
+// Werte unter dem Bild in DIESER Seite, opt.name: Kameraname darueber.
+function renderCameraSeite(elc, page, d, opt){ if(!page) return;
+  opt=opt||{};
+  const setCls=extra=>{ if(opt.cls) page.className=opt.cls+(extra||''); };
+  const blocks=d&&d.blocks ? intercomBlocks(d.blocks) : null;
   if(blocks===null){   // Push noch nicht da -> Platzhalter
-    if(page.dataset.cam!=='wait'){ page.dataset.cam='wait'; delete page.dataset.camsig; page.className=cls;
-      page.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>Kamera lädt …</span></div>'; }
+    if(page.dataset.cam!=='wait'){ page.dataset.cam='wait'; delete page.dataset.camsig; setCls('');
+      page.innerHTML='<div class="camwait">'+svg(ICONS.cam)+'<span>'+(opt.nr?'Kamera '+opt.nr+' lädt …':'Kamera lädt …')+'</span></div>'; }
     return;
   }
   const video=blocks.find(b=>b.k==='video'), row=blocks.find(b=>b.k==='row');
   const bell=blocks.find(b=>b.k==='astat'), nostat=blocks.find(b=>b.k==='status');
   const talk=blocks.find(b=>b.k==='intercom-talk');
-  const baseSig=(video?'v':'')+'|'+(row?row.cells.length:0)+'|'+(nostat?nostat.text:'')+'|'+(camPaneWerte(qargCamNow())?'w':'')+'|';
+  const name=opt.name ? (d.name||'') : '';
+  const baseSig=(video?'v':'')+'|'+(row?row.cells.length:0)+'|'+(nostat?nostat.text:'')+'|'+(opt.werte?'w':'')+'|'+name+'|';
   const sig=baseSig+(talk?talk.uuid:'');
   if(talk && page.dataset.camsig===baseSig){   // Gegensprechen kommt dazu: vor die Werte unter dem Bild
     const werte=page.querySelector('.camwerte');
@@ -562,18 +599,20 @@ function renderCameraSeite(elc, page, paged){ if(!page) return;
   }
   if(page.dataset.camsig!==sig){          // Struktur -> Neuaufbau
     page.dataset.camsig=sig; page.dataset.cam='1';
-    let html='<div class="cambell astat crit" hidden></div>';
+    let html=name ? '<div class="camname">'+esc(name)+'</div>' : '';
+    html+='<div class="cambell astat crit" hidden></div>';
     html+= video ? '<div class="video"><img alt=""></div>'
                  : '<div class="status">'+esc(nostat?nostat.text:'Kein Video')+'</div>';
     if(row) html+='<div class="brow'+(row.wrap?' wraprow':'')+'">'+row.cells.map(cellHtml).join('')+'</div>';
     if(talk) html+=intercomTalkHtml(talk);
-    if(camPaneWerte(qargCamNow())) html+='<div class="camwerte werte"></div>';   // Werte unter dem Bild
-    page.className=cls+(talk?' intercom-page':''); page.innerHTML=html;
+    if(opt.werte) html+='<div class="camwerte werte"></div>';   // Werte unter dem Bild
+    setCls(talk?' intercom-page':''); if(!opt.cls) page.classList.toggle('intercom-page', !!talk);
+    page.innerHTML=html;
     renderCameraWerte(elc);
     const vimg=page.querySelector('.video img'); if(vimg&&video) vimg.src=video.src;   // direkt, KEIN onload-Gate
     if(row){ const btns=page.querySelectorAll('.brow [data-c]');
       row.cells.forEach((c,i)=>{ const btn=btns[i]; if(!btn)return;
-        btn.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(c.cmd) sendCmd(c.cmd.uuid,c.cmd.cmd,!!(cameraData&&cameraData.secured)); }); }); }
+        btn.addEventListener('pointerdown',ev=>{ ev.preventDefault(); if(c.cmd) sendCmd(c.cmd.uuid,c.cmd.cmd,!!(d&&d.secured)); }); }); }
   } else {                                // gleiche Struktur -> nur Buttons und Werte aktualisieren (Video unangetastet)
     if(row){ const btns=page.querySelectorAll('.brow [data-c]');
       row.cells.forEach((c,i)=>{ const btn=btns[i]; if(btn){ btn.textContent=c.label||''; btn.className='btn'+(c.on?' on':''); } }); }

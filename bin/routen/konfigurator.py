@@ -7,6 +7,7 @@ Die Handler holen die App aus request.app["app"]; main() in webvisu.py traegt
 sie in die Routentabelle ein. Importiert webvisu nicht (App nur als Typangabe)."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -86,8 +87,15 @@ async def api_meta(request: web.Request) -> web.Response:
             "tasten": len(kachel.get("controls") or []),
             "cover": kachel.get("cover") or "",
         })
+    # Grafana-Panels fuer die Verlaufs-Auswahl (grafana.py); kurz begrenzt, damit
+    # ein nicht erreichbares Grafana den Konfigurator nicht aufhaelt
+    try:
+        grafana = await asyncio.wait_for(app.grafana_katalog(), 6)
+    except asyncio.TimeoutError:
+        grafana = {"ok": False, "error": "Grafana antwortet nicht", "panels": []}
+        app.gf_katalog = (time.monotonic(), grafana)   # nicht bei jedem Laden erneut warten
     return web.json_response({
-        "rooms": rooms, "cats": cats, "controls": controls,
+        "rooms": rooms, "cats": cats, "controls": controls, "grafana": grafana,
         # Zeitraeume der Verlaufs-Diagramme (Schluessel, Anzeige) fuer die Auswahl
         # "Verlauf in der Kachel" — eine Quelle mit der Visu (STAT_RANGES).
         "statRanges": [[k, v[0]] for k, v in STAT_RANGES.items()],

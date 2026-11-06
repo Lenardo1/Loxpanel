@@ -243,7 +243,7 @@ function syncPager(onPage){
   if(!c || pages.length<2 || svSideOn()){ clearPager(); return; }
   // ohne Angabe: die Kamera-Pane meldet den Seitenwechsel (sichtbare Kamera)
   _pagerOnPage = (onPage!==undefined) ? (onPage||null)
-               : ((paneKind(paneRawNow())==='camera' && typeof camPageTo==='function') ? camPageTo : null);
+               : ((paneKind(paneRawNow())==='camera' && typeof camPageTo==='function' && camBlaettern()) ? camPageTo : null);
   if(d.children.length!==pages.length){
     d.innerHTML=pages.map((_,i)=>'<i data-pg="'+i+'"></i>').join('');
     d.querySelectorAll('[data-pg]').forEach(dot=>dot.addEventListener('pointerdown',ev=>{
@@ -393,17 +393,19 @@ function applyPane(){
   const euid=qarg(qraw,'energy:');
   if(euid!==curEnergyUuid){ curEnergyUuid=euid; try{ send({t:'setenergy',uuid:euid}); }catch(e){} }
   // Kamera (Intercom) dem Server melden (er pusht dann {t:'camera'} mit Video+Buttons).
-  // "camera:<uuid>[,<uuid>...]|<uuid>,..." - mehrere Kameras sind blaetterbare
-  // Seiten (gemeldet wird nur die sichtbare, auf der Uhr-Seite die erste),
-  // hinter dem Strich stehen Werte unter dem Bild
+  // "camera:[page:|stack:]<uuid>[,<uuid>...]|<uuid>,..." - mehrere Kameras stehen
+  // gestapelt untereinander (gemeldet werden alle) oder sind blaetterbare Seiten
+  // ("page:", gemeldet wird nur die sichtbare); die Uhr-Seite stapelt immer.
+  // Hinter dem Strich stehen Werte unter dem Bild.
   const camArg=qarg(qraw,'camera:');
-  camList=camPaneUuids(camArg);
+  camList=camPaneUuids(camArg); camMode=camPaneModus(camArg);
   if(svSideOn() || camCamIdx>=camList.length) camCamIdx=0;
-  const cuid=camList[camCamIdx]||'';
+  const camMelden=camBlaettern() ? camList.slice(camCamIdx, camCamIdx+1) : camList;
+  const cuid=camMelden.join(',');
   if(cuid!==curCameraUuid){ curCameraUuid=cuid; cameraData=null;
     if(fp){ delete fp.dataset.cam; delete fp.dataset.camsig; }
     const sb=el('svBox'); if(sb){ delete sb.dataset.cam; delete sb.dataset.camsig; }
-    try{ send({t:'setcamera',uuid:cuid}); }catch(e){}
+    try{ send({t:'setcamera',uuid:camMelden[0]||'',uuids:camMelden}); }catch(e){}
     // Sofort einen Platzhalter zeigen, bis der Push kommt — je nachdem, wo die
     // Kamera gerade hingehoert.
     if(cuid){ if(svSideOn()) renderFront(); else if(kind==='camera') renderCameraPane(fp); }
@@ -431,7 +433,7 @@ function applyPane(){
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
   // Seiten-Indikator nachziehen (blaetterbare Widgets, s. syncPager)
-  requestAnimationFrame(()=>syncPager(kind==='camera' ? camPageTo : null));
+  requestAnimationFrame(()=>syncPager(kind==='camera' && camBlaettern() ? camPageTo : null));
 }
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und

@@ -101,6 +101,13 @@ im Browser – ganz ohne Programmierung und ohne die Loxone-App.
   Konfigurator unter Einstellungen → SIP → „Displays im Netz“ freigegeben. Den
   Ton tauschen Türstation und Display direkt aus, der Server baut nur die
   Verbindung auf.
+- **Verläufe aus Grafana:** neben der Loxone-Statistik auch Panels aus einer
+  Grafana-Installation (z. B. der von Stats4Lox) als Verlauf zeigen – im selben
+  Stil, mit 24 h / 7 Tage / 30 Tage. Zugang unter *Einstellungen → Grafana*
+  (IP:Port und Service-Account-Token mit Rolle „Viewer“), danach stehen die
+  Panels überall zur Wahl, wo es „Verlauf“ gibt. LoxPanel lässt Grafana die
+  Abfragen des Panels ausführen (`/api/ds/query`), funktioniert also mit jeder
+  Datenquelle (InfluxDB, Prometheus, SQL …).
 - **Theming:** Kategorie-Farben, Zustandsfarben, Icon-/Schriftgrößen, sichtbare
   Tabs und Schrift zentral einstellbar.
 - **Sicherung an Bord:** Backup & Wiederherstellung der kompletten Konfiguration
@@ -439,6 +446,8 @@ und ohne LoxBerry.
 
 Vollständige Release-Notes: [GitHub Releases](https://github.com/Lenardo1/Loxpanel/releases).
 
+- **1.0.1** – **Grafana-Sammel-Panels** mit vielen Datenpunkten zeigen bis zu 12 Linien (vorher 6), mit eigenen Farben und knapper Legende. Die **Verlaufs-Pane** zeichnet Diagramme in der echten Pane-Größe, Linien und Schrift werden nicht mehr in die Höhe gezogen oder gestaucht.
+- **1.0.0** – Erste stabile Version. **Verläufe aus Grafana** (z. B. Stats4Lox-Daten) als Verlauf-Widget mit 24 h / 7 Tage / 30 Tage, eingerichtet unter Einstellungen → Grafana. **Klimaregler** zeigt, welche Räume Heiz- oder Kühlanforderung haben (mit Ist-/Soll-Temperatur, Tipp öffnet den Raum). **Mehrere Kameras pro Widget**, gestapelt in voller Höhe oder zum Blättern; **Widget-Pager** mit blätterbaren Seiten je Widget. **Strompreis-Optimierer** (Preis, Prognose, Zyklus starten/abbrechen), **Energiefluss** mit Hausverbrauch in der Mitte, **aktive zuerst** bei Zentralen und Fensterüberwachung. Kameras: ein Strom je Kamera für alle Zuschauer mit selbständigem Neuverbinden, Bild passt in flache Felder. Wecker zeigt die nächste Weckzeit in Ortszeit. Android-App hält WLAN und CPU wach, solange der Server läuft. LoxBerry-Plugin startet nach einem Update nicht mehr neu.
 - **0.9.9** – Letzter Schritt vor 1.0.0. **Natives SIP-Gegensprechen** an der Loxone-Intercom (Gen1), **alle Bausteine bedienbar** (Jalousien/Beschattung, Rauchmelder, Alarm, Sauna/Wellness, Energiemanager, Briefkasten u. a.), neuer **Kachel-Aufbau** mit drei Kachel-Sets (Loxone/Touch/Kreide), **Hausübersicht**, überarbeitete **Einrichtung**, Gesten, Verbindungszustand und Diagnose (`/api/health`, `/api/diagnose`). Miniserver erkennt **HTTP/HTTPS am Port** selbst (behebt `WRONG_VERSION_NUMBER`), LoxBerry-**Port frei einstellbar**. Intern: großer Modul-Refactor (Server und Oberfläche in Module zerlegt), ohne Verhaltensänderung. Hinweis: Release liefert nur noch **Plugin-ZIP** und **Android-APK** (kein `.deb` mehr).
 - **0.7.0** – Direkt aufs Gerät: **Android-App (APK, inkl. 32-bit/armeabi-v7a)** und **Linux-.deb** mit eingebautem Server (ohne LoxBerry/Docker). Verlauf-Widget stapelbar, Neu-Laden gegen Einfrieren, Version/Commit/Bauzeit sichtbar; diverse Detailkorrekturen.
 - **0.6.0** – Einheitliches **Widget-Konzept** (Pane 2 / Screensaver / eigener Tab), freie Tab-Inhalte, **Panel-Assistent**, Displays-Reiter + Betriebsmodus-Automatik, Verlaufs-Diagramme, Anzeige-Skalierung.

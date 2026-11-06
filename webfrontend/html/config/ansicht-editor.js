@@ -520,13 +520,25 @@ function energyControlOptions(sel){
   return (META.controls||[]).filter(c=>c.type==='EFM'||c.type==='EnergyManager2')
     .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
 }
+// Verlaufsquellen: Bausteine mit Aufzeichnung, dahinter die Panels aus Grafana
+// (Einstellungen -> Grafana; uuid "gf:<dashboard>:<panel>", roomName "Grafana · <Dashboard>").
+function grafanaPanels(){ return ((META.grafana||{}).panels||[]); }
 function statControls(){
   return (META.controls||[]).filter(c=>c.stat)
-    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'));
+    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'))
+    .concat(grafanaPanels());
 }
+// Eintrag einer Verlaufs-Auswahl (Baustein oder Grafana-Panel) fuer die Chips
+function statCtrl(u){ return (META.controls||[]).find(x=>x.uuid===u) || grafanaPanels().find(x=>x.uuid===u); }
 function chartControlOptions(sel){
-  return statControls()
-    .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
+  const o=c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>';
+  const lox=(META.controls||[]).filter(c=>c.stat)
+    .sort((a,b)=>(a.roomName||'').localeCompare(b.roomName||'','de')||a.name.localeCompare(b.name,'de'));
+  const gf=grafanaPanels();
+  if(!gf.length) return lox.map(o).join('');
+  return (lox.length?'<optgroup label="'+esc(T('Loxone-Statistik'))+'">'+lox.map(o).join('')+'</optgroup>':'')+
+    '<optgroup label="Grafana">'+gf.map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+
+      esc(c.name)+' ('+esc((c.roomName||'').replace(/^Grafana · /,''))+')</option>').join('')+'</optgroup>';
 }
 function chartAddOptions(){   // Dropdown zum Hinzufuegen: nur Bausteine mit Aufzeichnung
   return '<option value="">'+T('＋ hinzufügen …')+'</option>'+chartControlOptions('');
@@ -544,6 +556,9 @@ function firstEnergyControl(){
 // der Baustein Intercom (IntercomV2). Das Live-Bild kommt ueber /mjpeg?id=<uuid>;
 // die Zugangsdaten stehen in Einstellungen -> Intercom.
 const INTERCOM_TYPEN=['Intercom','IntercomV2'];
+// Hoechstens so viele Kameras je Widget (wie KAMERA_MAX im Server): jede
+// gestapelte haelt eine eigene Bildverbindung, Browser erlauben nur ~6 je Server
+const KAMERA_MAX=4;
 function cameraOptions(sel){
   return (META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type))
     .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
@@ -653,9 +668,8 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
     const isP=v.indexOf('player:')===0, isE=v.indexOf('energy:')===0, isC=v.indexOf('camera:')===0, isV=v.indexOf('chart:')===0, isS=v.indexOf('status:')===0;
     const isH=(v==='header'||v.indexOf('header:')===0);   // Kopfzeile: Uhr, Wetter, dazu Werte nach Wahl
     const kind=isP?'player':(isE?'energy':(isC?'camera':(isV?'chart':(isS?'status':(isH?'header':v))))), zone=isP?v.slice(7):'', euid=isE?v.slice(7):'';
-    // Kamera: "camera:<uuid>|<uuid>,..." - Bild-UUID vor, Werte unter dem Bild hinter dem Strich
-    // mehrere Kameras ("camera:a,b|...") = blaetterbare Seiten; die erste waehlt das Feld, weitere die Chips
-    const cams=isC?camUuids(v):[], camu=cams[0]||'', cwu=isC?camWerte(v):[];
+    // Kamera: "camera:[page:]<uuid>,...|<uuid>,..." - Kameras vor, Werte unter dem Bild hinter dem Strich
+    const cwu=isC?camWerte(v):[];
     const suu=isS?v.slice(7).split(',').filter(Boolean):[];
     const huu=isH?v.slice(7).split(',').filter(Boolean):[];   // "header:" ist 7 Zeichen wie "status:"
     // Verlauf: ein oder mehrere Bausteine; Modus 'page:'/'stack:' optional vorangestellt
@@ -680,24 +694,13 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
       '</select>';
     if(isP) row+='<select data-panez="'+esc(tk)+'">'+audioZoneOptions(zone)+'</select>';
     if(isE) row+='<select data-panee="'+esc(tk)+'">'+energyControlOptions(euid)+'</select>';
-    if(isC) row+='<select data-panec="'+esc(tk)+'">'+cameraOptions(camu)+'</select>';
     row+='</div>';
     // Werteleiste: die Anzeige-Bausteine dieser Seite als Zeile ueber dem
     // Raster statt als Kacheln (ui.valueBar nennt die Seiten)
     row+='<div class="ccrow" style="margin:2px 0 0 0"><label class="chk" style="margin:0;font-size:13px">'+
       '<input type="checkbox" data-leiste="'+esc(tk)+'"'+(leiste.indexOf(tk)>-1?' checked':'')+'> '+
       T('Werte als Leiste über den Kacheln')+'</label></div>';
-    if(isC){   // weitere Kameras: blaetterbare Seiten mit Punkten, gestreamt wird nur die sichtbare
-      const frei=(META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type) && cams.indexOf(c.uuid)<0);
-      row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Weitere Kameras')+'</span>'+
-        (frei.length ? '<select class="pcams-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+
-          frei.map(c=>'<option value="'+esc(c.uuid)+'">'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('')+'</select>' : '')+
-        '</div><div class="picked" style="margin:6px 0 2px">'+(cams.length>1
-          ? cams.slice(1).map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
-              return '<span class="chip on" data-pk="'+esc(tk)+'" data-camx="'+esc(u)+'">'+esc(c?c.name:u)+
-                '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
-          : '<span class="ccmut">'+T('Keine – eine Kamera ohne Blättern.')+'</span>')+'</div>';
-    }
+    if(isC) row+=kameraWahlHtml(v, tk);   // eine oder mehrere Kameras, gestapelt oder zum Blaettern
     if(isC){   // Werte unter dem Kamerabild (Tablet: die Pane ist hoeher als das 4:3-Bild)
       row+='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Werte unter dem Bild')+'</span>'+
         '<select class="pcam-add" data-pk="'+esc(tk)+'"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -733,7 +736,7 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
         '<select class="pchart-add" data-pk="'+esc(tk)+'">'+chartAddOptions()+'</select>'+
         ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':'')+'</div>'+
         '<div class="picked" style="margin:6px 0 2px">'+(vuu.length
-          ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+          ? vuu.map(u=>{ const c=statCtrl(u);
               return '<span class="chip on" data-pk="'+esc(tk)+'" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
                 '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
           : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>'+
@@ -807,34 +810,78 @@ function paneListe(p, box, tabs, leer, nachher, opt={}){
   box.querySelectorAll('select[data-panee]').forEach(s=>s.onchange=()=>{
     setPane(s.dataset.panee,'energy:'+s.value);
   });
-  box.querySelectorAll('select[data-panec]').forEach(s=>s.onchange=()=>{   // erste Kamera wechseln, weitere und Werte behalten
-    const tk=s.dataset.panec, cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
-    const rest=camUuids(cur).slice(1).filter(x=>x!==s.value);
-    setPane(tk, camPane([s.value].concat(rest).join(','), camWerte(cur)));
-    renderPanes(p);
-  });
-  box.querySelectorAll('.pcams-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
-    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'', cc=camUuids(cur);
-    if(!u||cc.indexOf(u)>-1) return;
-    setPane(tk, camPane(cc.concat([u]).join(','), camWerte(cur))); renderPanes(p); });
-  box.querySelectorAll('.chip[data-camx][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
-    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
-    setPane(tk, camPane(camUuids(cur).filter(x=>x!==n.dataset.camx).join(','), camWerte(cur))); renderPanes(p); });
+  const paneJetzt=tk=>(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
+  const kamera=(n)=>{ const tk=n.dataset.pk, neu=kameraWahlNeu(paneJetzt(tk), n);
+    if(neu){ setPane(tk, neu); renderPanes(p); } };
+  box.querySelectorAll('select.kw-add[data-pk], select.kw-mode[data-pk]').forEach(s=>s.onchange=()=>kamera(s));
+  box.querySelectorAll('.kw-chip[data-pk]').forEach(n=>n.onclick=()=>kamera(n));
   box.querySelectorAll('.pcam-add').forEach(s=>s.onchange=()=>{ const tk=s.dataset.pk, u=s.value; s.value='';
-    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'', uu=camWerte(cur);
-    if(!u||uu.indexOf(u)>-1||(svMax()&&uu.length>=svMax())) return;
-    setPane(tk, camPane(camUuid(cur), uu.concat([u]))); renderPanes(p); });
+    const t=camTeile(paneJetzt(tk));
+    if(!u||t.werte.indexOf(u)>-1||(svMax()&&t.werte.length>=svMax())) return;
+    t.werte=t.werte.concat([u]); setPane(tk, camWert(t)); renderPanes(p); });
   box.querySelectorAll('.chip[data-cwu][data-pk]').forEach(n=>n.onclick=()=>{ const tk=n.dataset.pk;
-    const cur=(p.ui&&p.ui.panes&&p.ui.panes[tk])||'';
-    setPane(tk, camPane(camUuid(cur), camWerte(cur).filter(x=>x!==n.dataset.cwu))); renderPanes(p); });
+    const t=camTeile(paneJetzt(tk)); t.werte=t.werte.filter(x=>x!==n.dataset.cwu);
+    setPane(tk, camWert(t)); renderPanes(p); });
 }
-// Kamera-Widget: "camera:<uuid>[,<uuid>...]" oder dahinter "|<uuid>,<uuid>" (Werte unter
-// dem Bild). camUuid liefert alle Kameras als Text (fuer camPane), camUuids als Liste.
-function camUuid(v){ return (v||'').indexOf('camera:')===0 ? v.slice(7).split('|')[0] : ''; }
-function camUuids(v){ return camUuid(v).split(',').filter(Boolean); }
-function camWerte(v){ if((v||'').indexOf('camera:')!==0) return []; const r=v.slice(7), i=r.indexOf('|');
-  return i<0?[]:r.slice(i+1).split(',').filter(Boolean); }
-function camPane(u,uu){ return 'camera:'+(u||'')+(uu&&uu.length?'|'+uu.join(','):''); }
+// Kamera-Widget: "camera:[page:|stack:]<uuid>[,<uuid>...]" oder dahinter "|<uuid>,<uuid>"
+// (Werte unter dem Bild). Mehrere Kameras wie beim Verlauf: ohne Modus gestapelt,
+// "page:" zum Blaettern. camTeile zerlegt, camWert baut (Modus nur bei page und
+// mehreren Kameras).
+function camTeile(v){
+  if((v||'').indexOf('camera:')!==0) return {mode:'stack', cams:[], werte:[]};
+  let r=v.slice(7), mode='stack';
+  const m=/^(page|stack):/.exec(r); if(m){ mode=m[1]; r=r.slice(m[0].length); }
+  const i=r.indexOf('|');
+  return {mode:mode, cams:(i<0?r:r.slice(0,i)).split(',').filter(Boolean),
+          werte:i<0?[]:r.slice(i+1).split(',').filter(Boolean)};
+}
+function camWert(t){
+  return 'camera:'+(t.mode==='page'&&t.cams.length>1?'page:':'')+t.cams.join(',')+
+    (t.werte&&t.werte.length?'|'+t.werte.join(','):'');
+}
+function camWerte(v){ return camTeile(v).werte; }
+// Kamera-Auswahl, gleich in Widget-Pane, freier Seite und Uhr-Seite: gewaehlte
+// Kameras als Chips (die letzte bleibt), weitere ueber "hinzufuegen", ab zwei die
+// Darstellung (opt.modus:false laesst sie weg - die Uhr-Seite stapelt immer).
+// pk: Kennung fuer die Handler (data-pk), leer wo es nur eine Auswahl gibt.
+function kameraWahlHtml(v, pk, opt){
+  opt=opt||{};
+  const t=camTeile(v), pkA=pk?' data-pk="'+esc(pk)+'"':'';
+  const alle=(META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type));
+  const frei=alle.filter(c=>t.cams.indexOf(c.uuid)<0), voll=t.cams.length>=KAMERA_MAX;
+  let h='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Kameras')+'</span>'+
+    (frei.length&&!voll ? '<select class="kw-add"'+pkA+'><option value="">'+T('＋ Kamera hinzufügen …')+'</option>'+
+        frei.map(c=>'<option value="'+esc(c.uuid)+'">'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('')+'</select>'
+      : '<span class="ccmut">'+(voll ? T('Mehr Kameras gehen nicht gleichzeitig.')
+          : (alle.length<2 ? T('Nur ein Intercom-Baustein in der Anlage.') : ''))+'</span>')+'</div>';
+  h+='<div class="picked" style="margin:6px 0 2px">'+(t.cams.length
+    ? t.cams.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+        return '<span class="chip on kw-chip"'+pkA+' data-kwu="'+esc(u)+'">'+esc(c?c.name:u)+
+          '<span class="rm">'+esc((c&&c.roomName)||'')+'</span>'+(t.cams.length>1?'<span class="x">×</span>':'')+'</span>'; }).join('')
+    : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
+  if(t.cams.length>=2 && opt.modus!==false)
+    h+='<div class="ccrow" style="margin:4px 0 0 0"><span class="ccnm">'+T('Darstellung')+'</span>'+
+      '<select class="kw-mode"'+pkA+'>'+
+        '<option value="stack"'+(t.mode!=='page'?' selected':'')+'>'+T('Gestapelt (untereinander)')+'</option>'+
+        '<option value="page"'+(t.mode==='page'?' selected':'')+'>'+T('Blättern (Punkte)')+'</option>'+
+      '</select></div>';
+  return h;
+}
+// Neuer Wert nach einer Aktion in der Kamera-Auswahl (ziel = geaendertes Select
+// oder angetippter Chip), null = nichts zu tun. opt.modus:false entfernt den Modus.
+function kameraWahlNeu(v, ziel, opt){
+  opt=opt||{};
+  const t=camTeile(v);
+  if(opt.modus===false) t.mode='stack';
+  if(ziel.matches('select.kw-add')){ const u=ziel.value; ziel.value='';
+    if(!u || t.cams.indexOf(u)>-1 || t.cams.length>=KAMERA_MAX) return null;
+    t.cams.push(u); return camWert(t); }
+  if(ziel.matches('select.kw-mode')){ t.mode=ziel.value==='page'?'page':'stack'; return camWert(t); }
+  const chip=ziel.closest && ziel.closest('.kw-chip');
+  if(chip){ if(t.cams.length<2) return null;
+    t.cams=t.cams.filter(x=>x!==chip.dataset.kwu); return camWert(t); }
+  return null;
+}
 // Screensaver: rechte Spalte. Gleiche Werte-Grammatik wie die Tab-Panes, damit
 // es nicht zwei Sprachen fuer dieselbe Sache gibt.
 // Drei Arten brauchen ein Ziel: "Werte" mindestens einen Baustein, Energiefluss
@@ -869,8 +916,8 @@ function renderSvPane(p){
       '<option value="status"'+(k==='status'?' selected':'')+'>Werte</option>'+
       '<option value="off"'+(k==='off'?' selected':'')+'>Nichts (Uhr über volle Breite)</option>'+
     '</select>';
-  if(k==='player'||k==='energy'||k==='camera'){
-    const opt=(k==='player')?audioZoneOptions(arg):(k==='energy')?energyControlOptions(arg):cameraOptions(arg);
+  if(k==='player'||k==='energy'||(k==='camera'&&!firstCamera())){
+    const opt=(k==='player')?audioZoneOptions(arg):(k==='energy')?energyControlOptions(arg):'';
     h+= opt ? '<select id="fSvArg">'+opt+'</select>'
       : '<span class="ccmut">'+(k==='player'
           ? T('Keine Musikzone in der Anlage.')
@@ -880,6 +927,8 @@ function renderSvPane(p){
   h+='</div>';
   const uu=(k==='status'&&arg)?arg.split(','):[];
   const vuu=(k==='chart'&&arg)?arg.split(','):[];   // Verlauf gestapelt (wie Werte)
+  // Kameras: eine oder mehrere, die Uhr-Seite stapelt sie immer (keine Darstellung)
+  if(k==='camera' && firstCamera() && v.indexOf('camera:')===0) h+=kameraWahlHtml(v, '', {modus:false});
   if(k==='status'){
     h+='<div class="ccrow" style="margin-top:8px"><span class="ccnm">'+T('Bausteine')+'</span>'+
        '<select id="fSvAdd"><option value="">'+T('＋ hinzufügen …')+'</option>'+controlOptions()+'</select>'+
@@ -894,9 +943,9 @@ function renderSvPane(p){
     h+='<div class="ccrow" style="margin-top:8px"><span class="ccnm">'+T('Bausteine')+'</span>'+
        '<select id="fSvChartAdd">'+chartAddOptions()+'</select>'+
        ((svMax()&&vuu.length>=svMax())?'<span class="ccmut">'+T('Mehr passt nicht auf die Seite.')+'</span>':
-         (statControls().length?'':'<span class="ccmut">'+T('Kein Baustein mit Aufzeichnung in der Anlage.')+'</span>'))+'</div>';
+         (statControls().length?'':'<span class="ccmut">'+T('Kein Baustein mit Aufzeichnung in der Anlage und kein Grafana-Panel.')+'</span>'))+'</div>';
     h+='<div class="picked" style="margin-top:8px">'+(vuu.length
-      ? vuu.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
+      ? vuu.map(u=>{ const c=statCtrl(u);
           return '<span class="chip on" data-cu="'+esc(u)+'">'+esc(c?c.name:u)+
             '<span class="rm">'+esc((c&&c.roomName)||'')+'</span><span class="x">×</span></span>'; }).join('')
       : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
@@ -930,6 +979,8 @@ function renderSvPane(p){
     const rest=uu.filter(x=>x!==n.dataset.su);
     setSv(rest.length?('status:'+rest.join(',')):'');
   });
+  box.querySelectorAll('select.kw-add').forEach(s=>s.onchange=()=>{ const n=kameraWahlNeu(v, s, {modus:false}); if(n) setSv(n); });
+  box.querySelectorAll('.kw-chip').forEach(n=>n.onclick=()=>{ const x=kameraWahlNeu(v, n, {modus:false}); if(x) setSv(x); });
   const cadd=$('#fSvChartAdd');
   if(cadd) cadd.onchange=()=>{ const u=cadd.value; cadd.value='';
     if(!u || vuu.indexOf(u)>-1 || (svMax()&&vuu.length>=svMax())) return;

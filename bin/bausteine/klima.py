@@ -91,9 +91,13 @@ def kachel_klimaanlage(app, uuid, c, it):
 def kachel_klimaregler(app, uuid, c, it):
     dh = app._state(c, "demandHeat") or 0
     dc = app._state(c, "demandCool") or 0
+    sub = "Heizt" if dh else ("Kühlt" if dc else "Bereit")
+    if dh or dc:
+        aktiv = [e for e in app._klima_einheiten(c) if e["demand"]]
+        if aktiv:
+            sub += " · " + app._klima_anzahl(aktiv, len(aktiv))
     it.update(icon="thermo", on=bool(dh or dc),
-              nav={"view": "control", "id": uuid},
-              sublabel=("Heizt" if dh else ("Kühlt" if dc else "Bereit")))
+              nav={"view": "control", "id": uuid}, sublabel=sub)
 
 
 @detail("IRoomControllerV2")
@@ -295,12 +299,10 @@ def detail_klimaregler(app, uuid, c, route):
     dh = app._state(c, "demandHeat") or 0
     dc = app._state(c, "demandCool") or 0
     big = "Heizt" if dh else ("Kühlt" if dc else "Bereit")
-    # verwaltete AC-Einheiten + wie viele gerade Bedarf anmelden
-    roh = app._state(c, "controls")
-    units = json_aus_text(roh)[1] if isinstance(roh, str) else None
-    units = units if isinstance(units, list) else []
-    active = sum(1 for u in units if isinstance(u, dict) and u.get("demand"))
-    sbits = [f"{active}/{len(units)} Anlagen aktiv"] if units else []
+    # zugeordnete Raumregler bzw. Klimaanlagen + wie viele gerade Bedarf anmelden
+    units = app._klima_einheiten(c)
+    active = sum(1 for e in units if e["demand"])
+    sbits = [f"{active}/{app._klima_anzahl(units, len(units))} aktiv"] if units else []
     hum = app._state(c, "humidity") or 0
     if hum:
         sbits.append(f"Feuchte {app._fmt_num(hum, '%.0f')} %")
@@ -310,13 +312,62 @@ def detail_klimaregler(app, uuid, c, route):
             sbits.append(f"Außen {app._fmt_num(out, '%.1f')} °C")
     except (TypeError, ValueError):
         pass
-    return app._big_view(uuid, "thermo", big, " · ".join(sbits),
-                          tone=("crit" if dc else None))
+    view = app._big_view(uuid, "thermo", big, " · ".join(sbits),
+                         tone=("crit" if dc else None))
+    # Liste der Einheiten, mit Anforderung zuerst; ein Tipp oeffnet die Einheit
+    for titel, gruppe in (("Mit Anforderung", [e for e in units if e["demand"]]),
+                          ("Ohne Anforderung", [e for e in units if not e["demand"]])):
+        if gruppe:
+            view["blocks"] += [{"k": "head", "text": titel},
+                               {"k": "row", "wrap": True, "cells": [app._klima_zelle(e) for e in gruppe]}]
+    return view
 
 
 class KlimaHelfer:
     """Helfer der Familie Klima fuer Kachel, Detailseite und Unterseiten. Mixin: App erbt sie ueber
     bausteine.BausteinHelfer, gerufen wird ueber self bzw. app."""
+
+    def _klima_einheiten(self, c: dict) -> list[dict]:
+        """Einheiten eines Klimareglers (ClimateControllerUS) aus dem State
+        controls ([{uuid, demand}]): Raumregler bzw. Klimaanlagen, die es in
+        der Struktur gibt, je {uuid, demand, name, typ}. Heissen zwei gleich
+        (etwa zwei "Klimaanlagensteuerung"), steht der Raum dahinter."""
+        roh = self._state(c, "controls")
+        liste = json_aus_text(roh)[1] if isinstance(roh, str) else None
+        out = []
+        for e in liste if isinstance(liste, list) else []:
+            u = e.get("uuid") if isinstance(e, dict) else None
+            ec = self.controls.get(u)
+            if not ec:
+                continue
+            out.append({"uuid": u, "demand": bool(e.get("demand")), "typ": ec.get("type"),
+                        "name": _clean(ec.get("name")), "room": ec.get("room")})
+        namen = [e["name"] for e in out]
+        for e in out:
+            raum = _clean((self.rooms.get(e["room"]) or {}).get("name"))
+            if namen.count(e["name"]) > 1 and raum:
+                e["name"] += f" ({raum})"
+        return out
+
+    @staticmethod
+    def _klima_anzahl(einheiten: list[dict], n: int) -> str:
+        """"4 Räume" fuer Raumregler, sonst "2 Anlagen" (Klimaanlagen)."""
+        raeume = all(e["typ"] in ("IRoomControllerV2", "IRoomController") for e in einheiten)
+        if raeume:
+            return f"{n} {'Raum' if n == 1 else 'Räume'}"
+        return f"{n} {'Anlage' if n == 1 else 'Anlagen'}"
+
+    def _klima_zelle(self, e: dict) -> dict:
+        """Zelle einer Einheit im Klimaregler: Name, bei Raumreglern Ist/Soll;
+        ein Tipp oeffnet ihre Detailseite."""
+        label = e["name"]
+        if e["typ"] in ("IRoomControllerV2", "IRoomController"):
+            ec = self.controls.get(e["uuid"], {})
+            ist = self._fmt_num(self._state(ec, "tempActual"), "%.1f")
+            soll = self._fmt_num(self._state(ec, "tempTarget"), "%.1f")
+            if ist and soll:
+                label += f" · {ist} / {soll} °C"
+        return {"label": label, "on": e["demand"], "nav": {"view": "control", "id": e["uuid"]}}
 
     def _irc2_einstellungen(self, c: dict) -> list[dict]:
         """Einstellbare Temperaturen einer Raumregelung V2 (IRC2_EINSTELLUNGEN)

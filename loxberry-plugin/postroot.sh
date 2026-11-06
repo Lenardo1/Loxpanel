@@ -60,11 +60,12 @@ fi
 # Reste eines alten Containers entfernen (Daten liegen im Volume -> verlustfrei).
 docker rm -f loxpanel > /dev/null 2>&1
 
-# LoxPanel starten – aber nur, wenn Docker schon verfuegbar ist. Beim Erst-
-# Install wird Docker erst nach dem Reboot installiert; dann startet der
-# daemon (Boot) das Panel automatisch. Scheitert der Start (etwa: Port am
-# LoxBerry belegt), steht der Grund in der Ausgabe darueber.
-if which docker > /dev/null 2>&1; then
+# LoxPanel starten – aber nur, wenn Docker schon laeuft. Ist Docker nach dem
+# Erst-Install noch nicht bereit, fordern wir den Neustart an (plugin.cfg hat
+# REBOOT=false, damit Updates ohne Neustart auskommen); nach dem Neustart
+# startet der daemon (Boot) das Panel automatisch. Scheitert der Start (etwa:
+# Port am LoxBerry belegt), steht der Grund in der Ausgabe darueber.
+if which docker > /dev/null 2>&1 && docker info > /dev/null 2>&1; then
 	echo "<INFO> Starte LoxPanel..."
 	PORT=$(su -s /bin/bash loxberry -c "$BINDIR/loxpanel-ctl.sh port")
 	if su -s /bin/bash loxberry -c "$BINDIR/loxpanel-ctl.sh start"; then
@@ -74,7 +75,15 @@ if which docker > /dev/null 2>&1; then
 		RC=1
 	fi
 else
-	echo "<INFO> Docker wird beim Neustart installiert – LoxPanel startet danach automatisch."
+	# Wie plugininstall.pl bei REBOOT=true: LoxBerry::System::reboot_required()
+	# schreibt nach log/system_tmpfs/reboot.required, die Oberflaeche zeigt dann
+	# "Neustart erforderlich". Ohne die Perl-Lib dieselbe Datei direkt.
+	LPREBOOT="LoxPanel: Neustart nötig, damit Docker bereit ist."
+	if ! perl -I "$ARGV5/libs/perllib" -MLoxBerry::System -e 'LoxBerry::System::reboot_required($ARGV[0])' "$LPREBOOT" 2>/dev/null; then
+		echo "$LPREBOOT" >> "$ARGV5/log/system_tmpfs/reboot.required"
+		chown loxberry:loxberry "$ARGV5/log/system_tmpfs/reboot.required" 2>/dev/null
+	fi
+	echo "<INFO> Docker ist noch nicht bereit – bitte LoxBerry neu starten, LoxPanel startet danach automatisch."
 fi
 
 exit $RC

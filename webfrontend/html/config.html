@@ -346,6 +346,22 @@
           </div>
         </section>
 
+        <!-- Grafana: Panels als zweite Verlaufsquelle (bin/grafana.py) -->
+        <section class="spane" data-sub="grafana">
+          <p class="lead" data-i18n>Zeigt Panels aus deiner Grafana (z.B. der von Stats4Lox) als Verlauf in der Visu – im selben Stil wie die Loxone-Statistik. Danach stehen die Panels überall zur Wahl, wo es „Verlauf“ gibt.</p>
+          <div class="card">
+            <div class="field" style="max-width:none"><label class="lbl" data-i18n>Adresse (IP:Port)</label><input type="text" id="gf_url" placeholder="192.168.1.10:3000" autocomplete="off"></div>
+            <div class="field" style="max-width:none;margin-top:12px"><label class="lbl" data-i18n>Service-Account-Token</label><input type="password" id="gf_token" autocomplete="new-password"></div>
+            <p class="note" data-i18n>In Grafana unter Administration → Benutzer und Zugriff → Service-Accounts einen Account mit der Rolle „Viewer“ anlegen und dort ein Token erzeugen. Alternativ Benutzer und Passwort eines Grafana-Kontos; ist anonymer Zugriff erlaubt, bleibt beides leer.</p>
+            <div class="row2" style="margin-top:12px">
+              <div class="field"><label class="lbl" data-i18n>Benutzer</label><input type="text" id="gf_user" autocomplete="off"></div>
+              <div class="field"><label class="lbl" data-i18n>Passwort</label><input type="password" id="gf_pass" autocomplete="new-password"></div>
+            </div>
+            <div class="actions"><button class="btn ghost" id="gf_test" data-i18n>Verbindung prüfen</button><span class="toast" id="gf_toast"></span></div>
+            <div class="note" id="gf_status" style="margin-top:10px"></div>
+          </div>
+        </section>
+
         <!-- Neues Panel -->
         <section class="spane" data-sub="backup">
           <p class="lead" data-i18n>Alle Einstellungen dieses Servers als ZIP-Datei: Miniserver-Zugang, Kamera, Kalender, Ansichten, Geräte und Design.</p>

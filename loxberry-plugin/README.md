@@ -19,7 +19,9 @@ und hält ihn am Laufen. Die gesamte App (Server + Weboberfläche) steckt im Ima
 
 ## Bedienung
 
-Nach der Installation (und einem Reboot, falls Docker frisch installiert wurde):
+Nach der Installation (und einem Reboot, falls LoxBerry danach einen anfordert –
+nur wenn Docker frisch installiert wurde und noch nicht bereit ist; Updates
+kommen ohne Neustart aus):
 
 - **Konfiguration:** `http://<LoxBerry-IP>:<Port>/config` (Panels, Räume, Kacheln)
 - **Einstellungen:** `http://<LoxBerry-IP>:<Port>/settings` (Miniserver-Zugang, Intercom, Displays)

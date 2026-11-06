@@ -47,6 +47,7 @@ from konfig import (  # noqa: E402  # Konfigdateien: Pfade, Laden, Pruefen, Schr
     load_theme, _night_config)
 # App setzt sich aus Mixins zusammen, je Thema ein Modul (Reihenfolge wie die Basisklassen).
 from statistik import Statistik  # noqa: E402  # Verlaeufe (Statistik-Dateien)
+from grafana import Grafana  # noqa: E402  # Verlaeufe aus Grafana-Panels
 from bausteine import BausteinHelfer  # noqa: E402  # Helfer der Bausteine
 from haus import Haus  # noqa: E402  # Hausuebersicht
 from gesten import Gesten  # noqa: E402  # Gesten der Visu
@@ -67,8 +68,8 @@ from routen.visu import ws_handler  # noqa: E402
 from routen.konfigurator import (  # noqa: E402
     api_entwurf, api_kachelset, api_meta, api_save_panels, api_save_theme, api_types)
 from routen.einstellungen import (  # noqa: E402
-    api_backup, api_restore, api_settings, api_settings_audiometa, api_settings_calendar, api_settings_ms,
-    api_settings_night)
+    api_backup, api_grafana_panels, api_grafana_pruefen, api_restore, api_settings, api_settings_audiometa,
+    api_settings_calendar, api_settings_grafana, api_settings_ms, api_settings_night)
 from routen.intercom import (  # noqa: E402
     api_intercom_geraete, api_intercom_talk_start, api_intercom_talk_status, api_intercom_talk_stop,
     api_settings_intercom, api_sip,
@@ -83,7 +84,7 @@ from routen.system import api_diagnose, api_health  # noqa: E402
 log = logging.getLogger("loxpanel.webvisu")
 
 
-class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
+class App(Statistik, Grafana, BausteinHelfer, Haus, Gesten, Miniserver,
           Geraete, Audiodienst, Intercomdienst, Front, Verteilung, Medien, Diagnosedaten, Ansicht, Seiten):
     # Pruefen und Exportieren der Konfiguration liegt in konfig.py; hier als
     # statische Methoden erreichbar, weil Server, Sicherung und Tests sie so rufen.
@@ -153,7 +154,7 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
         self._drv_session: aiohttp.ClientSession | None = None   # HTTP-Session fuer Display-Treiber (Kiosk-Apps)
         self.conn_player: dict[web.WebSocketResponse, str] = {}   # ws -> AudioZone-UUID der aktiven Player-Pane (via setplayer)
         self.conn_energy: dict[web.WebSocketResponse, str] = {}   # ws -> EFM/EnergyManager2-UUID der aktiven Energiefluss-Pane (via setenergy)
-        self.conn_camera: dict[web.WebSocketResponse, str] = {}   # ws -> Intercom-UUID der aktiven Kamera-Pane (via setcamera)
+        self.conn_camera: dict[web.WebSocketResponse, tuple] = {}   # ws -> Intercom-UUID(s) der aktiven Kamera-Pane (via setcamera)
         self.conn_status: dict[web.WebSocketResponse, tuple] = {}  # ws -> UUIDs der Status-Kacheln auf der Uhr-Seite (via setsvstatus)
         self.conn_chart: dict[web.WebSocketResponse, tuple[tuple[str, ...], str]] = {}   # ws -> (Baustein-UUIDs, Zeitraum) der Verlaufs-Pane (via setchart)
         self.conn_geste: dict[web.WebSocketResponse, dict] = {}   # ws -> laufende Geste (Dimmen, Lautstaerke), App.geste()
@@ -215,6 +216,8 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
         self.stat2_sem = asyncio.Semaphore(2)
         self.stat_gen = 0              # zaehlt jeden Abruf, Schluessel fuer stat_memo
         self.stat_memo: dict[tuple, list] = {}
+        # Grafana als zweite Verlaufsquelle (grafana.py): Zugang, Caches, Panel-Liste
+        self._grafana_init()
         # Prognose der Strompreis-Optimierer (getForecasts): uuid -> (forecastsTimestamp
         # beim Abruf, monotonic, [(start, ende, wert, geplant)] oder None nach Abruffehler)
         self.prognose_cache: dict[str, tuple[object, float, list | None]] = {}
@@ -315,6 +318,7 @@ class App(Statistik, BausteinHelfer, Haus, Gesten, Miniserver,
             await self.ws.close()
         if self.icon_session:
             await self.icon_session.close()
+        await self.grafana_close()
         if self.client:
             await self.client.close()
         if self.audio:
@@ -450,6 +454,9 @@ def main() -> None:
     a.router.add_post("/api/settings/night", api_settings_night)
     a.router.add_post("/api/settings/audiometa", api_settings_audiometa)
     a.router.add_post("/api/settings/calendar", api_settings_calendar)
+    a.router.add_post("/api/settings/grafana", api_settings_grafana)
+    a.router.add_post("/api/grafana/pruefen", api_grafana_pruefen)
+    a.router.add_get("/api/grafana/panels", api_grafana_panels)
     a.router.add_post("/api/agent/announce", api_agent_announce)
     a.router.add_get("/api/agents", api_agents)
     a.router.add_post("/api/agent/command", api_agent_command)
