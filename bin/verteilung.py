@@ -98,6 +98,31 @@ class Verteilung:
             m["secured"] = True
         return m
 
+    def _camera_msg(self, uuids) -> dict | None:
+        """{t:"camera"} fuer die Kamera-Pane: je gemeldeter Kamera ihre
+        Intercom-Bloecke ("cams": [{uuid, name, blocks, secured?}, ...]).
+        Gestapelt meldet das Panel alle Kameras der Pane, beim Blaettern nur die
+        sichtbare. "blocks"/"secured" der ersten Kamera stehen zusaetzlich oben
+        (Form von frueher). None, wenn keine davon ein Intercom ist."""
+        if isinstance(uuids, str):
+            uuids = (uuids,)
+        cams = []
+        for u in uuids or ():
+            ib = self.intercom_blocks(u)
+            if ib is None:
+                continue
+            c = self._pane_msg("camera", u, ib)
+            c.pop("t", None)
+            c["uuid"] = u
+            c["name"] = str((self.controls.get(u) or {}).get("name") or "")
+            cams.append(c)
+        if not cams:
+            return None
+        m = {"t": "camera", "blocks": cams[0]["blocks"], "cams": cams}
+        if cams[0].get("secured"):
+            m["secured"] = True
+        return m
+
     def _mark_dirty(self) -> None:
         self._dirty = True
 
@@ -368,13 +393,12 @@ class Verteilung:
             except Exception:
                 log.exception("chart_stack fehlgeschlagen (%s)", _chart)
         # Split-Layout: Kamera-Pane (Intercom-Vollansicht) des aktiven Tabs
-        # mitrendern (kommt vom Client via setcamera -> conn_camera).
+        # mitrendern (kommt vom Client via setcamera -> conn_camera, eine oder mehrere).
         camera_msg = None
         _cuid = self.conn_camera.get(ws)
         if _cuid:
             try:
-                ib = self.intercom_blocks(_cuid)
-                camera_msg = self._pane_msg("camera", _cuid, ib) if ib is not None else None
+                camera_msg = self._camera_msg(_cuid)
             except Exception:
                 log.exception("intercom_blocks fehlgeschlagen (%s)", _cuid)
         # Screensaver-Statusspalte: frei gewaehlte Bausteine dieses
