@@ -8,7 +8,10 @@
 // formatiert zeigt jedes Panel dieselbe Uhrzeit wie der Miniserver, egal in
 // welcher Zeitzone der Browser laeuft. Farben per style, weil var() in
 // SVG-Praesentationsattributen nicht ueberall greift.
-const CH_COLORS=['var(--accent)','var(--glow)','var(--crit)','var(--muted)'];
+// Die ersten vier aus dem Theme, danach feste, gut unterscheidbare Farben
+// fuer Diagramme mit vielen Reihen (Grafana-Sammel-Panels, bis 12 Linien).
+const CH_COLORS=['var(--accent)','var(--glow)','var(--crit)','var(--muted)',
+  '#4fa3e0','#e8a33d','#3fb68b','#9b6fd6','#e0679a','#c9c23a','#5bc0c8','#d9734a'];
 function chNum(v,dec){ return (+v).toFixed(dec).replace('.',','); }
 function chTime(t,span){ const d=new Date(t*1000), p=n=>String(n).padStart(2,'0');
   return span<=129600 ? p(d.getUTCHours())+':'+p(d.getUTCMinutes()) : p(d.getUTCDate())+'.'+p(d.getUTCMonth()+1)+'.'; }
@@ -27,14 +30,26 @@ function chTicks(t0,t1){
   return {ticks:[t0,t1], day:true};
 }
 let chSeq=0;
-function paintChart(box,b){
+function paintChart(box,b,nochmal){
   box.querySelectorAll('[data-rng]').forEach(c=>c.classList.toggle('on',c.dataset.rng===b.range));
   const body=box.querySelector('.chbody'); if(!body) return;
   if(b.state!=='ok'){
     body.innerHTML='<div class="chmsg">'+(b.state==='loading'?'Verlauf wird geladen …'
       :b.state==='error'?'Verlauf nicht abrufbar':'Keine Aufzeichnung in diesem Zeitraum')+'</div>';
     return; }
-  const W=440,H=150,pL=36,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
+  // In der Verlaufs-Pane (eine Seite, Diagramm fuellt die Hoehe) in echten
+  // Pixeln zeichnen: ein festes 440x150 mit preserveAspectRatio="none" wuerde
+  // Linien und Schrift mit der Pane-Hoehe in die Laenge ziehen.
+  const fill=!!body.closest('.fp-page.solo.cpage:not(.stack)');
+  let W=440, H=150;
+  if(fill && nochmal){ W=nochmal[0]; H=nochmal[1]; }
+  else if(fill){
+    body.innerHTML='<svg></svg>'+chLegend(b);
+    const sv=body.firstChild, w=Math.round(sv.clientWidth||0), h=Math.round(sv.clientHeight||0);
+    if(w>40 && h>40){ W=w; H=h; }
+    chBeobachten(body,box,b);
+  }
+  const pL=36,pR=10,pT=10,pB=22, t0=b.t0, t1=b.t1, span=Math.max(1,t1-t0);
   const unit=b.unit?(' '+b.unit):'', dec=Math.max(0,...b.series.map(s=>s.dec||0));
   const vals=b.series.flatMap(s=>s.pts.map(p=>p[1]));
   let lo=vals.length?Math.min(...vals):0, hi=vals.length?Math.max(...vals):1, mn, mx;
@@ -52,7 +67,9 @@ function paintChart(box,b){
   tk.ticks.forEach(t=>{ const x=X(t), a=x<pL+18?'start':(x>W-pR-18?'end':'middle');
     s+='<line class="chvgrid" x1="'+f(x)+'" x2="'+f(x)+'" y1="'+pT+'" y2="'+(H-pB)+'"/>'+
        '<text class="chax" x="'+f(x)+'" y="'+(H-6)+'" text-anchor="'+a+'">'+chTime(t,tk.day?Infinity:0)+'</text>'; });
-  const leg=[];
+  // Viele Reihen (Grafana-Sammel-Panels): knappe Legende mit dem letzten Wert,
+  // sonst braucht sie mehrere Zeilen und staucht das Diagramm.
+  const leg=[], viele=b.series.length>4;
   b.series.forEach((se,si)=>{
     const col=CH_COLORS[si%CH_COLORS.length], p=se.pts; if(!p.length) return;
     let info='';
@@ -77,11 +94,35 @@ function paintChart(box,b){
       s+='<polyline points="'+line+'" style="fill:none;stroke:'+col+';stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round"/>';
       const q=p[p.length-1]; s+='<circle cx="'+f(X(q[0]))+'" cy="'+f(Y(q[1]))+'" r="3.5" style="fill:'+col+'"/>';
       const vs=p.map(q=>q[1]);
-      info='min <b>'+chNum(Math.min(...vs),se.dec)+'</b> · max <b>'+chNum(Math.max(...vs),se.dec)+unit+'</b>';
+      info=viele ? '<b>'+chNum(q[1],se.dec)+unit+'</b>'
+                 : 'min <b>'+chNum(Math.min(...vs),se.dec)+'</b> · max <b>'+chNum(Math.max(...vs),se.dec)+unit+'</b>';
     }
     leg.push('<span><span class="chdot" style="background:'+col+'"></span>'+esc(se.name)+' · '+info+'</span>');
   });
-  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg">'+leg.join('')+'</div>';
+  body.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'+s+'</svg><div class="chleg'+(viele?' viele':'')+'">'+leg.join('')+'</div>';
+  if(fill && !nochmal){   // echte Legende braucht mehr/weniger Platz: einmal nachziehen
+    const sv=body.firstChild, w=Math.round(sv.clientWidth||0), h=Math.round(sv.clientHeight||0);
+    if(w>40 && h>40 && (Math.abs(w-W)>2 || Math.abs(h-H)>2)) paintChart(box,b,[w,h]);
+  }
+}
+// Legende vorab (gleiche Zeilenzahl wie die echte), damit das Diagramm vor dem
+// Zeichnen die Hoehe kennt, die ihm neben der Legende bleibt.
+function chLegend(b){
+  const viele=b.series.length>4, u=b.unit?(' '+esc(b.unit)):'';
+  return '<div class="chleg'+(viele?' viele':'')+'">'+b.series.filter(se=>se.pts.length).map(se=>
+    '<span><span class="chdot"></span>'+esc(se.name)+' · '+(viele?'<b>00,0'+u+'</b>':'min <b>00,0</b> · max <b>00,0'+u+'</b>')+'</span>').join('')+'</div>';
+}
+// Groesse der Pane aendert sich (Drehen, Blaettern, Split): neu zeichnen.
+const chRO=window.ResizeObserver ? new ResizeObserver(es=>es.forEach(e=>{
+  const body=e.target, k=body._chSize, w=Math.round(e.contentRect.width), h=Math.round(e.contentRect.height);
+  if(!body.isConnected || !body._chB) return;
+  if(k && Math.abs(k[0]-w)<3 && Math.abs(k[1]-h)<3) return;
+  body._chSize=[w,h];
+  if(k) paintChart(body._chBox, body._chB);
+})) : null;
+function chBeobachten(body,box,b){
+  body._chB=b; body._chBox=box;
+  if(chRO && !body._chObs){ body._chObs=true; chRO.observe(body); }
 }
 // Rahmen eines Diagramms (Detailseite und Verlaufs-Pane); die Zeitraum-Knoepfe
 // traegt nur das erste Diagramm einer Seite (b.ranges).
