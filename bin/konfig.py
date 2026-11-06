@@ -363,6 +363,10 @@ def _clean_lang(v):
 # Screensaver: hoechstens so viele Status-Kacheln in der rechten Spalte. Mehr
 # passt neben Uhr und Wetter auf keinem Panel lesbar hin.
 SV_STATUS_MAX = 8
+# Kameras je Kamera-Widget: jede gestapelte Kamera haelt im Browser eine eigene
+# MJPEG-Verbindung offen, und Browser erlauben je Server nur ~6 gleichzeitig.
+# Bei 4 bleiben Luft fuer Icons und /api. Gleicher Wert im Konfigurator (KAMERA_MAX).
+KAMERA_MAX = 4
 
 # Skalierung der Visu. Kette: global (theme.json ui.scale) -> Profil (ui.scale)
 # -> Geraet (devices[name].scale); die spaetere gewinnt, FEHLT sie, gilt die
@@ -556,19 +560,22 @@ def _clean_screen(d) -> dict:
     return {k: v for k, v in out.items() if v is not None}
 
 
-def _clean_camera(v: str) -> str:
-    """Kamera-Widget pruefen: "camera:<uuid>[,<uuid>...]" oder dahinter
-    "|<uuid>,<uuid>,...". Mehrere Kameras zeigt das Panel als blaetterbare
-    Seiten (die Uhr-Seite nur die erste); sie werden getrimmt, doppelte
-    entfernt und auf SV_STATUS_MAX begrenzt. Hinter dem senkrechten Strich
-    stehen frei gewaehlte Werte (wie "status:"), die das Panel unter dem
-    Kamerabild zeigt - auf einem Tablet bleibt dort sonst die halbe Pane leer.
-    Die Liste wird je Eintrag getrimmt und auf SV_STATUS_MAX begrenzt; ohne
-    Eintraege faellt der Strich weg. "" = ungueltig."""
+def _clean_camera(v: str, modus: bool = True) -> str:
+    """Kamera-Widget pruefen: "camera:[page:|stack:]<uuid>[,<uuid>...]" oder
+    dahinter "|<uuid>,<uuid>,...". Mehrere Kameras zeigt das Panel wie den
+    Verlauf: ohne Modus bzw. mit "stack:" untereinander (alle laufen), mit
+    "page:" als blaetterbare Seiten (nur die sichtbare laeuft). Die Kameras
+    werden getrimmt, doppelte entfernt und auf KAMERA_MAX begrenzt. Hinter
+    dem senkrechten Strich stehen frei gewaehlte Werte (wie "status:"), die das
+    Panel unter dem Kamerabild zeigt - auf einem Tablet bleibt dort sonst die
+    halbe Pane leer. Die Liste wird je Eintrag getrimmt und auf SV_STATUS_MAX
+    begrenzt; ohne Eintraege faellt der Strich weg. Der Modus bleibt nur bei
+    mehreren Kameras stehen und nur mit modus=True (die Uhr-Seite stapelt
+    immer, wie beim Verlauf). "" = ungueltig."""
     kopf = "camera:"
     if not (isinstance(v, str) and v.startswith(kopf) and len(v) > len(kopf)):
         return ""
-    rest = v[len(kopf):]
+    mode, rest = _chart_modus(v[len(kopf):])
     cams, _, werte = rest.partition("|")
     cc: list = []
     for x in cams.split(","):
@@ -577,8 +584,11 @@ def _clean_camera(v: str) -> str:
             cc.append(x)
     if not cc:
         return ""
+    cc = cc[:KAMERA_MAX]
+    if not modus or len(cc) < 2:
+        mode = ""
     uu = [x.strip() for x in werte.split(",") if x.strip()][:SV_STATUS_MAX]
-    return kopf + ",".join(cc[:SV_STATUS_MAX]) + ("|" + ",".join(uu) if uu else "")
+    return kopf + mode + ",".join(cc) + ("|" + ",".join(uu) if uu else "")
 
 
 def _chart_modus(rest: str) -> tuple[str, str]:
@@ -593,8 +603,9 @@ def _chart_modus(rest: str) -> tuple[str, str]:
 
 def _clean_tabpane(v) -> str:
     """Split-Pane eines Tabs pruefen: "weather" | "calendar" | "player:<uuid>"
-    | "energy:<uuid>" | "camera:<uuid>[,<uuid>...][|<uuid>,...]" (eine oder
-    mehrere Kameras, dahinter optional Werte unter dem Bild, _clean_camera) | "chart:[page:|stack:]<uuid>,..." (ein
+    | "energy:<uuid>" | "camera:[page:|stack:]<uuid>[,<uuid>...][|<uuid>,...]"
+    (eine oder mehrere Kameras, gestapelt oder zum Blaettern, dahinter optional
+    Werte unter dem Bild, _clean_camera) | "chart:[page:|stack:]<uuid>,..." (ein
     oder mehrere Verlaufs-Bausteine mit Aufzeichnung; ohne Modus bzw. mit
     "stack:" gestapelt, mit "page:" je Baustein eine blaetterbare Seite) | "status:<uuid>,..."
     (frei gewaehlte Werte, wie auf der Uhr-Seite) | "header" bzw.
@@ -694,8 +705,9 @@ def _clean_svpane(v) -> str:
     """Rechte Spalte der Uhr-Seite (Screensaver) pruefen und normieren.
 
     Erlaubt: "off" (keine zweite Spalte), "calendar", "weather",
-    "player:<zone>", "energy:<uuid>", "camera:<uuid>", "chart:<uuid>,..." (ein
-    oder mehrere Verlaufs-Bausteine, gestapelt) und "status:<uuid>,<uuid>,...".
+    "player:<zone>", "energy:<uuid>", "camera:<uuid>,..." (eine oder mehrere
+    Kameras, gestapelt), "chart:<uuid>,..." (ein oder mehrere
+    Verlaufs-Bausteine, gestapelt) und "status:<uuid>,<uuid>,...".
     Alles andere ergibt "" — das ist die Automatik: Termine, wenn welche
     anstehen, sonst die Wetter-Details. Unbekannte Werte wandern damit auf
     die Automatik statt eine leere Spalte zu erzeugen."""
@@ -704,8 +716,8 @@ def _clean_svpane(v) -> str:
     v = v.strip()
     if v in ("off", "calendar", "weather"):
         return v
-    if v.startswith("camera:"):
-        return _clean_camera(v)
+    if v.startswith("camera:"):   # Screensaver stapelt auch Kameras -> Modus abstreifen
+        return _clean_camera(v, modus=False)
     for kopf in ("player:", "energy:"):
         if v.startswith(kopf) and len(v) > len(kopf):
             return v

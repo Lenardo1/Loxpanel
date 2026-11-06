@@ -237,7 +237,7 @@ function seInhaltHtml(w){
       '</optgroup></select></div>';
   if(k==='player') h+='<div class="field"><label class="lbl">'+T('Musikzone')+'</label><select data-se-warg>'+audioZoneOptions(arg)+'</select></div>';
   else if(k==='energy') h+='<div class="field"><label class="lbl">'+T('Baustein')+'</label><select data-se-warg>'+energyControlOptions(arg)+'</select></div>';
-  else if(k==='camera') h+='<div class="field"><label class="lbl">'+T('Baustein')+'</label><select data-se-warg>'+cameraOptions(arg)+'</select></div>';
+  else if(k==='camera') h+='<div class="field se-werte-wahl">'+kameraWahlHtml(w, '')+'</div>';   // eine oder mehrere, gestapelt oder blaettern
   else if(k==='chart' || k==='status'){
     const uu=arg?arg.split(',').filter(Boolean):[];
     h+='<div class="field se-werte-wahl"><label class="lbl">'+T('Bausteine')+'</label>'+
@@ -497,6 +497,8 @@ function seKlick(host, ev){
   if(weg && ctx.seiteWeg){ ev.stopPropagation(); ctx.seiteWeg(Number(weg.dataset.seSeiteWeg)); return; }
   const kw=ev.target.closest('[data-se-kopf-weg]');
   if(kw){ seKopfWert(ctx, kw.dataset.seKopfWeg, false); seZeichnen(host); return; }
+  const kc=ev.target.closest('.kw-chip');
+  if(kc){ const e=ctx.seite(), n=kameraWahlNeu(e.widget||'', kc); if(n){ e.widget=n; ctx.geaendert(); seEigenNeu(host); seZeichnen(host); } return; }
   const ww=ev.target.closest('[data-se-wweg]');
   if(ww){ seWidgetWerte(ctx, ww.dataset.seWweg, false); seEigenNeu(host); seZeichnen(host); return; }
   const b=ev.target.closest('button'); if(!b || !host.contains(b) || b.disabled) return;
@@ -526,6 +528,8 @@ function seAenderung(host, ev){
   else if(t.matches('[data-se-raumf]')) seZustand(ctx.pkey).raum=t.value;
   else if(t.matches('[data-se-inhalt]')){ seInhalt(ctx, t.value); seEigenNeu(host); if(host.id==='seHost') sePaneZeichnen(PANELS[cur]); }
   else if(t.matches('[data-se-warg]')){ const e=ctx.seite(); e.widget=wKind(e.widget||'')+':'+t.value; ctx.geaendert(); }
+  else if(t.matches('select.kw-add, select.kw-mode')){ const e=ctx.seite(), n=kameraWahlNeu(e.widget||'', t);
+    if(!n) return; e.widget=n; ctx.geaendert(); seEigenNeu(host); }
   else if(t.matches('[data-se-wneu]')){ seWidgetWerte(ctx, t.value, true); seEigenNeu(host); }
   else if(t.matches('[data-se-kopf-neu]')) seKopfWert(ctx, t.value, true);
   else return;

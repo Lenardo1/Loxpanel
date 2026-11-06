@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from aiohttp import web, WSMsgType
 
 from geraete import KIOSK_APPS, NEULADEN_STUNDE
-from konfig import _clean_screen, KACHEL_WACHSEN, PANE_ANTEIL, STAT_RANGES, SV_STATUS_MAX
+from konfig import _clean_screen, KACHEL_WACHSEN, PANE_ANTEIL, STAT_RANGES, SV_STATUS_MAX, KAMERA_MAX
 from routen.gemeinsam import server_stand
 from statistik import STAT_DEFAULT_RANGE
 
@@ -274,17 +274,26 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 else:
                     app.conn_status.pop(ws, None)
             elif data.get("t") == "setcamera":
-                # Client meldet die Intercom-Kachel der aktiven Kamera-Pane
-                # (oder "" = keine).
-                cuid = str(data.get("uuid") or "").strip()
-                if cuid:
-                    app.conn_camera[ws] = cuid
+                # Client meldet die Intercom-Kachel(n) der aktiven Kamera-Pane:
+                # "uuids" (gestapelt alle, beim Blaettern die sichtbare) oder
+                # wie frueher eine "uuid"; leer = keine.
+                roh = data.get("uuids")
+                if not isinstance(roh, list):
+                    roh = [data.get("uuid")]
+                cuu: list = []
+                for x in roh:
+                    x = str(x or "").strip()[:60]
+                    if x and x not in cuu:
+                        cuu.append(x)
+                cuu = cuu[:KAMERA_MAX]
+                if cuu:
+                    app.conn_camera[ws] = tuple(cuu)
                     try:
-                        ib = app.intercom_blocks(cuid)
-                        if ib is not None:
-                            await ws.send_json(app._pane_msg("camera", cuid, ib))
+                        _cm = app._camera_msg(cuu)
+                        if _cm is not None:
+                            await ws.send_json(_cm)
                     except Exception:
-                        log.exception("intercom_blocks (setcamera) fehlgeschlagen (%s)", cuid)
+                        log.exception("intercom_blocks (setcamera) fehlgeschlagen (%s)", cuu)
                 else:
                     app.conn_camera.pop(ws, None)
     finally:

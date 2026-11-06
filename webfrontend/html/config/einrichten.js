@@ -27,12 +27,16 @@ function paneTausch(v, uu){
   const m=/^([a-z]+):(.*)$/.exec(v||''); if(!m) return v;   // weather, calendar, header, off, ''
   const art=m[1], rest=m[2];
   if(art==='player'||art==='energy'){ const z=uu(rest); return z ? art+':'+z : ''; }
-  if(art==='camera'){ const [bild, werte]=rest.split('|'); const b=uu(bild); if(!b) return '';
+  // Kamera und Verlauf: Darstellung ("page:"/"stack:") bleibt vorn stehen
+  const mm=/^(page|stack):/.exec(rest), modus=(art==='camera'||art==='chart')&&mm ? mm[0] : '';
+  const rumpf=modus ? rest.slice(modus.length) : rest;
+  if(art==='camera'){ const [bild, werte]=rumpf.split('|');
+    const b=(bild||'').split(',').filter(Boolean).map(uu).filter(Boolean); if(!b.length) return '';
     const w=(werte||'').split(',').filter(Boolean).map(uu).filter(Boolean);
-    return 'camera:'+b+(w.length?('|'+w.join(',')):''); }
-  const l=rest.split(',').filter(Boolean).map(uu).filter(Boolean);   // chart, status, header
+    return 'camera:'+(b.length>1?modus:'')+b.join(',')+(w.length?('|'+w.join(',')):''); }
+  const l=rumpf.split(',').filter(Boolean).map(uu).filter(Boolean);   // chart, status, header
   if(art==='header') return l.length ? 'header:'+l.join(',') : 'header';
-  return l.length ? art+':'+l.join(',') : '';
+  return l.length ? art+':'+modus+l.join(',') : '';
 }
 function profilMitRaumtausch(p, von, nach, controls){
   const quelle=controls.filter(c=>c.room===von), ziel=controls.filter(c=>c.room===nach);
