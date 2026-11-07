@@ -173,6 +173,8 @@ function connect(){
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs;
       applyDisplayCfg(msg);   // Display aus / Auto-Neustart ohne Agent (Kiosk-App)
       pinMerkenS=(typeof msg.pinMerken==='number' && msg.pinMerken>0) ? msg.pinMerken : 0;
+      paneGrossS=(typeof msg.paneGross==='number' && msg.paneGross>0) ? msg.paneGross : 0;
+      grossPruefen();   // ausgeschaltet: eine grosse Seite gleich zurueck; Griff ein/aus
       gestenAn=(msg.gesten===true);   // Zwei-Finger-Gesten (Vorgaben/Ansicht)
       gestenHinweis=(msg.gestenHinweis===true);   // ... mit Hinweis-Symbol
       nachtUhrSetzen();               // ihre Symbole auf der Nacht-Uhr
