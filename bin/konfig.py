@@ -408,7 +408,7 @@ KLINGELTON_WERTE = ("app", "alle")
 THEME_UI_KEYS = ("iconSize", "nameSize", "subSize", "roomSize", "bigSize", "font", "textColor",
                  "baseColor", "bold", "lang", "scale", "nightDim", "nightWake", "dpmsOff", "reloadHours",
                  "gesten", "gestenHinweis", "hausAus", "raumVerlassen", "nightClock", "nightClockBright",
-                 "klingelTon")
+                 "klingelTon", "grenzwerte")
 
 # Groessen (px), wenn weder das Panel noch die globale Darstellung eine setzt,
 # je Kachel-Aufbau. Der neue stellt meist den Zustand gross und den Namen klein
@@ -1526,6 +1526,19 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     # LoxPanel-App, "alle" auf jedem Display; fehlt = aus
     if ui.get("klingelTon") in KLINGELTON_WERTE:
         out["klingelTon"] = ui["klingelTon"]
+    # Grenzwerte je Baustein (eigene Version): {uuid: {"min": x, "max": y}}
+    gw = ui.get("grenzwerte")
+    if isinstance(gw, dict):
+        sauber = {}
+        for u, g in list(gw.items())[:50]:
+            if not isinstance(u, str) or not isinstance(g, dict):
+                continue
+            e = {k: float(g[k]) for k in ("min", "max")
+                 if isinstance(g.get(k), (int, float)) and not isinstance(g.get(k), bool)}
+            if e:
+                sauber[u[:64]] = e
+        if sauber:
+            out["grenzwerte"] = sauber
     return out
 
 

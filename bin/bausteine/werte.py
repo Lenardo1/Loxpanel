@@ -69,7 +69,13 @@ def kachel_schieberegler(app, uuid, c, it):
 @kachel("InfoOnlyAnalog")
 def kachel_analogwert(app, uuid, c, it):
     det = c.get("details") or {}
-    it["sublabel"] = app._fmt_num(app._state(c, "value"), det.get("format", "%.1f"))
+    wert = app._state(c, "value")
+    it["sublabel"] = app._fmt_num(wert, det.get("format", "%.1f"))
+    # Grenzwerte (eigene Version): ausserhalb [min, max] rot, z. B. pH/Chlor am Whirlpool
+    g = ((app.theme.get("ui") or {}).get("grenzwerte") or {}).get(uuid)
+    if g and isinstance(wert, (int, float)) and not isinstance(wert, bool):
+        if (g.get("min") is not None and wert < g["min"]) or (g.get("max") is not None and wert > g["max"]):
+            it["tone"] = "crit"
 
 
 @kachel("TextState", "InfoOnlyText")

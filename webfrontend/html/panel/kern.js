@@ -177,7 +177,9 @@ function playKlingelTon(test){
       const komp=_actx.createDynamicsCompressor();
       komp.threshold.value=-18; komp.knee.value=6; komp.ratio.value=12;
       komp.attack.value=0.003; komp.release.value=0.25;
-      const vor=_actx.createGain(); vor.gain.value=2.5;
+      // Nachts (Nacht-Ausloeser, z. B. Schlafen) leise statt laut (eigene Version)
+      const nachts=(typeof NIGHT!=='undefined' && NIGHT.on);
+      const vor=_actx.createGain(); vor.gain.value=nachts ? 0.35 : 2.5;
       vor.connect(komp); komp.connect(_actx.destination);
       const ton=(f,t,dauer)=>{
         // Grundton mit Obertoenen, weich abklingend wie ein Gong
