@@ -182,7 +182,7 @@ function connect(){
       _screenSent='';         // neue Verbindung: der Server kennt die Groesse noch nicht
       applyScale();
       renderTabs(); return; }
-    if(msg.t==='ring'){ if(msg.id){ wake(); nav({view:'control',id:msg.id}); } return; }   // Klingel: Display an, Uhr weg
+    if(msg.t==='ring'){ if(msg.id){ wake(); nav({view:'control',id:msg.id}); klingelGross(); } return; }   // Klingel: Display an, Uhr weg, Tuersprechanlage gross
     if(msg.t==='alarm'){ if(msg.on){ wake(); startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
     if(msg.t==='testtone'){ playTestTone(); return; }
     if(msg.t==='front'){ frontData=msg; renderFront(); if(FRONT_TEST) renderFrontRich(el('frontPage')); applyPane();

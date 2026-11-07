@@ -76,7 +76,9 @@ def detail_tuersprechstelle(app, uuid, c, route):
         stumm = bool(app._state(c, "muted"))
         blocks.append({"k": "row", "id": "stumm", "cells": [
             {"label": "Stumm", "on": stumm, "cmd": {"uuid": ua, "cmd": "mute/0" if stumm else "mute/1"}}]})
-    return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
+    # "tuer": die Visu darf die Seite im Split ueber das Widget ziehen (Pfeil,
+    # beim Klingeln von selbst), auch ohne Gegensprechen (intercom-talk)
+    return {"t": "view", "title": _clean(c.get("name")), "route": route, "tuer": True, "blocks": blocks}
 
 
 # IntercomV2 deviceState: 1 = StateOk; 0 = StateUnknown sagt nichts Sicheres

@@ -445,7 +445,8 @@ function applyPane(){
 // Kachelseite ueber das Widget; dort bleibt der Doppeltipp beim Zoom bzw. den
 // Tasten. Nach paneGrossS Sekunden ohne Beruehrung (Panel-Option, 0 = aus)
 // geht es von selbst zurueck, jede Beruehrung startet die Zeit neu, der
-// Gegenpfeil oder ein zweiter Doppeltipp holt es sofort zurueck. Die verdeckte
+// Gegenpfeil oder ein zweiter Doppeltipp holt es sofort zurueck. Klingelt es,
+// wird die Tuersprechanlage von selbst gross (klingelGross). Die verdeckte
 // Seite bleibt im Raster stehen (nur verborgen) und wird nicht neu aufgebaut;
 // die grosse passt sich ueber ihre ResizeObserver an wie beim Drehen.
 const GROSS_TIPP_MS=350;   // so lange wartet ein Tipp auf den zweiten (wie GESTE_MEHRFACH_MS)
@@ -459,7 +460,8 @@ function grossPane(){ const pp=el('playerpane'), fp=el('frontpane');
   return (pp && !pp.hidden) ? pp : ((fp && !fp.hidden) ? fp : null); }
 function grossSplit(){ const sc=document.querySelector('.screen'); return !!(sc && sc.classList.contains('split')) && paneGrossS>0; }
 // Kachelseite gross nur fuer Anlagenschema und Tuersprechanlage
-function gridGrossOk(){ const g=el('grid'); return !!(g && (g.classList.contains('scheme') || g.classList.contains('intercom-page'))); }
+function gridGrossOk(){ const g=el('grid');
+  return !!(g && (g.classList.contains('scheme') || (g.classList.contains('panel') && view && view.tuer) || g.classList.contains('intercom-page'))); }
 // Woran haengt die grosse Seite: das Widget am Pane-Wert, die Kachelseite an der Route
 function grossSchluessel(art){ return art==='pane' ? 'p:'+(paneRawNow()||'') : 'g:'+(view && view.route ? key(view.route) : ''); }
 // Raster-Zeilen und -Spalten der grossen Seite und der verdeckten
@@ -507,7 +509,18 @@ function paneGross(art){
 // Gehoert die grosse Seite noch zur Ansicht? Anderer Tab, anderes Widget,
 // Schema verlassen, Split aus: zurueck. Laeuft aus applyPane und bei jedem
 // Wechsel der Kachelseite (Klassen von #grid).
+// Klingel: die Visu springt auf die Tuersprechanlage (nav in verbindung.js);
+// sobald deren Seite steht, zieht sie sich gross ueber das Widget. So lange
+// wartet sie auf die Seite, danach nicht mehr (etwa ohne Split).
+const KLINGEL_GROSS_MS=15000;
+let _klingelGross=0;
+function klingelGross(){ _klingelGross=Date.now(); grossPruefen(); }
 function grossPruefen(){
+  if(_klingelGross){
+    if(Date.now()-_klingelGross>KLINGEL_GROSS_MS) _klingelGross=0;
+    else if(view && view.route && view.route.view==='control' && gridGrossOk()){
+      _klingelGross=0; paneGross('grid'); return; }
+  }
   if(_gross && !(grossSplit() && grossPane() && (_gross==='pane' || gridGrossOk()) && grossSchluessel(_gross)===_grossSchluessel)) paneGross(null);
   else griffSetzen();
 }
