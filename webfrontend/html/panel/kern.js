@@ -118,6 +118,7 @@ let gridAuto = 0;        // automatisches Raster: Zielgroesse einer Kachel in px
 let gridGrow = 1;        // ... bis zu diesem Vielfachen wachsen die Kacheln, wenn alle auf eine Seite passen (vom Server)
 let paneCols = 0;        // Widget im automatischen Raster: feste Breite in Kachelspalten (hochkant Zeilen), 0 = Automatik (vom Server)
 let paneShare = 0;       // ... Anteil der Spalten in der Automatik (PANE_ANTEIL vom Server)
+let paneGrossS = 0;      // Widget nach Doppeltipp so viele Sekunden ueber den Kacheln, 0 = aus (vom Server)
 
 function svg(inner){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">'+inner+'</svg>';}
 function svgF(inner){return '<svg viewBox="0 0 24 24" fill="currentColor">'+inner+'</svg>';}

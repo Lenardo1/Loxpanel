@@ -95,6 +95,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         "scale": app.effective_scale(prof, dev),  # Skalierung (Geraet vor Profil)
                         "dpmsOff": app.panel_dpms(prof["id"], roh, dev),
                         "pinMerken": prof["pinMerken"],   # Visu-PIN behalten, Sek. (0 = jedes Mal)
+                        "paneGross": prof["paneGross"],   # Widget nach Doppeltipp gross, Sek. (0 = aus)
                         "gesten": prof["gesten"],         # Zwei-Finger-Gesten (Loxone-Standard) an
                         # ... mit Hinweis-Symbol (reserviert die Fusszeile unter dem Kachelfeld)
                         "gestenHinweis": prof["gesten"] and prof["gestenHinweis"],

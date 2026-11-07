@@ -18,7 +18,7 @@ from konfig import (
     _clean_kennung, _clean_pane_spalten, _clean_scale, _clean_svpane, _clean_tabpane,
     _clean_werteleiste, _clean_zielgeraet, DEFAULT_THEME, GESTEN_HINWEIS_STANDARD, GESTEN_STANDARD,
     GROESSEN_STANDARD, HAUS_AUFBAU_STANDARD, HAUS_AUFBAUTEN, _is_tab, KACHEL_ZIEL_STANDARD,
-    load_theme, _pick_tabs, _pin_merken, THEME_UI_KEYS, VALID_TABS)
+    load_theme, _pane_gross, _pick_tabs, _pin_merken, THEME_UI_KEYS, VALID_TABS)
 
 
 def _kachel_klassisch(ui: dict) -> bool:
@@ -355,6 +355,8 @@ class Ansicht:
             "scale": _clean_scale(ui.get("scale")) or "off",
             # Visu-PIN gesicherter Bausteine so viele Sekunden behalten (0 = nie)
             "pinMerken": _pin_merken(ui.get("pinMerken")),
+            # Widget nach Doppeltipp so viele Sekunden ueber den Kacheln (0 = aus)
+            "paneGross": _pane_gross(ui.get("paneGross")),
             # Gesten wie auf den Loxone-Tastern (ui ist aus Vorgaben und Ansicht
             # gemischt: die Ansicht geht vor) und ihr Raum ausserhalb von
             # Raumseiten ("" = dort keine Wirkung)
@@ -380,7 +382,7 @@ class Ansicht:
                        "cols", "rows", "fill", "baseColor",
                        "overlay", "textColor", "bold", "lang", "player", "panes", "split",
                        "svPane", "scale", "catFilter", "tileLayout", "tileSet", "tileHue", "tileActive",
-                       "grid", "tileSize", "pinMerken",
+                       "grid", "tileSize", "pinMerken", "paneGross",
                        "valueBar", "paneCols", "gesten", "gestenRaum", "gestenHinweis",
                        "nightClock", "nightClockBright", "hausAufbau")}
         # Widget je Tab: nur gueltige Tab-Kennung und gueltiger Pane-Wert, und
