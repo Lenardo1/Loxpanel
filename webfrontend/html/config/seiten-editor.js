@@ -722,6 +722,7 @@ function renderTileEditor(){
         '<div class="ovctrl">'+overlayFields(ov.overlay,'tov_')+'</div></div>'+
       (c.stat?chartStyleRows(c,ov):'')+
       breiteRow(c,ov)+
+      lichtTippRow(c,ov)+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
   bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
@@ -740,12 +741,25 @@ function renderTileEditor(){
       if(o.overlay) delete o.overlay; else o.overlay={}; pruneTile(); renderTileEditor(); renderTileList(); markDirty(); }; }
   { const ts=$('#tChartStyle'); if(ts) ts.onchange=()=>setChartStyle(ts.value); }
   { const tw=$('#tWidth'); if(tw) tw.onchange=()=>setTile('w', tw.value?parseInt(tw.value):null); }
+  { const tl=$('#tLichtTipp'); if(tl) tl.onchange=()=>setTile('lichtTipp', tl.value?parseInt(tl.value):null); }
   { const tr=$('#tChartRange'); if(tr) tr.onchange=()=>setTile('chart', tr.value); }
   $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
   renderIconPick('builtin'); drawPrev();
 }
 // Breite der Kachel in Spalten: zwei fuer Audio, Raumregelung und Energiefluss
 // (Standard nach Typ, Liste vom Server: META.kachelBreit), je Kachel uebersteuerbar
+// Lichtsteuerung (eigene Version): was ein kurzer Tipp auf die Kachel tut. Standard =
+// Menue oeffnen; mit Stimmung schaltet der Tipp aus/ein, langer Druck oeffnet das Menue.
+function lichtTippRow(c,ov){
+  if(c.type!=='LightControllerV2') return '';
+  const lc=(META.lichtStimmungen||[]).find(x=>x.uuid===c.uuid), moods=(lc&&lc.moods)||[{id:777,name:'Viel Licht'}];
+  const cur=ov.lichtTipp?String(ov.lichtTipp):'';
+  return '<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Antippen')+'</label>'+
+    '<select id="tLichtTipp"><option value=""'+(cur===''?' selected':'')+'>'+T('Menü öffnen (Standard)')+'</option>'+
+    moods.map(m=>'<option value="'+esc(String(m.id))+'"'+(cur===String(m.id)?' selected':'')+'>'+
+      esc(T('Schalten: aus / ')+m.name)+'</option>').join('')+'</select></div>'+
+    '<div class="hint" style="margin:2px 0 6px">'+T('Mit „Schalten“: kurz tippen schaltet aus bzw. in die Stimmung, lang drücken öffnet das Menü.')+'</div>';
+}
 function breiteRow(c,ov){
   const breit=(META.kachelBreit||[]).indexOf(c.type)>=0, cur=ov.w?String(ov.w):'';
   const opts=[['',T('Standard')+' ('+(breit?T('breit'):T('schmal'))+')'],['1',T('1 Spalte')],['2',T('2 Spalten (breit)')]];

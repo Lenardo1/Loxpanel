@@ -216,6 +216,13 @@ class Seiten:
         fn = bausteine.kachel_fuer(t)
         if fn:
             fn(self, uuid, c, it)
+        # Lichtsteuerung mit Tipp-Stimmung (eigene Version): Tipp schaltet aus bzw.
+        # in die gewaehlte Stimmung, langer Druck oeffnet weiter das Menue (nav)
+        if t == "LightControllerV2" and prof:
+            lt = (((prof.get("tiles") or {}).get(uuid)) or {}).get("lichtTipp")
+            if isinstance(lt, int) and lt > 0:
+                it["tipp"] = {"uuid": c.get("uuidAction"),
+                              "cmd": "changeTo/778" if it.get("on") else f"changeTo/{lt}"}
         # Status-Bausteine antippbar machen -> grosse Wertseite
         if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
             it["nav"] = {"view": "control", "id": uuid}

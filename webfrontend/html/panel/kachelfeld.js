@@ -456,7 +456,12 @@ function render(){
     }
     fitTile(n);
     _kachelM=kachelMass();   // fuer faktorNachziehen: neu einpassen, wenn sich das Mass aendert
+    // Lichtkachel mit Tipp-Stimmung (eigene Version): kurz tippen schaltet, lang (0,6 s) oeffnet das Menue
+    n.onpointerdown=()=>{ const t=n._it||it; n._lang=false; clearTimeout(n._langT);
+      if(t&&t.tipp&&t.nav) n._langT=setTimeout(()=>{ n._lang=true; nav((n._it||it).nav); }, 600); };
+    n.onpointerup=n.onpointercancel=n.onpointerleave=()=>clearTimeout(n._langT);
     n.onclick=(e)=>{ if(e.target.closest('.tctrls')) return; const t=n._it||it;
+      if(t.tipp){ if(!n._lang) sendCmd(t.tipp.uuid,t.tipp.cmd,(view&&view.secured)||t.secured); n._lang=false; return; }
       if(t.nav) nav(t.nav); else if(t.cmd) sendCmd(t.cmd.uuid,t.cmd.cmd,(view&&view.secured)||t.secured); };
   });
   // Eine LEERE Liste ist eine Aussage ("diese Seite hat keine Sprungmarken"),

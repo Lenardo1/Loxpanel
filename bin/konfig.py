@@ -1273,6 +1273,10 @@ def _sanitize_panels(panels: dict) -> dict:
                         e2["chartStyle"] = ov["chartStyle"]   # Tagesmuster / Tagesspanne
                 if _kachel_breite(ov.get("w")) is not None:
                     e2["w"] = _kachel_breite(ov["w"])   # Breite in Spalten (1 | 2); fehlt = nach Typ
+                # Lichtsteuerung: Tipp schaltet direkt in diese Stimmung, langer Druck oeffnet das Menue (eigene Version)
+                lt = ov.get("lichtTipp")
+                if isinstance(lt, int) and not isinstance(lt, bool) and 0 < lt < 1000:
+                    e2["lichtTipp"] = lt
                 if e2:
                     ct[cu] = e2
             if ct:
