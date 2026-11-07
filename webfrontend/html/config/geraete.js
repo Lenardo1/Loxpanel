@@ -126,6 +126,16 @@ function modiHtml(name){
     : T('Erst nötig, wenn Loxone die Ansicht umschalten soll (Gäste, Nacht, Urlaub).');
   return gzZeile('modi', T('Betriebsmodi'), esc(wert), woher, gzAufKnopf('modi', modi.length?T('Ändern'):T('Einrichten'), GK_AUF.has(name+'/modi')));
 }
+// BLE-Presence-Scanner in der LoxPanel-App (eigene Version): nur anzeigen
+function bleHtml(d){
+  const b=d.ble; if(!b) return '';
+  const zustand=!b.scannt ? T('wartet auf Bluetooth') : !b.registriert ? T('nicht beim Plugin angemeldet') : T('läuft');
+  const teile=[zustand, b.bekannt+' '+(b.bekannt===1?T('Gerät bekannt'):T('Geräte bekannt')), b.inReichweite+' '+T('in Reichweite')];
+  const z=b.zuletztErkannt ? new Date(b.zuletztErkannt*1000) : null;
+  const woher=(z ? T('Zuletzt erkannt:')+' '+z.toLocaleString(undefined,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : T('Noch kein bekanntes Gerät erkannt.'))+
+    ' · '+T('Meldet sich beim Plugin BLE Presence als Scanner')+' „'+(b.scanner||'?')+'“.';
+  return gzZeile('ble', T('BLE-Scanner'), esc(teile.join(' · ')), woher, '');
+}
 function technikHtml(name, d){
   const e=DEV[name]||{}, disp=e.display||{};
   const typ=TYPE_LABEL[d.type]||d.type||T('Browser');
@@ -426,6 +436,7 @@ function devRow(name){
       '<label style="font-size:13px;opacity:.85"><input type="checkbox" class="dev_auto"'+(d.auto?' checked':'')+'> '+T('Automatik aktiv')+'</label>'+
       '<div class="dmrows">'+rows+'</div>'+
       '<button class="btn sm ghost dm_add" type="button" style="margin-top:4px">'+T('+ Modus')+'</button>')+
+    bleHtml(g)+
     technikHtml(name, g)+
     editor('technik',
       '<div class="gk-teil">'+T('Am Gerät')+'</div>'+

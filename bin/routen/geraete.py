@@ -399,6 +399,27 @@ async def api_notify(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "sent": n})
 
 
+async def api_geraet_ble(request: web.Request) -> web.Response:
+    """BLE-Presence-Scanner der LoxPanel-App meldet seinen Zustand (eigene
+    Version): {scanner, registriert, scannt, bekannt, inReichweite,
+    zuletztErkannt}. Zugeordnet ueber die IP des Geraets."""
+    app: App = request.app["app"]
+    try:
+        d = await request.json()
+    except (ValueError, aiohttp.ContentTypeError):
+        return web.json_response({"ok": False, "error": "kein JSON"}, status=400)
+    if not isinstance(d, dict) or not request.remote:
+        return web.json_response({"ok": False}, status=400)
+    def zahl(k):
+        v = d.get(k)
+        return int(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0
+    app.ble_status[request.remote] = {
+        "scanner": str(d.get("scanner") or "")[:64], "registriert": d.get("registriert") is True,
+        "scannt": d.get("scannt") is True, "bekannt": zahl("bekannt"), "inReichweite": zahl("inReichweite"),
+        "zuletztErkannt": zahl("zuletztErkannt"), "empfangen": time.time()}
+    return web.json_response({"ok": True})
+
+
 async def api_testtone(request: web.Request) -> web.Response:
     """Schickt einen kurzen Test-Weckton an die Panel-Browser (zum Pruefen der
     Audio-Ausgabe am Geraet, z.B. YC-41PM). Mit `panel` auf ein Profil begrenzt,

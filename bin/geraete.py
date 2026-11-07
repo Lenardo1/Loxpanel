@@ -424,6 +424,11 @@ class Geraete:
             e = entry(name)
             e["configured"] = True
             e["zugeordnet"] = cfg.get("panel") or ""   # die eine Stelle: was das Geraet zeigen soll
+        # BLE-Presence-Scanner der App (eigene Version): Meldung der letzten 2 Minuten
+        for e in devs.values():
+            st = self.ble_status.get(e["ip"]) if e["ip"] else None
+            if st and now - st.get("empfangen", 0) < 120:
+                e["ble"] = st
         for name, on in self._presence_on.items():
             entry(name)["presence"] = on   # nur Geraete mit gekoppeltem Praesenzmelder
         for name, v in self.vorschau_geraet.items():   # Geraet zeigt einen Entwurf (Punkt 12)

@@ -15,6 +15,14 @@
     <!-- Damit BootReceiver die Kiosk-Anzeige aus dem Hintergrund starten darf
          (umgeht Androids Background-Activity-Launch-Sperre). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- BLE-Presence-Scanner (eigene Version): Bluetooth-Suche braucht bis
+         Android 11 BLUETOOTH(_ADMIN) und den Standort, ab 12 BLUETOOTH_SCAN. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
         android:label="LoxPanel"
@@ -60,6 +68,14 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="on-device LoxPanel web server for wall-panel kiosk" />
         </service>
+
+        <!-- BLE-Presence-Scanner (eigene Version). Einrichten nur per adb:
+             DUMP hat die adb-Shell, gewoehnliche Apps nicht. -->
+        <service
+            android:name=".BlePresenceService"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:foregroundServiceType="location" />
 
         <receiver
             android:name=".BootReceiver"

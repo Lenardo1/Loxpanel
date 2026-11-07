@@ -16,6 +16,7 @@ class BootReceiver : BroadcastReceiver() {
             // Den eigenen Server nur, wenn er auf diesem Gerät laufen soll; mit
             // einem Server im Netz gibt es nichts zu starten (Visu.eigenerServer).
             ServerService.starten(context)
+            BlePresenceService.starten(context)   // nur wenn eingerichtet (eigene Version)
             // Eingebauten Kiosk (unsere Vollbild-WebView) in den Vordergrund holen.
             try {
                 context.startActivity(

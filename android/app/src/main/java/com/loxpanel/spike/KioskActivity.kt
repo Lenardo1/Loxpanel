@@ -127,6 +127,7 @@ class KioskActivity : Activity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BlePresenceService.starten(this)   // BLE-Presence-Scanner, nur wenn eingerichtet (eigene Version)
 
         // Bildschirm anlassen: Wir dimmen im Screensaver selbst, damit die App
         // aktiv bleibt und den Näherungssensor auswerten kann (sofortiges Wecken).
