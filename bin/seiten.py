@@ -216,6 +216,11 @@ class Seiten:
         fn = bausteine.kachel_fuer(t)
         if fn:
             fn(self, uuid, c, it)
+        # Warnen (eigene Version): Vorgaben ui.warnen {uuid: "an"|"aus"} -> rot, wenn der
+        # Baustein an (z. B. Fenster offen, Regenwarnung) bzw. aus ist (Alarmanlage unscharf)
+        wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)
+        if wr == "an" and it.get("on") or wr == "aus" and not it.get("on"):
+            it["tone"] = "crit"
         # Lichtsteuerung mit Tipp-Stimmung (eigene Version): Tipp schaltet aus bzw.
         # in die gewaehlte Stimmung, langer Druck oeffnet weiter das Menue (nav)
         if t == "LightControllerV2" and prof:

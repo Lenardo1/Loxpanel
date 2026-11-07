@@ -408,7 +408,7 @@ KLINGELTON_WERTE = ("app", "alle")
 THEME_UI_KEYS = ("iconSize", "nameSize", "subSize", "roomSize", "bigSize", "font", "textColor",
                  "baseColor", "bold", "lang", "scale", "nightDim", "nightWake", "dpmsOff", "reloadHours",
                  "gesten", "gestenHinweis", "hausAus", "raumVerlassen", "nightClock", "nightClockBright",
-                 "klingelTon", "grenzwerte")
+                 "klingelTon", "grenzwerte", "warnen")
 
 # Groessen (px), wenn weder das Panel noch die globale Darstellung eine setzt,
 # je Kachel-Aufbau. Der neue stellt meist den Zustand gross und den Namen klein
@@ -1543,6 +1543,12 @@ def _sanitize_theme_ui(ui: dict) -> dict:
                 sauber[u[:64]] = e
         if sauber:
             out["grenzwerte"] = sauber
+    # Warn-Regeln je Baustein (eigene Version): {uuid: "an" | "aus"}
+    wn = ui.get("warnen")
+    if isinstance(wn, dict):
+        w = {u[:64]: v for u, v in list(wn.items())[:80] if isinstance(u, str) and v in ("an", "aus")}
+        if w:
+            out["warnen"] = w
     return out
 
 

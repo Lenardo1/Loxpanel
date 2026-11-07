@@ -38,6 +38,33 @@ def kachel_fronius(app, uuid, c, it):
         it["subInfo"] = True
 
 
+@kachel("Wallbox2")
+def kachel_wallbox2(app, uuid, c, it):
+    """Wallbox (Baustein Wallbox, neue Generation; eigene Version): laedt / angesteckt /
+    frei, dazu Leistung und die Energie dieses Ladevorgangs bzw. heute."""
+    laedt = bool(app._state(c, "active"))
+    dran = bool(app._state(c, "connected"))
+    frei = app._state(c, "enabled")
+    kw = app._state(c, "actual") or 0
+    try:
+        kw = float(kw)
+    except (TypeError, ValueError):
+        kw = 0.0
+    heute = app._state(c, "totalDay")
+    teile = []
+    if laedt:
+        teile.append("Lädt " + f"{kw:.1f}".replace(".", ",") + " kW")
+    elif dran:
+        teile.append("Angesteckt")
+    else:
+        teile.append("Nicht angesteckt")
+    if frei is not None and not frei:
+        teile.append("gesperrt")
+    if isinstance(heute, (int, float)) and heute > 0:
+        teile.append("heute " + f"{heute:.1f}".replace(".", ",") + " kWh")
+    it.update(on=laedt, sublabel=" · ".join(teile))   # Icon kommt aus Loxone (iconUrl)
+
+
 @kachel("EFM")
 def kachel_energiefluss(app, uuid, c, it):
     # Energieflussmonitor: Ppwr Erzeugung, Gpwr Netz (+Bezug/-Einspeisung),
