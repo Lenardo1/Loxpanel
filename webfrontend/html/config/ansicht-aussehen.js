@@ -309,6 +309,7 @@ function renderGlobalEditor(p){
     '<section class="spane" data-sub="verhalten"><div class="card"><h3>'+T('Nacht')+'</h3>'+
       '<p class="note">'+T('Wann die Geräte abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.')+'</p>'+
       '<div class="row2"><div class="field" style="max-width:460px"><label class="lbl">'+T('Auslöser (optional)')+'</label><select id="nt_control"></select></div></div>'+
+      '<div class="picked" id="nt_chips" style="margin:6px 0 2px"></div>'+
       '<div class="grph">'+T('Abdunkelung')+'</div>'+
       '<div class="sizes">'+nachtFelder(ui, nstd.nightDim, nstd.nightWake)+'</div>'+
       '<p class="note">'+T('Nacht-Uhr: Nachts zeigt die Uhr-Seite nur die Uhrzeit, gedimmt auf Schwarz, wie die Nachtanzeige der Loxone-Taster. Sind Gesten an, stehen oben die Symbole ihrer Spalten. „Nachts abdunkeln“ wirkt zusätzlich.')+'</p>'+
@@ -320,7 +321,8 @@ function renderGlobalEditor(p){
     '</div>'+klingelVorgabenKarte(ui)+gestenVorgabenKarte(ui)+'</section>';
   bindAppearance(p);
   nachtZeichnen();
-  { const s=$('#nt_control'); if(s) s.onchange=()=>{ NACHT.control=s.value; bereichOffen('nacht'); }; }
+  { const s=$('#nt_control'); if(s) s.onchange=()=>{ const u=s.value; s.value='';
+      if(u && nachtListe().indexOf(u)<0){ NACHT.control=nachtListe().concat([u]).join(','); bereichOffen('nacht'); nachtZeichnen(); } }; }
   aufhellenZeigen(nstd.nightDim);
   altEintragBinden(p);
   renderCatColors(p);

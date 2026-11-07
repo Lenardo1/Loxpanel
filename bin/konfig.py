@@ -964,9 +964,16 @@ def _intercom_config() -> dict:
     return cfg
 
 
+def night_controls(cfg: dict | None) -> list[str]:
+    """Nacht-Ausloeser aus `night.control`: eine UUID oder mehrere, durch Komma
+    getrennt (aeltere Konfigurationen haben genau eine)."""
+    roh = (cfg or {}).get("control") or ""
+    return [u.strip() for u in str(roh).split(",") if u.strip()]
+
+
 def _night_config() -> dict:
-    """Nachtmodus-Block aus loxpanel.cfg `night`: {"control": "<uuid>"}. Der
-    `active`-State dieses Bausteins schaltet den Nachtmodus. Leer = kein
+    """Nachtmodus-Block aus loxpanel.cfg `night`: {"control": "<uuid>[,<uuid>...]"}.
+    Ist einer dieser Bausteine `active`, ist Nacht (night_controls). Leer = kein
     Ausloeser, dann entscheiden die Sonnenzeiten."""
     base = Path(__file__).resolve().parent.parent / "config"
     f = base / "loxpanel.cfg"

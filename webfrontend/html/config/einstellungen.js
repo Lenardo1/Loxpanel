@@ -334,13 +334,23 @@ function sipErgebnis(j){
 // mit dem Editor neu gezeichnet; solange 'nacht' offen ist, ueberschreibt loadSettings()
 // die Wahl nicht.
 let NACHT={control:'', options:[]};
+// Mehrere Ausloeser: NACHT.control ist eine Komma-Liste, Nacht ist, sobald einer an ist.
+function nachtListe(){ return String(NACHT.control||'').split(',').map(s=>s.trim()).filter(Boolean); }
 function nachtZeichnen(){
   const sel=$('#nt_control'); if(!sel) return;
-  const c=NACHT.control||'', bekannt=NACHT.options.some(o=>o.uuid===c);
-  sel.innerHTML='<option value="">'+T('— kein Auslöser (Sonnenuntergang) —')+'</option>'
-    + (c && !bekannt ? '<option value="'+esc(c)+'" selected>'+esc(T('Baustein nicht mehr in der Anlage'))+' ('+esc(c)+')</option>' : '')
-    + NACHT.options.map(o=>'<option value="'+esc(o.uuid)+'"'+(o.uuid===c?' selected':'')+'>'
+  const liste=nachtListe();
+  sel.innerHTML='<option value="">'+(liste.length?T('＋ weiteren Auslöser hinzufügen …'):T('— kein Auslöser (Sonnenuntergang) — ＋ hinzufügen …'))+'</option>'
+    + NACHT.options.filter(o=>liste.indexOf(o.uuid)<0).map(o=>'<option value="'+esc(o.uuid)+'">'
         + esc((o.room?o.room+' · ':'')+o.name+' ('+o.type+')')+'</option>').join('');
+  sel.value='';
+  const chips=$('#nt_chips'); if(!chips) return;
+  chips.innerHTML=liste.length ? liste.map(u=>{ const o=NACHT.options.find(x=>x.uuid===u);
+      return '<span class="chip on" data-nt="'+esc(u)+'">'+esc(o?o.name:T('Baustein nicht mehr in der Anlage'))+
+        '<span class="rm">'+esc(o&&o.room||'')+'</span><span class="x">×</span></span>'; }).join('')
+      +'<div class="note" style="margin-top:4px">'+T('Nacht ist, sobald einer dieser Bausteine an ist.')+'</div>'
+    : '<span class="none">'+T('Ohne Auslöser entscheidet der Sonnenuntergang.')+'</span>';
+  chips.querySelectorAll('[data-nt]').forEach(c=>c.onclick=()=>{
+    NACHT.control=nachtListe().filter(u=>u!==c.dataset.nt).join(','); bereichOffen('nacht'); nachtZeichnen(); });
 }
 function nachtSpeichern(){ return postJson('/api/settings/night', {control:NACHT.control||''}); }
 function audioSpeichern(){ return postJson('/api/settings/audiometa', {enabled:$('#am_enabled').checked}); }

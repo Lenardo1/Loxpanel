@@ -22,7 +22,7 @@ import aiohttp
 
 from bausteine.gemeinsam import _clean
 from konfig import (
-    _atomic_write, _clean_kachelziel, _clean_scale, _kachel_vorschlag, load_panels, NACHT_STANDARD,
+    night_controls, _atomic_write, _clean_kachelziel, _clean_scale, _kachel_vorschlag, load_panels, NACHT_STANDARD,
     NACHT_UHR_HELL_MIN, PANELS_FILE)
 
 log = logging.getLogger("loxpanel.webvisu")   # derselbe Logger wie der Server: die Methoden gehoeren zu App
@@ -268,15 +268,14 @@ class Geraete:
     def _night_now(self) -> bool:
         """Ist gerade Nacht?
 
-        Rangfolge: ein in den Einstellungen gewaehlter Baustein (sein `active`-State
-        = Nacht), sonst die Sonnenzeiten nach _sun_minutes() (Miniserver vor
-        Wetterdienst), zuletzt NIGHT_FROM..NIGHT_TO. Ein gewaehlter, aber nicht
-        (mehr) vorhandener Baustein faellt still auf die Sonnenzeiten zurueck."""
-        u = (self.night_cfg or {}).get("control")
-        if u:
-            c = self.controls.get(u)
-            if c:
-                return bool(self._state(c, "active"))
+        Rangfolge: in den Einstellungen gewaehlte Bausteine (Nacht, sobald einer
+        `active` ist), sonst die Sonnenzeiten nach _sun_minutes() (Miniserver vor
+        Wetterdienst), zuletzt NIGHT_FROM..NIGHT_TO. Gewaehlte, aber nicht (mehr)
+        vorhandene Bausteine zaehlen nicht; ist keiner mehr da, gelten still die
+        Sonnenzeiten."""
+        da = [c for c in (self.controls.get(u) for u in night_controls(self.night_cfg)) if c]
+        if da:
+            return any(bool(self._state(c, "active")) for c in da)
         now = datetime.now()
         sun = self._sun_minutes()
         if sun:
