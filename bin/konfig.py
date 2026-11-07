@@ -1153,7 +1153,7 @@ def _sanitize_panels(panels: dict) -> dict:
         if isinstance(ui.get("reloadHours"), (int, float)):
             cui["reloadHours"] = max(0, min(168, float(ui["reloadHours"])))  # Auto-Neustart Std.
         if isinstance(ui.get("nightDim"), (int, float)):
-            cui["nightDim"] = max(0, min(90, int(ui["nightDim"])))    # Nachts abdunkeln in %
+            cui["nightDim"] = max(0, min(100, int(ui["nightDim"])))   # Nachts abdunkeln in %, 100 = schwarz
         if isinstance(ui.get("nightWake"), (int, float)):
             cui["nightWake"] = max(0, min(300, int(ui["nightWake"])))  # Aufhellen bei Beruehrung, Sek.
         if isinstance(ui.get("nightClock"), bool):
@@ -1409,7 +1409,7 @@ def _sanitize_devices(devices: dict, panel_ids: set) -> dict:
         def _zahl(key, lo, hi):
             v = cfg.get(key)
             return max(lo, min(hi, int(v))) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-        dpms, dim, wake = _zahl("dpmsOff", 0, 3600), _zahl("nightDim", 0, 90), _zahl("nightWake", 0, 300)
+        dpms, dim, wake = _zahl("dpmsOff", 0, 3600), _zahl("nightDim", 0, 100), _zahl("nightWake", 0, 300)
         if not modes and not display and scale is None and ziel is None and not presence \
                 and not licht_start and not panel and dpms is None and dim is None and wake is None:
             continue
@@ -1494,7 +1494,7 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     # Verhalten); panel_night(), panel_dpms() und panel_reload() nehmen sie,
     # solange das Profil keine eigenen setzt. Grenzen wie dort.
     if isinstance(ui.get("nightDim"), (int, float)):
-        out["nightDim"] = max(0, min(90, int(ui["nightDim"])))
+        out["nightDim"] = max(0, min(100, int(ui["nightDim"])))
     if isinstance(ui.get("nightWake"), (int, float)):
         out["nightWake"] = max(0, min(300, int(ui["nightWake"])))
     if isinstance(ui.get("dpmsOff"), (int, float)):

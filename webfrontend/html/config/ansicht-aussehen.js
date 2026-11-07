@@ -420,7 +420,7 @@ function nachtPlatzhalter(k,v){
 function nachtFelder(ui, dimLeer, wakeLeer){
   const wert=k=>(ui[k]==null)?'':ui[k];
   return '<div class="field" style="max-width:180px"><label class="lbl">'+T('Nachts abdunkeln (%)')+'</label>'+
-      '<input type="number" min="0" max="90" step="5" data-ui="nightDim" value="'+esc(wert('nightDim'))+'" placeholder="'+esc(nachtPlatzhalter('nightDim',dimLeer))+'">'+erbtFeld('nightDim')+'</div>'+
+      '<input type="number" min="0" max="100" step="5" data-ui="nightDim" value="'+esc(wert('nightDim'))+'" placeholder="'+esc(nachtPlatzhalter('nightDim',dimLeer))+'">'+erbtFeld('nightDim')+'</div>'+
     '<div class="field" style="max-width:180px" id="nightWakeField"><label class="lbl">'+T('Aufhellen bei Berührung (Sek.)')+'</label>'+
       '<input type="number" min="0" max="300" step="5" data-ui="nightWake" value="'+esc(wert('nightWake'))+'" placeholder="'+esc(nachtPlatzhalter('nightWake',wakeLeer))+'">'+erbtFeld('nightWake')+'</div>'+
     nachtUhrFelder(ui);

@@ -28,13 +28,16 @@ function nightLayer(){
 // (automatische Helligkeit am Geraet) oder kennt sie die Funktion nicht (aeltere
 // App), dunkelt wie bisher die Auflage ab.
 function appHelligkeit(dim){
-  const prozent = dim>0 ? Math.max(1, Math.round(100*Math.pow(1-dim/100, 2.2))) : 100;
+  // 100 % abdunkeln = ganz schwarz (eigene Version): Helligkeit 0
+  const prozent = dim>=100 ? 0 : dim>0 ? Math.max(1, Math.round(100*Math.pow(1-dim/100, 2.2))) : 100;
   try{ return !!(window.LoxKiosk && typeof LoxKiosk.setDisplayBrightness==='function'
                  && LoxKiosk.setDisplayBrightness(prozent)); }catch(e){ return false; } }
 function applyNight(awake){
   NIGHT.hell=!!awake;
-  const dim = (NIGHT.on && NIGHT.dim>0 && !awake) ? Math.min(90,NIGHT.dim) : 0;
-  nightLayer().style.opacity = appHelligkeit(dim) ? 0 : dim/100;
+  const dim = (NIGHT.on && NIGHT.dim>0 && !awake) ? Math.min(100,NIGHT.dim) : 0;
+  // 100 %: auch die Auflage ganz schwarz, damit nichts mehr leuchtet
+  nightLayer().style.opacity = dim>=100 ? 1 : (appHelligkeit(dim) ? 0 : dim/100);
+  if(dim>=100) appHelligkeit(dim);
 }
 function setNight(on){ const vorher=NIGHT.on; NIGHT.on=!!on; clearTimeout(nightWakeTimer); applyNight(false);
   if(NIGHT.on && !vorher) pinVergessen();   // Nacht beginnt: gemerkte PIN weg

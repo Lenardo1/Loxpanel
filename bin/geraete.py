@@ -215,7 +215,7 @@ class Geraete:
             return max(lo, min(hi, int(v))) if isinstance(v, (int, float)) else default
 
         uhr = ui.get("nightClock")
-        return {"dim": _num("nightDim", 0, 90, NACHT_STANDARD["nightDim"]),
+        return {"dim": _num("nightDim", 0, 100, NACHT_STANDARD["nightDim"]),   # 100 = schwarz (eigene Version)
                 "wake": _num("nightWake", 0, 300, NACHT_STANDARD["nightWake"]),
                 # Nacht-Uhr statt der Uhr-Seite und ihre Helligkeit in Prozent
                 "uhr": uhr if isinstance(uhr, bool) else NACHT_STANDARD["nightClock"],

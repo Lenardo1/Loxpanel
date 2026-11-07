@@ -420,7 +420,7 @@ function devRow(name){
       '<div class="gk-teil">'+T('Nacht')+'</div>'+
       '<div class="dnrow" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:8px 0 2px">'+
         '<span style="font-size:13px;opacity:.85">'+T('Nachts abdunkeln (%)')+'</span>'+
-        '<input type="number" class="dd_dim" min="0" max="90" step="5" placeholder="'+esc(nachtPlatzhalter('nightDim', nd.v))+'" value="'+esc(gesetzt(d.nightDim)?d.nightDim:'')+'" style="width:80px">'+
+        '<input type="number" class="dd_dim" min="0" max="100" step="5" placeholder="'+esc(nachtPlatzhalter('nightDim', nd.v))+'" value="'+esc(gesetzt(d.nightDim)?d.nightDim:'')+'" style="width:80px">'+
         '<span style="font-size:13px;opacity:.85">'+T('Aufhellen bei Berührung (Sek.)')+'</span>'+
         '<input type="number" class="dd_wake" min="0" max="300" step="5" placeholder="'+esc(nachtPlatzhalter('nightWake', nw.v))+'" value="'+esc(gesetzt(d.nightWake)?d.nightWake:'')+'" style="width:80px">'+
       '</div>'+
@@ -538,7 +538,7 @@ function readDevFromDom(){
     DEV[n.dataset.name]={auto:n.querySelector('.dev_auto').checked, modes, display,
                          scale:sc?scaleValue(sc.value):'', presence:pr?pr.value:'',
                          tileTarget:(tz&&parseInt(tz.value)>0)?parseInt(tz.value):'',
-                         dpmsOff:zahl(dp, 3600), nightDim:zahl(dn, 90), nightWake:zahl(dw, 300),
+                         dpmsOff:zahl(dp, 3600), nightDim:zahl(dn, 100), nightWake:zahl(dw, 300),
                          lichtStart:ls?ls.value:'',
                          panel:(DEV[n.dataset.name]||{}).panel||''};   // Zuordnung (Schritt 2): setzt nur "Ansicht wechseln"
   });

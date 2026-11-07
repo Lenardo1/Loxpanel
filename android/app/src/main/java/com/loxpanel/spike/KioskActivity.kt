@@ -568,7 +568,8 @@ class KioskActivity : Activity(), SensorEventListener {
         val jetzt = SystemClock.elapsedRealtime()
         if (!annaeherung.aktiv) { setBrightness(helligkeit); return }
         val basis = if (helligkeit >= 0f) helligkeit else (systemHelligkeit() ?: 1f)
-        setBrightness((basis * annaeherung.faktor(jetzt)).coerceIn(0.01f, 1f))
+        // basis 0 = nachts ganz schwarz (100 % abdunkeln); sonst nie ganz aus
+        setBrightness(if (basis <= 0f) 0f else (basis * annaeherung.faktor(jetzt)).coerceIn(0.01f, 1f))
         annaeherung.naechsteAenderungMs(jetzt)?.let { ui.postDelayed(annaeherungTakt, it) }
     }
 
