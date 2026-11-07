@@ -14,6 +14,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -108,6 +109,9 @@ class KioskActivity : Activity(), SensorEventListener {
     // im Nachtmodus der Visu, ein Teil davon (setDisplayBrightness).
     private var helligkeit = Helligkeit.SYSTEM
     private val goDark = Runnable { enterScreensaver() }
+    // Helligkeit nach Annaeherung (eigene Version): Einstellung per adb, siehe annaeherungLesen()
+    private val annaeherung = Annaeherung()
+    private val annaeherungTakt = Runnable { helligkeitAnwenden() }
     // Berührung im Schoner: ein Finger weckt, zwei Finger gehen als Geste an die
     // Visu (Gesten im Dunkeln). Das erste Ereignis hält die Anzeige zurück, bis
     // feststeht, ob ein zweiter Finger kommt (SchonerBeruehrung).
@@ -128,6 +132,7 @@ class KioskActivity : Activity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         BlePresenceService.starten(this)   // BLE-Presence-Scanner, nur wenn eingerichtet (eigene Version)
+        annaeherungLesen(intent)
 
         // Bildschirm anlassen: Wir dimmen im Screensaver selbst, damit die App
         // aktiv bleibt und den Näherungssensor auswerten kann (sofortiges Wecken).
@@ -386,8 +391,14 @@ class KioskActivity : Activity(), SensorEventListener {
         ui.postDelayed({ reloadPending = false; if (!destroyed) show() }, 2000)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        annaeherungLesen(intent)   // Einstellung per adb auch bei laufender App (singleTask)
+    }
+
     override fun onResume() {
         super.onResume()
+        annaeherungLesen(null)   // Werte aus der Einstellungsseite (DisplayEinstellung)
         intercom.onResume()
         enterImmersive()
         // Näherungssensor abonnieren (falls vorhanden) -> weckt aus dem Screensaver.
@@ -440,6 +451,7 @@ class KioskActivity : Activity(), SensorEventListener {
         // in der das Display noch hell ist, auf den 1. Tab (statt nur aus dem
         // Dunkeln). Eine Berührung, die im Schoner begann, endet auch dort, sonst
         // bekäme die Visu Ereignisse ohne Anfang.
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) annaeherungNah()
         if (saverOn || visuSaver || beruehrung.laeuft) return imSchoner(ev)
         wake()
         return super.dispatchTouchEvent(ev)
@@ -522,7 +534,42 @@ class KioskActivity : Activity(), SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_PROXIMITY) return
         val near = event.values.isNotEmpty() &&
             event.values[0] < (proximity?.maximumRange ?: 5f)
+        if (near) annaeherungNah()
         if (near && (saverOn || visuSaver)) userWake()
+    }
+
+    // ---- Helligkeit nach Annaeherung (eigene Version, Marco) ----
+    // Einrichten per adb (Werte bleiben in den App-Daten):
+    //   adb shell am start -n com.loxpanel.spike/.KioskActivity \
+    //     --ei annaeherung_ruhe 30 --ei annaeherung_halten 30
+    // ruhe = Prozent ohne Annaeherung (100 = aus), halten = Sekunden voll hell.
+    private fun annaeherungLesen(intent: Intent?) {
+        val p = getSharedPreferences(DisplayEinstellung.PREFS, Context.MODE_PRIVATE)
+        intent?.let {
+            val e = p.edit()
+            if (it.hasExtra("annaeherung_ruhe")) e.putInt("ruhe", it.getIntExtra("annaeherung_ruhe", 100).coerceIn(5, 100))
+            if (it.hasExtra("annaeherung_halten")) e.putInt("halten", it.getIntExtra("annaeherung_halten", 30).coerceIn(5, 3600))
+            e.apply()
+        }
+        annaeherung.ruheProzent = p.getInt("ruhe", 100)
+        annaeherung.haltenSek = p.getInt("halten", 30)
+        annaeherungNah()
+    }
+
+    private fun annaeherungNah() {
+        annaeherung.nah(SystemClock.elapsedRealtime())
+        helligkeitAnwenden()
+    }
+
+    /** Fensterhelligkeit aus Nachtmodus (helligkeit) und Annaeherung; im Schoner bleibt es dunkel. */
+    private fun helligkeitAnwenden() {
+        ui.removeCallbacks(annaeherungTakt)
+        if (saverOn) return
+        val jetzt = SystemClock.elapsedRealtime()
+        if (!annaeherung.aktiv) { setBrightness(helligkeit); return }
+        val basis = if (helligkeit >= 0f) helligkeit else (systemHelligkeit() ?: 1f)
+        setBrightness((basis * annaeherung.faktor(jetzt)).coerceIn(0.01f, 1f))
+        annaeherung.naechsteAenderungMs(jetzt)?.let { ui.postDelayed(annaeherungTakt, it) }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* egal */ }
@@ -629,7 +676,7 @@ class KioskActivity : Activity(), SensorEventListener {
             val wert = Helligkeit.fensterwert(prozent, systemHelligkeit())
             ui.post {
                 helligkeit = wert ?: Helligkeit.SYSTEM
-                if (!saverOn) setBrightness(helligkeit)
+                helligkeitAnwenden()
             }
             return wert != null
         }
@@ -651,7 +698,7 @@ class KioskActivity : Activity(), SensorEventListener {
             saverOn = false
             saver.visibility = View.GONE
         }
-        setBrightness(helligkeit)
+        helligkeitAnwenden()
     }
 
     private fun setBrightness(b: Float) {

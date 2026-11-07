@@ -130,6 +130,8 @@ class ServerActivity : Activity() {
         knoepfe.addView(trotzdem)
         knoepfe.addView(weiter)
         spalte.addView(knoepfe)
+        // Display-Helligkeit (eigene Version), nur wenn die App schon eingerichtet ist
+        if (warEingerichtet) spalte.addView(DisplayEinstellung.abschnitt(this, ::text, ::dp))
 
         setContentView(ScrollView(this).apply { addView(spalte) })
 
