@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hmac
 import ipaddress
+import json
 import logging
 import os
 import re
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING
 import aiohttp
 from aiohttp import web
 
+import intercom_geraete
 import sip_probe
 from bausteine.gemeinsam import _clean, INTERCOM_TYPES
 from intercom_talk import TalkBusy
@@ -125,16 +127,59 @@ async def api_sip_pruefen(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, **erg})
 
 
-def _native_talk(request: web.Request) -> None:
-    """Nur die eingebettete App kennt den Prozess-Token; keine LAN-Call-API."""
+def _native_talk(request: web.Request) -> bool:
+    """Die eingebettete App mit ihrem Prozess-Token (nur ueber Loopback)."""
     token = os.environ.get("LOXPANEL_INTERCOM_TOKEN", "")
     try:
         local = ipaddress.ip_address(request.remote or "").is_loopback
     except ValueError:
         local = False
-    if not local or not token or not hmac.compare_digest(
-            request.headers.get("X-LoxPanel-Intercom", ""), token):
-        raise web.HTTPForbidden(text="Gegensprechen ist nur in der nativen LoxPanel-App verfügbar")
+    return local and bool(token) and hmac.compare_digest(
+        request.headers.get("X-LoxPanel-Intercom", ""), token)
+
+
+def _geraet_name(app: App, ip: str) -> str:
+    """Name des Displays mit dieser IP aus der Geraeteliste, sonst leer."""
+    try:
+        for d in app.device_list().get("devices", []):
+            if d.get("ip") == ip and d.get("name"):
+                return _clean(d["name"])
+    except Exception:   # nur fuer die Anzeige im Konfigurator, nie ein Grund zum Abbruch
+        log.debug("Geraeteliste fuer Gegensprechen nicht lesbar", exc_info=True)
+    return ""
+
+
+def _verweigert(text: str) -> web.HTTPForbidden:
+    # JSON wie die uebrigen Antworten: die App zeigt "message" als Status an
+    return web.HTTPForbidden(text=json.dumps({"ok": False, "message": text}, ensure_ascii=False),
+                             content_type="application/json")
+
+
+def _talk_zugang(request: web.Request, anmelden: bool = False) -> str | None:
+    """Wer sprechen darf: die eingebettete App (-> None, Ton an dieses Geraet)
+    oder ein im Konfigurator freigegebenes Display im Netz (-> seine IPv4 fuer
+    den Ton). anmelden: ein unbekannter Geraeteschluessel wird als wartend
+    gespeichert (nur beim Start, Status und Auflegen lesen nur)."""
+    if _native_talk(request):
+        return None
+    schluessel = request.headers.get(intercom_geraete.KOPF, "")
+    if not intercom_geraete.gueltiger_schluessel(schluessel):
+        raise _verweigert("Gegensprechen ist nur in der LoxPanel-App verfügbar")
+    ip = intercom_geraete.ton_adresse(request.remote)
+    if ip is None:
+        raise _verweigert("Das Display braucht für den Ton eine IPv4-Adresse im Heimnetz")
+    if anmelden:
+        try:
+            frei = intercom_geraete.pruefen(schluessel, ip, _geraet_name(request.app["app"], ip)) \
+                == intercom_geraete.FREI
+        except OSError:
+            raise _verweigert("Die Freigabe konnte nicht gespeichert werden") from None
+    else:
+        frei = intercom_geraete.ist_frei(schluessel)
+    if not frei:
+        raise _verweigert("Dieses Display ist für das Gegensprechen noch nicht freigegeben "
+                          "(Konfigurator: Einstellungen → SIP)")
+    return ip
 
 
 def _talk_session(data: dict) -> str:
@@ -155,7 +200,7 @@ async def _talk_json(request: web.Request) -> dict:
 
 
 async def api_intercom_talk_start(request: web.Request) -> web.Response:
-    _native_talk(request)
+    media_host = _talk_zugang(request, anmelden=True)
     data = await _talk_json(request)
     session = _talk_session(data)
     uuid, port = data.get("uuid"), data.get("rtpPort")
@@ -165,22 +210,37 @@ async def api_intercom_talk_start(request: web.Request) -> web.Response:
     if type(port) is not int or not 1024 <= port <= 65535:
         return web.json_response({"ok": False, "message": "Ungültiger RTP-Port"}, status=400)
     try:
-        result = await app.intercom_talk.start(session, uuid, port)
+        result = await app.intercom_talk.start(session, uuid, port, media_host)
     except TalkBusy as err:
         return web.json_response({"ok": False, "message": str(err)}, status=409)
     return web.json_response(result)
 
 
 async def api_intercom_talk_status(request: web.Request) -> web.Response:
-    _native_talk(request)
+    _talk_zugang(request)
     session = _talk_session(dict(request.query))
     return web.json_response(request.app["app"].intercom_talk.status(session))
 
 
 async def api_intercom_talk_stop(request: web.Request) -> web.Response:
-    _native_talk(request)
+    _talk_zugang(request)
     session = _talk_session(await _talk_json(request))
     return web.json_response(await request.app["app"].intercom_talk.stop(session))
+
+
+async def api_intercom_geraete(request: web.Request) -> web.Response:
+    """Einstellungen -> SIP -> Displays im Netz: GET die Liste (ohne Schluessel),
+    POST {"id", "aktion": "freigeben" | "sperren" | "entfernen"}."""
+    if request.method == "POST":
+        data = await _talk_json(request)
+        try:
+            ok = intercom_geraete.setzen(str(data.get("id") or ""), str(data.get("aktion") or ""))
+        except OSError as err:
+            return web.json_response({"ok": False, "error": str(err)}, status=500)
+        if not ok:
+            return web.json_response({"ok": False, "error": "Unbekanntes Display"}, status=404)
+        log.info("Gegensprechen im Netz: %s %s", data.get("aktion"), data.get("id"))
+    return web.json_response({"ok": True, "geraete": intercom_geraete.liste()})
 
 
 async def mjpeg_handler(request: web.Request) -> web.StreamResponse:
