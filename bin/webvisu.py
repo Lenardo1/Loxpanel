@@ -71,7 +71,8 @@ from routen.einstellungen import (  # noqa: E402
     api_backup, api_grafana_panels, api_grafana_pruefen, api_restore, api_settings, api_settings_audiometa,
     api_settings_calendar, api_settings_grafana, api_settings_ms, api_settings_night)
 from routen.intercom import (  # noqa: E402
-    api_intercom_talk_start, api_intercom_talk_status, api_intercom_talk_stop, api_settings_intercom, api_sip,
+    api_intercom_geraete, api_intercom_talk_start, api_intercom_talk_status, api_intercom_talk_stop,
+    api_settings_intercom, api_sip,
     api_sip_pruefen, mjpeg_handler)
 from routen.geraete import (  # noqa: E402
     api_agent_announce, api_agent_command, api_agents, api_device_name, api_device_switch, api_devices_get,
@@ -448,6 +449,8 @@ def main() -> None:
     a.router.add_post("/api/intercom/talk/start", api_intercom_talk_start)
     a.router.add_get("/api/intercom/talk/status", api_intercom_talk_status)
     a.router.add_post("/api/intercom/talk/stop", api_intercom_talk_stop)
+    a.router.add_get("/api/intercom/geraete", api_intercom_geraete)
+    a.router.add_post("/api/intercom/geraete", api_intercom_geraete)
     a.router.add_post("/api/settings/night", api_settings_night)
     a.router.add_post("/api/settings/audiometa", api_settings_audiometa)
     a.router.add_post("/api/settings/calendar", api_settings_calendar)

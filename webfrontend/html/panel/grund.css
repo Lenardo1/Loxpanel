@@ -78,6 +78,37 @@
      Kacheln bleiben mit und ohne Widget gleich gross. */
   .screen.split.auto:not(.hoch){grid-template-columns:var(--auto-k,1fr) var(--auto-p,1fr);}
   .screen.split.hoch.auto{grid-template-rows:var(--auto-k,1fr) var(--auto-p,1fr) auto;}
+  /* Gross (paneGross in seiten.js): eine Seite des Splits liegt zeitweise
+     ueber der anderen - .gross das Widget ueber den Kacheln, .grossk die
+     Kachelseite (Anlagenschema, Tuersprechanlage) ueber dem Widget. Zeilen und
+     Spalten setzt die Visu inline (grossSpannen); die verdeckte Seite bleibt
+     im Raster stehen und wird nur verborgen - kein Neuaufbau. */
+  .screen.split.gross #grid,
+  .screen.split.gross .werteleiste,
+  .screen.split.grossk #playerpane,
+  .screen.split.grossk #frontpane{visibility:hidden;}
+  .screen.split.gross #playerpane,
+  .screen.split.gross #frontpane{z-index:3;border-left:0;border-top:0;background:var(--screen);}
+  .screen.split.grossk #grid{z-index:3;background:var(--screen);}
+  .screen.split #playerpane.grossanim,
+  .screen.split #frontpane.grossanim,
+  .screen.split #grid.grossanim{animation:paneGross .22s ease-out;}
+  @keyframes paneGross{from{opacity:.35;transform:scale(.985);}}
+  @media (prefers-reduced-motion:reduce){ .screen.split .grossanim{animation:none;} }
+  /* Griff an der Grenze: zwei Pfeile, links/oben zieht das Widget gross bzw.
+     die Kachelseite zurueck, rechts/unten umgekehrt. Mitte auf der Kante. */
+  .gross-griff{position:absolute;z-index:5;display:flex;gap:6px;transform:translate(-50%,-50%);pointer-events:none;}
+  .gross-griff[hidden]{display:none;}
+  .gross-griff.hoch{flex-direction:column;}
+  .gross-griff.hoch button svg{transform:rotate(90deg);}
+  .gross-griff button{pointer-events:auto;width:30px;height:44px;padding:0;border-radius:15px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+    color:var(--muted);background:var(--tabbar,rgba(0,0,0,.35));border:1px solid var(--line);
+    opacity:.75;-webkit-tap-highlight-color:transparent;}
+  .gross-griff.hoch button{width:44px;height:30px;}
+  .gross-griff button[hidden]{display:none;}
+  .gross-griff button:active{opacity:1;transform:scale(.94);}
+  .gross-griff button svg{width:20px;height:20px;}
   /* Widget-Seite (Vollbild-Tab): das Widget fuellt die ganze Flaeche, kein
      Kachelgrid, kein Split - gleiche gerahmte fp-page wie in Pane 2. */
   .screen.widgettab #grid{display:none;}
@@ -196,17 +227,17 @@
     overflow-y:auto;overflow-x:hidden;}
   #frontpane .campage .camwerte .fp-h{flex:0 0 auto;}
   /* Mehrere Kameras gestapelt (camera:a,b oder stack:a,b): eine Seite, je Kamera
-     ein Abschnitt in voller Pane-Hoehe untereinander; die Seite scrollt und rastet
-     je Kamera ein (wie Seiten, nur ohne Punkte). Auf der Uhr-Seite (sv-box) gibt
-     es kein Scrollen, dort teilen sich die Kameras die Hoehe. Werte unter dem
-     Bild stehen einmal am Ende. */
+     ein Abschnitt. Die Abschnitte teilen sich die Hoehe, das Bild nimmt den Rest
+     neben Name und Tasten (object-fit:contain im .video). Unter einer
+     Mindesthoehe scrollt die Seite, statt die Bilder winzig zu quetschen; die
+     Uhr-Seite (sv-box) teilt nur. Werte unter dem Bild stehen einmal am Ende. */
   .campage.camstack{display:flex;flex-direction:column;gap:12px;}
-  #frontpane .fp-page.solo.campage.camstack{overflow-y:auto;overflow-x:hidden;scroll-snap-type:y mandatory;}
-  .campage.camstack .camsec{flex:0 0 100%;min-height:100%;display:flex;flex-direction:column;gap:8px;
-    scroll-snap-align:start;}
-  .saver .sv-box .campage.camstack .camsec{flex:1 1 0;min-height:0;}
+  #frontpane .fp-page.solo.campage.camstack{overflow-y:auto;overflow-x:hidden;}
+  .campage.camstack .camsec{flex:1 1 0;min-height:170px;display:flex;flex-direction:column;gap:8px;}
+  .saver .sv-box .campage.camstack .camsec{min-height:0;}
   .campage.camstack .camsec+.camsec{border-top:1px solid var(--line);padding-top:10px;}
-  .campage.camstack .camsec .video{flex:1 1 0;min-height:0;aspect-ratio:auto;}
+  .campage.camstack .camsec .video{flex:1 1 0;min-height:90px;aspect-ratio:auto;}
+  .saver .sv-box .campage.camstack .camsec .video{min-height:0;}
   .campage.camstack .camname{flex:0 0 auto;font-size:13px;font-weight:600;color:var(--muted);
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .campage.camstack>.camwerte{flex:0 0 auto;overflow:visible;}

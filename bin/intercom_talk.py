@@ -45,7 +45,8 @@ class IntercomTalk:
             result["media"] = dict(self.call.media)
         return result
 
-    async def start(self, session: str, uuid: str, port: int) -> dict:
+    async def start(self, session: str, uuid: str, port: int, media_host: str | None = None) -> dict:
+        """media_host: Adresse des Displays im Netz fuer den Ton, None = dieses Geraet."""
         async with self._lock:
             now = time.monotonic()
             self._cancelled = {s: until for s, until in self._cancelled.items() if until > now}
@@ -69,16 +70,18 @@ class IntercomTalk:
             self.session, self.uuid, self.state, self.message = session, uuid, "connecting", ""
             self.call = None
             self._heartbeat = now
-            self._run_task = asyncio.create_task(self._run(uuid, port))
+            self._run_task = asyncio.create_task(self._run(uuid, port, media_host))
             self._lease_task = asyncio.create_task(self._watch())
             return self._snapshot()
 
-    async def _run(self, uuid: str, port: int) -> None:
+    async def _run(self, uuid: str, port: int, media_host: str | None = None) -> None:
         try:
             sip = await self.credentials(uuid)
             if self.state != "connecting":
                 return
-            self.call = self.factory(sip["host"], sip["user"], sip["pass"], port)
+            # media_host nur, wenn gesetzt: Fabriken ohne den Parameter bleiben nutzbar
+            extra = {"media_host": media_host} if media_host else {}
+            self.call = self.factory(sip["host"], sip["user"], sip["pass"], port, **extra)
             await self.call.start()
             if self.state == "connecting":
                 self.state = self.call.state

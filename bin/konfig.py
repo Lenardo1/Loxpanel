@@ -275,6 +275,16 @@ PIN_MERKEN_STANDARD = 30
 
 PIN_MERKEN_MAX = 3600
 
+# Widget gross (Split-Layout): ein Doppeltipp auf das Widget (Pane 2) zieht es
+# ueber die Kacheln, nach so vielen Sekunden ohne Beruehrung geht es von selbst
+# auf Widget-Groesse zurueck (Panel-Option ui.paneGross, 0 = aus). Unter
+# PANE_GROSS_MIN waere es weg, bevor man hinsieht; Obergrenze zehn Minuten.
+PANE_GROSS_STANDARD = 30
+
+PANE_GROSS_MIN = 5
+
+PANE_GROSS_MAX = 600
+
 # Automatisches Raster (ui.grid "auto", fuer Tablets): Zielgroesse einer Kachel
 # in CSS-Pixeln (ui.tileSize, je Geraet devices[name].tileTarget). Die Visu
 # rechnet daraus Spalten und Zeilen fuer den Schirm, ein groesserer Schirm
@@ -325,6 +335,7 @@ PANE_SPALTEN_MAX = 3
 PANEL_STANDARD = {("ui", "split"): True, ("ui", "tileSize"): (KACHEL_ZIEL_STANDARD, "medium"),
                   ("ui", "hausAufbau"): HAUS_AUFBAU_STANDARD,
                   ("ui", "pinMerken"): PIN_MERKEN_STANDARD,
+                  ("ui", "paneGross"): PANE_GROSS_STANDARD,
                   ("ui", "paneCols"): 0,
                   # Farbton und aktive Kachel des Kachel-Sets mit Rechnung (touch)
                   ("ui", "tileHue"): theme_colors.KACHEL_SETS["touch"]["farbton"]["standard"],
@@ -350,6 +361,15 @@ def _pin_merken(v) -> int:
     if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
         return PIN_MERKEN_STANDARD
     return max(0, min(PIN_MERKEN_MAX, int(v)))
+
+
+def _pane_gross(v) -> int:
+    """Sekunden, die das Widget nach einem Doppeltipp gross bleibt; 0 = aus,
+    sonst PANE_GROSS_MIN bis PANE_GROSS_MAX, ungueltig -> Standard."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        return PANE_GROSS_STANDARD
+    v = int(v)
+    return 0 if v <= 0 else max(PANE_GROSS_MIN, min(PANE_GROSS_MAX, v))
 
 
 def _clean_lang(v):
@@ -1143,6 +1163,9 @@ def _sanitize_panels(panels: dict) -> dict:
         if isinstance(ui.get("pinMerken"), (int, float)) and \
                 _pin_merken(ui["pinMerken"]) != PIN_MERKEN_STANDARD:
             cui["pinMerken"] = _pin_merken(ui["pinMerken"])   # PIN merken, Sek.; fehlt = Standard
+        if isinstance(ui.get("paneGross"), (int, float)) and \
+                _pane_gross(ui["paneGross"]) != PANE_GROSS_STANDARD:
+            cui["paneGross"] = _pane_gross(ui["paneGross"])   # Widget gross, Sek.; fehlt = Standard
         if ui.get("cols") in (2, 3):
             cui["cols"] = int(ui["cols"])   # Spalten: 2 oder 3
         if ui.get("rows") in (2, 3):

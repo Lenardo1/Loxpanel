@@ -16,7 +16,7 @@ class IntercomAudio(private val activity: Activity, private val ui: Handler) {
     companion object { const val MICROPHONE_REQUEST = 1701 }
 
     private val session = IntercomSession()
-    private val calls = IntercomCallClient()
+    private val calls = IntercomCallClient(activity.applicationContext)
     private val jobs = Executors.newScheduledThreadPool(2) { r ->
         Thread(r, "loxpanel-intercom").apply { isDaemon = true }
     }

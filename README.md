@@ -95,9 +95,15 @@ im Browser – ganz ohne Programmierung und ohne die Loxone-App.
   Raum-Player mit Cover (über den Miniserver).
 - **Intercom** (z. B. Mobotix T25): Live-Bild (MJPEG mit Auth), Tür öffnen &
   Außenlicht, Klingel-Popup (der Server erkennt den `bell`-State und schiebt die
-  Ansicht aufs Panel). Gegensprechen (SIP) folgt. Auf Wunsch spielt das Display
-  dazu einen Klingelton (zweimal Ding-Dong), einstellbar unter *Vorgaben →
-  Verhalten → Klingelton*: aus, nur in der LoxPanel-App oder auf allen Displays.
+  Ansicht aufs Panel). Gegensprechen (SIP, Intercom Gen-1) in der Android-App –
+  mit eigenem Server auf dem Gerät oder mit einem Server im Netz (LoxBerry,
+  Docker): Das Display meldet sich beim ersten „Sprechen“ und wird im
+  Konfigurator unter Einstellungen → SIP → „Displays im Netz“ freigegeben. Den
+  Ton tauschen Türstation und Display direkt aus, der Server baut nur die
+  Verbindung auf.
+  Auf Wunsch spielt das Display dazu einen Klingelton (zweimal Ding-Dong),
+  einstellbar unter *Vorgaben → Verhalten → Klingelton*: aus, nur in der
+  LoxPanel-App oder auf allen Displays.
 - **Verläufe aus Grafana:** neben der Loxone-Statistik auch Panels aus einer
   Grafana-Installation (z. B. der von Stats4Lox) als Verlauf zeigen – im selben
   Stil, mit 24 h / 7 Tage / 30 Tage. Zugang unter *Einstellungen → Grafana*

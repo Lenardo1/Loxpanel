@@ -287,6 +287,10 @@ function renderEditor(){
          '<div class="frow"><input type="range" id="fPaneCols" min="0" max="'+esc(String(paneSpalten().max))+'" step="1" value="'+esc(String(paneColsWert((p.ui||{}).paneCols)))+'">'+
            '<span id="fPaneColsTxt">'+esc(paneColsText((p.ui||{}).paneCols))+'</span></div>'+
          '<div class="hint" style="padding-top:4px">'+T('Wie viele Kachelspalten das Widget rechts neben den Kacheln belegt, hochkant Kachelzeilen darunter – die Kacheln bleiben gleich groß. „Automatisch“ nimmt den Anteil, den das Gerät aus seinem Raster rechnet. Mit fester Breite wachsen wenige Kacheln auch neben dem Widget, es wächst dann mit. Nur im Kachel-Layout „Automatisch“.')+'</div></div>'+
+       '<div class="field" style="max-width:320px" id="fPaneGrossField"><label class="lbl">'+T('Widget groß (Sek.)')+'</label>'+
+         '<input type="number" min="0" max="'+esc(String(paneGrossCfg().max))+'" step="5" data-ui="paneGross" value="'+
+         (((p.ui||{}).paneGross==null)?'':esc(String((p.ui||{}).paneGross)))+'" placeholder="'+esc(String(paneGrossCfg().standard))+'">'+
+         '<div class="hint" style="padding-top:4px">'+T('Ein Doppeltipp auf das Widget oder der Pfeil am Rand zieht es über die Kacheln; ein Anlagenschema oder die Türsprechanlage zieht der Gegenpfeil über das Widget. Nach so vielen Sekunden ohne Berührung geht es wieder auf die normale Größe zurück, jede Berührung startet die Zeit neu, der andere Pfeil holt es sofort zurück. 0 = aus.')+'</div></div>'+
      '</div>'+
      '<div class="grph">'+T('Feinjustierung')+'</div>'+
      '<div class="sizes">'+
@@ -464,7 +468,7 @@ function layoutWert(ui){ ui=ui||{};
 // Im automatischen Raster rechnet das Panel selbst: die Kachelgroesse zaehlt,
 // "Bildschirm fuellen" und Skalierung wirken dann nicht und verschwinden
 function layoutFelder(p){ const auto=layoutWert(p.ui)==='auto', split=(p.ui||{}).split!==false;
-  [['#fFillField',!auto],['#fPaneColsField',auto&&split]].forEach(f=>{
+  [['#fFillField',!auto],['#fPaneColsField',auto&&split],['#fPaneGrossField',split]].forEach(f=>{
     const e=$(f[0]); if(e) e.style.display=f[1]?'':'none'; }); }
 // Widget-Breite im automatischen Raster: Grenze und Anteil der Automatik vom
 // Server (/api/meta paneCols = PANE_SPALTEN_MAX, PANE_ANTEIL)
@@ -488,6 +492,9 @@ function neuladenStunde(){ return (META||{}).reloadAt; }
 // PIN merken: Standard und Grenze kommen vom Server (/api/meta pinMerken =
 // PIN_MERKEN_STANDARD/PIN_MERKEN_MAX).
 function pinMerkenCfg(){ return (META||{}).pinMerken||{standard:'',max:''}; }
+// Widget gross: Standard und Grenzen vom Server (/api/meta paneGross =
+// PANE_GROSS_STANDARD/PANE_GROSS_MIN/PANE_GROSS_MAX).
+function paneGrossCfg(){ return (META||{}).paneGross||{standard:'',min:'',max:''}; }
 function sizeStd(layout,mitGlobal,tileSet){
   // ein Kachel-Set bringt seinen (neuen) Aufbau und eigene Standardgroessen mit (/api/meta)
   const ks=kachelSetMeta(tileSet);

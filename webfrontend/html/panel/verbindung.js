@@ -173,6 +173,8 @@ function connect(){
       if(Array.isArray(msg.tabs)&&msg.tabs.length) tabsCfg=msg.tabs;
       applyDisplayCfg(msg);   // Display aus / Auto-Neustart ohne Agent (Kiosk-App)
       pinMerkenS=(typeof msg.pinMerken==='number' && msg.pinMerken>0) ? msg.pinMerken : 0;
+      paneGrossS=(typeof msg.paneGross==='number' && msg.paneGross>0) ? msg.paneGross : 0;
+      grossPruefen();   // ausgeschaltet: eine grosse Seite gleich zurueck; Griff ein/aus
       gestenAn=(msg.gesten===true);   // Zwei-Finger-Gesten (Vorgaben/Ansicht)
       gestenHinweis=(msg.gestenHinweis===true);
       klingelTon=(msg.klingelTon==='app'||msg.klingelTon==='alle')?msg.klingelTon:'';   // Klingelton (Vorgaben)   // ... mit Hinweis-Symbol
@@ -181,7 +183,7 @@ function connect(){
       _screenSent='';         // neue Verbindung: der Server kennt die Groesse noch nicht
       applyScale();
       renderTabs(); return; }
-    if(msg.t==='ring'){ if(msg.id){ wake(); playKlingelTon(); nav({view:'control',id:msg.id}); } return; }   // Klingel: Display an, Ton (Vorgabe), Uhr weg
+    if(msg.t==='ring'){ if(msg.id){ wake(); playKlingelTon(); nav({view:'control',id:msg.id}); klingelGross(); } return; }   // Klingel: Display an, Ton (Vorgabe), Uhr weg, Tuersprechanlage gross
     if(msg.t==='alarm'){ if(msg.on){ wake(); startAlarmTone(); if(msg.id) nav({view:'control',id:msg.id}); } else { stopAlarmTone(); } return; }
     if(msg.t==='testtone'){ if(msg.art==='klingel') playKlingelTon(true); else playTestTone(); return; }
     if(msg.t==='front'){ frontData=msg; renderFront(); if(FRONT_TEST) renderFrontRich(el('frontPage')); applyPane();

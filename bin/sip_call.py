@@ -99,11 +99,16 @@ class _Wire(asyncio.DatagramProtocol):
 
 
 class SipCall:
-    """Ein direkter SIP-Anruf mit einem bereits in Android gebundenen RTP-Port."""
+    """Ein direkter SIP-Anruf mit einem bereits in Android gebundenen RTP-Port.
+
+    media_host: IPv4-Adresse, an die die Tuerstation den Ton schickt (SDP c=).
+    Ohne sie die eigene LAN-Adresse (App mit eigenem Server); mit ihr ein
+    Display im Netz, das den RTP-Port bei sich gebunden hat (intercom_geraete)."""
     def __init__(self, host: str, user: str, password: str, rtp_port: int,
-                 timeout: float = 20) -> None:
+                 timeout: float = 20, media_host: str | None = None) -> None:
         self.host, self.user, self.password = host, user, password
         self.rtp_port, self.timeout = rtp_port, max(0.1, float(timeout))
+        self.media_host = media_host
         self.state, self.error, self.media = "idle", "", {}
         self._transport = None
         self._wire = None
@@ -140,6 +145,11 @@ class SipCall:
                 raise RuntimeError("Anruf abgebrochen")
             if isinstance(self.rtp_port, bool) or not isinstance(self.rtp_port, int) or not 0 < self.rtp_port < 65536:
                 raise ValueError("Ungültiger lokaler RTP-Port")
+            if self.media_host is not None:
+                try:
+                    ipaddress.IPv4Address(self.media_host)
+                except ValueError:
+                    raise ValueError("Ungültige Audioadresse des Displays") from None
             if any(x in str(v) for v in (self.host, self.user) for x in ("\r", "\n", "<", ">")):
                 raise ValueError("Ungültige SIP-Adresse")
             raw_host = str(self.host).strip()
@@ -178,8 +188,10 @@ class SipCall:
             self._from = f"<sip:loxpanel@{self._local}>;tag={os.urandom(8).hex()}"
             self._to = f"<{self._uri}>"
             self._receiver = asyncio.create_task(self._receive())
-            sdp = (f"v=0\r\no=loxpanel 1 1 IN IP4 {local_ip}\r\ns=LoxPanel\r\n"
-                   f"c=IN IP4 {local_ip}\r\nt=0 0\r\nm=audio {self.rtp_port} RTP/AVP 8 0\r\n"
+            # Ton an das Display: das eigene Geraet oder eines im Netz (media_host)
+            ton_ip = self.media_host or local_ip
+            sdp = (f"v=0\r\no=loxpanel 1 1 IN IP4 {ton_ip}\r\ns=LoxPanel\r\n"
+                   f"c=IN IP4 {ton_ip}\r\nt=0 0\r\nm=audio {self.rtp_port} RTP/AVP 8 0\r\n"
                    "a=rtpmap:8 PCMA/8000\r\na=rtpmap:0 PCMU/8000\r\na=ptime:20\r\na=sendrecv\r\n")
             auth = ""
             for attempt in range(3):
