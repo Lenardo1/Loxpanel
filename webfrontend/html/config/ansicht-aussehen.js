@@ -317,7 +317,7 @@ function renderGlobalEditor(p){
       '<div class="sizes">'+displayFelder(ui, null, null)+'</div>'+
       '<div class="hint" style="padding-top:4px">'+esc(autoNeustartHinweis())+'</div>'+
       '<p class="note">'+T('„Display aus nach“ gilt für jedes Gerät ohne eigenen Wert (Zeile Display), der Auto-Neustart für alle Ansichten, die unter Verhalten nichts eintragen.')+'</p>'+
-    '</div>'+gestenVorgabenKarte(ui)+'</section>';
+    '</div>'+klingelVorgabenKarte(ui)+gestenVorgabenKarte(ui)+'</section>';
   bindAppearance(p);
   nachtZeichnen();
   { const s=$('#nt_control'); if(s) s.onchange=()=>{ NACHT.control=s.value; bereichOffen('nacht'); }; }
@@ -325,6 +325,7 @@ function renderGlobalEditor(p){
   altEintragBinden(p);
   renderCatColors(p);
   gestenVorgabenBinden(p);
+  klingelVorgabenBinden(p);
   $('#delSlot').innerHTML='';
   erbtZeichnen();
   renderSubtabs(); showSub(subVg);
@@ -351,6 +352,24 @@ function gestenRaumOptionen(sel){
   if(sel && !raeume.some(r=>r.uuid===sel)) raeume.unshift({uuid:sel, name:sel+' ('+T('nicht in der Struktur')+')'});
   return '<option value="">'+T('— keiner (nur auf Raumseiten) —')+'</option>'+
     raeume.map(r=>'<option value="'+esc(r.uuid)+'"'+(r.uuid===sel?' selected':'')+'>'+esc(r.name)+'</option>').join('');
+}
+// Klingelton, wenn es an einer Intercom klingelt (ui.klingelTon: "" | "app" | "alle")
+function klingelVorgabenKarte(ui){
+  const w=ui.klingelTon||'';
+  const opt=(v,txt)=>'<option value="'+v+'"'+(w===v?' selected':'')+'>'+T(txt)+'</option>';
+  return '<div class="card"><h3>'+T('Klingelton')+'</h3>'+
+    '<p class="note">'+T('Wenn es an einer Intercom klingelt, schaltet das Display ein und zeigt die Türstation. Dazu kann es zweimal Ding-Dong spielen. Im Browser spielt der Ton nur, wenn der Browser Audio ohne Antippen erlaubt; die LoxPanel-App und Fully Kiosk tun das.')+'</p>'+
+    '<div class="row2"><div class="field" style="max-width:320px"><label class="lbl">'+T('Klingelton')+'</label>'+
+      '<select id="gKlingel">'+opt('','Aus')+opt('app','Nur in der LoxPanel-App')+opt('alle','Auf allen Displays')+'</select></div></div>'+
+    '<div class="actions"><button class="btn ghost" id="gKlingelTest">'+T('Klingelton auf allen offenen Displays testen')+'</button></div>'+
+  '</div>';
+}
+function klingelVorgabenBinden(p){
+  const s=$('#gKlingel');
+  if(s) s.onchange=()=>{ p.ui=p.ui||{}; if(s.value) p.ui.klingelTon=s.value; else delete p.ui.klingelTon; markDirty(); };
+  const b=$('#gKlingelTest');
+  if(b) b.onclick=()=>{ fetch('/api/testtone',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({art:'klingel'})}).catch(()=>{}); };
 }
 function gestenVorgabenKarte(ui){
   const rv=ui.raumVerlassen||{};

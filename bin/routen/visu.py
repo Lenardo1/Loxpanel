@@ -99,6 +99,8 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         "gesten": prof["gesten"],         # Zwei-Finger-Gesten (Loxone-Standard) an
                         # ... mit Hinweis-Symbol (reserviert die Fusszeile unter dem Kachelfeld)
                         "gestenHinweis": prof["gesten"] and prof["gestenHinweis"],
+                        # Klingelton bei einer Klingel: "" aus, "app" nur LoxPanel-App, "alle"
+                        "klingelTon": (app.theme.get("ui") or {}).get("klingelTon") or "",
                         "reloadHours": app.panel_reload(prof["id"], roh),
                         "reloadAt": NEULADEN_STUNDE,   # nachts neu laden, wenn reloadHours fehlt
                         "night": {**app.panel_night(prof["id"], roh, dev), "on": app._night_on},
