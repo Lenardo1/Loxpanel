@@ -856,6 +856,8 @@
       'Groß (weniger Kacheln)': 'Large (fewer tiles)',
       'Zielkachel (px)': 'Target tile (px)',
       'Widget-Breite': 'Widget width',
+      'Widget groß (Sek.)': 'Enlarge widget (sec.)',
+      'Ein Doppeltipp auf das Widget oder der Pfeil am Rand zieht es über die Kacheln; ein Anlagenschema oder die Türsprechanlage zieht der Gegenpfeil über das Widget. Nach so vielen Sekunden ohne Berührung geht es wieder auf die normale Größe zurück, jede Berührung startet die Zeit neu, der andere Pfeil holt es sofort zurück. 0 = aus.': 'A double tap on the widget or the arrow at its edge spreads it over the tiles; the opposite arrow spreads a system scheme or the intercom over the widget. After this many seconds without a touch it returns to its normal size, every touch restarts the time, the other arrow returns it at once. 0 = off.',
       // --- Ansicht duplizieren mit Raumtausch (Punkt 14) ---
       'Duplizieren': 'Duplicate',
       'Ansicht duplizieren': 'Duplicate view',

@@ -26,7 +26,7 @@ from konfig import (
     GERAETE_KATALOG, GESTEN_HINWEIS_STANDARD, GESTEN_STANDARD, GROESSEN_STANDARD,
     HAUS_AUFBAU_STANDARD, HAUS_AUFBAUTEN, HAUS_TAB, KACHEL_WACHSEN, KACHEL_ZIEL, KACHEL_ZIEL_MAX,
     KACHEL_ZIEL_MIN, KACHEL_ZIEL_STANDARD, _loxlib_names, NACHT_STANDARD, PANE_ANTEIL,
-    PANE_SPALTEN_MAX, _panels_verworfen, PICK_TAB, PIN_MERKEN_MAX, PIN_MERKEN_STANDARD,
+    PANE_GROSS_MAX, PANE_GROSS_MIN, PANE_GROSS_STANDARD, PANE_SPALTEN_MAX, _panels_verworfen, PICK_TAB, PIN_MERKEN_MAX, PIN_MERKEN_STANDARD,
     _sanitize_categories, _sanitize_panels, _sanitize_theme_ui, SCALE_MAX, SCALE_MIN, STAT_RANGES,
     SV_STATUS_MAX, THEME_UI_KEYS)
 from routen.gemeinsam import _push
@@ -123,6 +123,8 @@ async def api_meta(request: web.Request) -> web.Response:
         "reloadAt": NEULADEN_STUNDE,
         # PIN merken: Standard und Grenze fuer das Feld im Konfigurator
         "pinMerken": {"standard": PIN_MERKEN_STANDARD, "max": PIN_MERKEN_MAX},
+        # Widget gross nach Doppeltipp: Standard und Grenzen fuer das Feld
+        "paneGross": {"standard": PANE_GROSS_STANDARD, "min": PANE_GROSS_MIN, "max": PANE_GROSS_MAX},
         "icons": {"loxone": app._loxone_icons(), "loxlib": len(_loxlib_names())},
         "tabs": [{"tab": "favoriten", "label": "Favoriten"},
                  {"tab": "zentral", "label": "Zentral"},

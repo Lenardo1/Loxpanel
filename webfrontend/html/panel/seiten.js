@@ -432,9 +432,157 @@ function applyPane(){
             : ((svKind(qraw)==='camera') ? camPaneWerte(svArg(qraw)) : '');
   if(suu!==curSvStatus){ curSvStatus=suu; svStatusData=null;
     try{ send({t:'setsvstatus', uuids: suu?suu.split(','):[]}); }catch(e){} }
-  // Seiten-Indikator nachziehen (blaetterbare Widgets, s. syncPager)
-  requestAnimationFrame(()=>syncPager(kind==='camera' && camBlaettern() ? camPageTo : null));
+  // "Gross" nur, solange dieselbe Seite im Split steht (Pane-Sichtbarkeit steht jetzt)
+  grossPruefen();
+  // Seiten-Indikator und Griff nachziehen (blaetterbare Widgets, s. syncPager)
+  requestAnimationFrame(()=>{ syncPager(kind==='camera' && camBlaettern() ? camPageTo : null); griffSetzen(); });
 }
+
+// ---- Gross: eine Seite des Splits zeitweise ueber die andere ziehen ----
+// Das Widget (Pane 2) zieht ein Doppeltipp darauf oder der Pfeil am Rand
+// ueber die Kacheln (quer beide Spalten, hochkant beide Zeilen). Umgekehrt
+// zieht der Gegenpfeil ein Anlagenschema oder die Tuersprechanlage auf der
+// Kachelseite ueber das Widget; dort bleibt der Doppeltipp beim Zoom bzw. den
+// Tasten. Nach paneGrossS Sekunden ohne Beruehrung (Panel-Option, 0 = aus)
+// geht es von selbst zurueck, jede Beruehrung startet die Zeit neu, der
+// Gegenpfeil oder ein zweiter Doppeltipp holt es sofort zurueck. Klingelt es,
+// wird die Tuersprechanlage von selbst gross (klingelGross). Die verdeckte
+// Seite bleibt im Raster stehen (nur verborgen) und wird nicht neu aufgebaut;
+// die grosse passt sich ueber ihre ResizeObserver an wie beim Drehen.
+const GROSS_TIPP_MS=350;   // so lange wartet ein Tipp auf den zweiten (wie GESTE_MEHRFACH_MS)
+const GROSS_TIPP_PX=30;    // so weit duerfen die beiden Tipps auseinander liegen
+const GROSS_WEG_PX=12;     // weiter bewegt: Wischen/Blaettern, kein Tipp
+// Bedienelemente im Widget: ihr Doppeltipp bleibt ihrer (Lautstaerke, Transport, Kalender)
+const GROSS_NICHT='button,a,input,select,textarea,.sbtn,[data-c],[data-sd],[data-mnav],[data-day],[data-calall]';
+let _gross=null;           // null | 'pane' (Widget gross) | 'grid' (Kachelseite gross)
+let _grossT=null, _grossSchluessel=null, _grossTipp=null, _grossDown=null;
+function grossPane(){ const pp=el('playerpane'), fp=el('frontpane');
+  return (pp && !pp.hidden) ? pp : ((fp && !fp.hidden) ? fp : null); }
+function grossSplit(){ const sc=document.querySelector('.screen'); return !!(sc && sc.classList.contains('split')) && paneGrossS>0; }
+// Kachelseite gross nur fuer Anlagenschema und Tuersprechanlage
+function gridGrossOk(){ const g=el('grid');
+  return !!(g && (g.classList.contains('scheme') || (g.classList.contains('panel') && view && view.tuer) || g.classList.contains('intercom-page'))); }
+// Woran haengt die grosse Seite: das Widget am Pane-Wert, die Kachelseite an der Route
+function grossSchluessel(art){ return art==='pane' ? 'p:'+(paneRawNow()||'') : 'g:'+(view && view.route ? key(view.route) : ''); }
+// Raster-Zeilen und -Spalten der grossen Seite und der verdeckten
+// zusammenfassen. Aus dem berechneten Stil statt fester Regeln: Werteleiste,
+// Kachel-Set "oben", Hochkant und automatisches Raster legen die Zeilen
+// jeweils anders. Das grosse Widget deckt auch die Werteleiste (sie gehoert zu
+// den Kacheln), die grosse Kachelseite waechst nur zum Widget hin und laesst
+// ihre Werteleiste stehen.
+function grossSpannen(art){
+  const [gross, weg]=grossElemente(art); if(!gross) return;
+  gross.style.gridRow=''; gross.style.gridColumn='';
+  const sc=document.querySelector('.screen'), hoch=!!(sc && sc.classList.contains('hoch'));
+  const teile = art==='pane' ? [gross, weg, el('werteleiste')] : [gross, weg];
+  const stile=teile.filter(Boolean).map(n=>getComputedStyle(n)).filter(cs=>cs.display!=='none');
+  const lage=(cs,a)=>{ const s=parseInt(cs['grid'+a+'Start'])||1, e=parseInt(cs['grid'+a+'End']);
+    return [s, (e>s) ? e : s+1]; };
+  const achsen = art==='pane' ? ['Row','Column'] : [hoch ? 'Row' : 'Column'];
+  for(const a of achsen){ const l=stile.map(cs=>lage(cs,a));
+    gross.style['grid'+a]=Math.min(...l.map(x=>x[0]))+' / '+Math.max(...l.map(x=>x[1])); }
+}
+function grossZurueckSetzen(){ ['playerpane','frontpane','grid'].forEach(id=>{ const q=el(id); if(q){ q.style.gridRow=''; q.style.gridColumn=''; } }); }
+function grossElemente(art){ const p=grossPane(), g=el('grid');
+  return art==='pane' ? [p, g] : [g, p]; }
+// art: 'pane' | 'grid' | null (zurueck). Gleiche Art noch einmal: Zeit neu starten.
+function paneGross(art){
+  const sc=document.querySelector('.screen'); if(!sc) return;
+  clearTimeout(_grossT); _grossT=null;
+  if(art && !(grossSplit() && grossPane() && (art==='pane' || gridGrossOk()))) art=null;
+  const vorher=_gross;
+  if(art){
+    if(art!==vorher){ grossZurueckSetzen(); grossSpannen(art);
+      _grossSchluessel=grossSchluessel(art); }
+    _grossT=setTimeout(()=>paneGross(null), paneGrossS*1000);
+  } else { grossZurueckSetzen(); _grossSchluessel=null; }
+  _gross=art||null;
+  griffSetzen();
+  if(_gross===vorher) return;
+  sc.classList.toggle('gross', _gross==='pane');
+  sc.classList.toggle('grossk', _gross==='grid');
+  // kurz einblenden, in beide Richtungen (die Rasterflaeche selbst springt)
+  const q=(_gross==='grid' || vorher==='grid') ? el('grid') : grossPane();
+  if(q){ q.classList.remove('grossanim'); void q.offsetWidth; q.classList.add('grossanim'); }
+  requestAnimationFrame(()=>{ syncPager(); if(typeof schemeFit==='function' && schemeFit && el('grid').classList.contains('scheme')) schemeFit(); griffSetzen(); });
+}
+// Gehoert die grosse Seite noch zur Ansicht? Anderer Tab, anderes Widget,
+// Schema verlassen, Split aus: zurueck. Laeuft aus applyPane und bei jedem
+// Wechsel der Kachelseite (Klassen von #grid).
+// Klingel: die Visu springt auf die Tuersprechanlage (nav in verbindung.js);
+// sobald deren Seite steht, zieht sie sich gross ueber das Widget. So lange
+// wartet sie auf die Seite, danach nicht mehr (etwa ohne Split).
+const KLINGEL_GROSS_MS=15000;
+let _klingelGross=0;
+function klingelGross(){ _klingelGross=Date.now(); grossPruefen(); }
+function grossPruefen(){
+  if(_klingelGross){
+    if(Date.now()-_klingelGross>KLINGEL_GROSS_MS) _klingelGross=0;
+    else if(view && view.route && view.route.view==='control' && gridGrossOk()){
+      _klingelGross=0; paneGross('grid'); return; }
+  }
+  if(_gross && !(grossSplit() && grossPane() && (_gross==='pane' || gridGrossOk()) && grossSchluessel(_gross)===_grossSchluessel)) paneGross(null);
+  else griffSetzen();
+}
+// Griff mit zwei Pfeilen an der Grenze der beiden Seiten: der zur Kachelseite
+// (links, hochkant oben) zieht das Widget gross bzw. die Kachelseite zurueck,
+// der zum Widget (rechts, unten) umgekehrt. Er liegt ausserhalb der Panes,
+// deren Inhalt staendig neu entsteht, und wird nach ihrer Lage gesetzt.
+function griffSetzen(){
+  const gf=el('grossGriff'), sc=document.querySelector('.screen'), p=grossPane(), g=el('grid');
+  if(!gf) return;
+  if(!grossSplit() || !p || !g || saverOn()){ gf.hidden=true; return; }   // Uhr-Seite oben: kein Griff
+  const hoch=sc.classList.contains('hoch');
+  const zurKachel = _gross!=='pane';                                     // links/oben: Widget gross oder Kachelseite zurueck
+  const zumWidget = _gross==='pane' || (_gross===null && gridGrossOk());  // rechts/unten: Widget zurueck oder Kachelseite gross
+  const bl=gf.querySelector('[data-r="k"]'), br=gf.querySelector('[data-r="w"]');
+  bl.hidden=!zurKachel; br.hidden=!zumWidget;
+  gf.classList.toggle('hoch', hoch);
+  gf.hidden=false;
+  // Grenze: Anfang des Widgets, bei grosser Kachelseite deren Ende
+  const n = _gross==='grid' ? g : p;   // an dessen Kante zur anderen Seite
+  let x, y;
+  if(hoch){ x=n.offsetLeft + n.offsetWidth/2; y=(_gross==='grid' ? n.offsetTop+n.offsetHeight : n.offsetTop); }
+  else { y=n.offsetTop + n.offsetHeight/2; x=(_gross==='grid' ? n.offsetLeft+n.offsetWidth : n.offsetLeft); }
+  // Gross liegt die Kante am Rand des Kastens: Griff ganz hinein
+  const hw=gf.offsetWidth/2+4, hh=gf.offsetHeight/2+4;
+  x=Math.max(hw, Math.min(sc.clientWidth-hw, x)); y=Math.max(hh, Math.min(sc.clientHeight-hh, y));
+  gf.style.left=x+'px'; gf.style.top=y+'px';
+}
+(function(){
+  const sc=document.querySelector('.screen'); if(!sc) return;
+  const gf=document.createElement('div'); gf.id='grossGriff'; gf.className='gross-griff'; gf.hidden=true;
+  gf.innerHTML='<button type="button" data-r="k" aria-label="Größer / zurück">'+svg('<path d="M15 6l-6 6 6 6"/>')+'</button>'+
+               '<button type="button" data-r="w" aria-label="Größer / zurück">'+svg('<path d="M9 6l6 6-6 6"/>')+'</button>';
+  sc.appendChild(gf);
+  gf.querySelectorAll('button').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation();
+    if(b.dataset.r==='k') paneGross(_gross==='grid' ? null : 'pane');
+    else paneGross(_gross==='pane' ? null : 'grid'); }));
+  // Kachelseite gewechselt (Schema, Bedienseite, Kacheln): passt "gross" noch?
+  const g=el('grid'); if(g && window.MutationObserver) new MutationObserver(()=>grossPruefen()).observe(g, {attributes:true, attributeFilter:['class']});
+})();
+['playerpane','frontpane','grid'].forEach(id=>{ const p=el(id); if(!p) return;
+  p.addEventListener('animationend', ()=>p.classList.remove('grossanim'));
+  p.addEventListener('pointerdown', ()=>{ if(_gross) paneGross(_gross); }, {passive:true, capture:true});   // Beruehrung: Zeit neu starten
+});
+['playerpane','frontpane'].forEach(id=>{ const p=el(id); if(!p) return;
+  p.addEventListener('pointerdown', e=>{ _grossDown = e.isPrimary ? {x:e.clientX, y:e.clientY} : null; }, {passive:true});
+  p.addEventListener('pointerup', e=>{
+    const d=_grossDown; _grossDown=null;
+    if(!d || !e.isPrimary || paneGrossS<=0 || (e.pointerType==='mouse' && e.button!==0)) return;
+    if(Math.hypot(e.clientX-d.x, e.clientY-d.y)>GROSS_WEG_PX) { _grossTipp=null; return; }
+    if(e.target && e.target.closest && e.target.closest(GROSS_NICHT)) { _grossTipp=null; return; }
+    const t=Date.now(), v=_grossTipp;
+    if(v && t-v.t<=GROSS_TIPP_MS && Math.hypot(e.clientX-v.x, e.clientY-v.y)<=GROSS_TIPP_PX){
+      _grossTipp=null; paneGross(_gross==='pane' ? null : 'pane'); return; }
+    _grossTipp={t:t, x:e.clientX, y:e.clientY};
+  });
+  p.addEventListener('pointercancel', ()=>{ _grossDown=null; _grossTipp=null; });
+});
+// Drehen oder neue Fenstergroesse: Spannweite und Griff neu, hochkant liegen die Zeilen anders
+window.addEventListener('resize', ()=>requestAnimationFrame(()=>{
+  if(_gross) grossSpannen(_gross);
+  griffSetzen(); }));
 
 // Inline-Style (CSS-Variablen + Farben) einer Kachel — von render() und
 // updateGrid() gemeinsam genutzt, liefert den ROHEN Style (ohne HTML-Escape).
