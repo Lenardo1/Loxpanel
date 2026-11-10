@@ -1290,6 +1290,12 @@ def _sanitize_panels(panels: dict) -> dict:
                 # Tor direkt fahren statt Detailseite (eigene Version)
                 if ov.get("direkt") is True:
                     e2["direkt"] = True
+                # Sammelkachel (eigene Version): weitere Ja/Nein-Bausteine, z. B. Bewohner
+                mit = ov.get("mit")
+                if isinstance(mit, list):
+                    mit = [m for m in mit if isinstance(m, str) and re.match(r"^[0-9a-f-]{20,40}$", m) and m != cu][:8]
+                    if mit:
+                        e2["mit"] = mit
                 if e2:
                     ct[cu] = e2
             if ct:

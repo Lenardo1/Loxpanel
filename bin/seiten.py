@@ -185,6 +185,19 @@ class Seiten:
             return {}
         return {"leiste": [self._control_item(u, prof, **kw) for u in uuids]}
 
+    def _sammelkachel(self, uuid: str, mit: list, it: dict) -> None:
+        teile = [(uuid, it)] + [(m, self._control_item(m)) for m in mit if m in self.controls]
+        def person(u):
+            n = _clean((self.controls.get(u) or {}).get("name"))
+            return n.split(":", 1)[1].strip() if ":" in n else n
+        kopf = _clean((self.controls.get(uuid) or {}).get("name"))
+        da = [person(u) for u, x in teile if x.get("on")]
+        it["label"] = kopf.split(":", 1)[0].strip() if ":" in kopf else kopf
+        it["on"] = bool(da)
+        it["sublabel"] = (", ".join(da) + " da") if da else "Niemand da"
+        it.pop("nav", None)
+        it.pop("cmd", None)
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False, ohne_raum: str = "") -> dict:
         """Kachel eines Bausteins. show_room: Raum an der Kachel (Seite ueber
@@ -230,6 +243,11 @@ class Seiten:
             if fahrt:
                 it["sublabel"] = "öffnet …" if fahrt > 0 else "schließt …"
             it.pop("nav", None)
+        # Sammelkachel (eigene Version): tiles[uuid].mit = weitere Ja/Nein-Bausteine,
+        # z. B. "Bewohner: Anna" + Ben + Clara -> eine Kachel "Bewohner" mit
+        # den Namen derer, die an sind. Name = Teil nach dem Doppelpunkt.
+        if tov.get("mit"):
+            self._sammelkachel(uuid, tov["mit"], it)
         # Nur lang druecken schaltet (eigene Version): z. B. Abwesend
         if prof and (((prof.get("tiles") or {}).get(uuid)) or {}).get("lang") and it.get("cmd"):
             it["lang"] = True
@@ -241,7 +259,7 @@ class Seiten:
                 it["tipp"] = {"uuid": c.get("uuidAction"),
                               "cmd": "changeTo/778" if it.get("on") else f"changeTo/{lt}"}
         # Status-Bausteine antippbar machen -> grosse Wertseite
-        if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
+        if t in STATUS_BIG and "nav" not in it and "cmd" not in it and not tov.get("mit"):
             it["nav"] = {"view": "control", "id": uuid}
         # Typ, den LoxPanel nicht kennt: sagen statt einer leeren Kachel. Der
         # Text beschreibt nur (subInfo); ausblenden wie jede Kachel ueber hide.
