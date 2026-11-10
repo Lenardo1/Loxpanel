@@ -268,7 +268,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 if _uu:
                     app.conn_status[ws] = _uu
                     try:
-                        sb = app.status_blocks(_uu)
+                        sb = app.status_blocks(_uu, app.conn_prof.get(ws))
                         _sm = {"t": "svstatus", "items": sb}
                         await ws.send_json(_sm)
                         app._last_sent.setdefault(ws, {})["svstatus"] = _sm

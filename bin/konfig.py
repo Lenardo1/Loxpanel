@@ -1290,6 +1290,10 @@ def _sanitize_panels(panels: dict) -> dict:
                 # Tor direkt fahren statt Detailseite (eigene Version)
                 if ov.get("direkt") is True:
                     e2["direkt"] = True
+                # Kurzname fuer Kopfzeile und Uhr-Seite (eigene Version)
+                kz = ov.get("kurz")
+                if isinstance(kz, str) and kz.strip():
+                    e2["kurz"] = kz.strip()[:24]
                 # Sammelkachel (eigene Version): weitere Ja/Nein-Bausteine, z. B. Bewohner
                 mit = ov.get("mit")
                 if isinstance(mit, list):

@@ -42,3 +42,9 @@ def test_sammelkachel_niemand():
 def test_konfig_mit():
     roh = {"p": {"tiles": {U1: {"mit": [U2, U3, U1, "x", 5]}}}}
     assert konfig._sanitize_panels(roh)["p"]["tiles"][U1] == {"mit": [U2, U3]}
+
+
+def test_konfig_kurz():
+    roh = {"p": {"tiles": {U1: {"kurz": "  Fenster  "}, U2: {"kurz": ""}, U3: {"kurz": 5}}}}
+    tiles = konfig._sanitize_panels(roh)["p"]["tiles"]
+    assert tiles == {U1: {"kurz": "Fenster"}}

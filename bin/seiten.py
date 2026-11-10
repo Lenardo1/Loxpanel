@@ -80,7 +80,7 @@ def _ohne_raum(name: str, raum: str) -> str:
 class Seiten:
     """Seiten, Kacheln und Detailseiten; Mixin der App (self ist die App)."""
 
-    def status_blocks(self, uuids) -> list:
+    def status_blocks(self, uuids, prof: dict | None = None) -> list:
         """Frei gewaehlte Bausteine als Nur-Lese-Kacheln fuer die rechte Spalte
         des Screensavers. Baut bewusst ueber _control_item() — damit stehen dort
         Name, Wert, Icon und Zustandsfarbe genau so wie auf einer Kachel, und ein
@@ -100,6 +100,10 @@ class Seiten:
             # kosten. Deshalb hier raus, statt sie im Panel zu ignorieren.
             for k in ("nav", "controls", "secured"):
                 it.pop(k, None)
+            # Kurzname (eigene Version): tiles[uuid].kurz, z. B. "Fenster" statt "Fensterueberwachung"
+            kurz = ((((prof or {}).get("tiles") or {}).get(u)) or {}).get("kurz")
+            if kurz:
+                it["label"] = kurz
             raus.append(it)
         return raus
 
