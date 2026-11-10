@@ -185,6 +185,26 @@ class Seiten:
             return {}
         return {"leiste": [self._control_item(u, prof, **kw) for u in uuids]}
 
+    def _kachel_direkt(self, uuid: str, c: dict, t: str, it: dict, prof: dict | None) -> None:
+        """Kachel-Einstellungen der Ansicht (tiles[uuid]), die das Antippen aendern:
+        lichtTipp (Lichtsteuerung schaltet direkt, langer Druck = Menue), direkt
+        (Tor faehrt statt Detailseite) und lang (nur 1 s gedrueckt halten schaltet)."""
+        ov = (((prof or {}).get("tiles") or {}).get(uuid)) or {}
+        if not ov:
+            return
+        ua = c.get("uuidAction")
+        lt = ov.get("lichtTipp")
+        if t == "LightControllerV2" and isinstance(lt, int) and lt > 0:
+            it["tipp"] = {"uuid": ua, "cmd": "changeTo/778" if it.get("on") else f"changeTo/{lt}"}
+        if t == "Gate" and ov.get("direkt"):
+            fahrt = self._state(c, "active") or 0
+            it["cmd"] = {"uuid": ua, "cmd": "stop" if fahrt else ("close" if it.get("on") else "open")}
+            if fahrt:
+                it["sublabel"] = "öffnet …" if fahrt > 0 else "schließt …"
+            it.pop("nav", None)
+        if ov.get("lang") and it.get("cmd"):
+            it["lang"] = True
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False, ohne_raum: str = "") -> dict:
         """Kachel eines Bausteins. show_room: Raum an der Kachel (Seite ueber
@@ -216,6 +236,7 @@ class Seiten:
         fn = bausteine.kachel_fuer(t)
         if fn:
             fn(self, uuid, c, it)
+        self._kachel_direkt(uuid, c, t, it, prof)
         # Status-Bausteine antippbar machen -> grosse Wertseite
         if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
             it["nav"] = {"view": "control", "id": uuid}
