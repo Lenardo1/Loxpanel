@@ -293,8 +293,10 @@ function renderKopfzeile(){
   // Werte nur, wenn die Kopfzeile welche nennt ("header:<uuid>,…") und der
   // Server sie schon geschickt hat; solange nicht, steht dort nichts.
   const items=(svArg(paneRawNow()||'') && Array.isArray(svStatusData)) ? svStatusData : [];
-  if(items.length) html+='<div class="kz-werte">'+kopfWerteHtml(items)+'</div>';
+  if(items.length) html+='<div class="kz-werte">'+items.map(it=>kopfWertHtml(it, it.id?' data-id="'+esc(String(it.id))+'"':'')).join('')+'</div>';
   kz.innerHTML=html; tickClock(); kopfEinpassen();
+  // Tipp auf einen Wert oeffnet seine Detailseite (eigene Version), z. B. welche Fenster offen sind
+  kz.querySelectorAll('.kz-w[data-id]').forEach(n=>{ n.style.cursor='pointer'; n.onclick=()=>nav({view:'control',id:n.dataset.id}); });
 }
 // Was rechts nicht mehr in die Zeile passt, bleibt weg - lieber drei ganze
 // Werte als vier angeschnittene. Die gewaehlten Werte gehen dem Wettertext vor
