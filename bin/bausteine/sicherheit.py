@@ -160,8 +160,10 @@ def detail_fensterueberwachung(app, uuid, c, route):
                 neu.append({"id": f"{uuid}:{i}:{j}", "icon": "blind", "on": bool(b2 & FENSTER_OFFEN),
                             "label": _clean(w2.get("name") or f"Fenster {j + 1}"),
                             "sublabel": f"{wtext(b2)} · {kurz}"})
-        neu.sort(key=lambda x: not x["on"])
-        return {"t": "view", "title": _clean(c.get("name")), "route": route,
+        # nur was offen ist; alles zu -> eine Zeile
+        neu = [x for x in neu if x["on"]] or [{"id": f"{uuid}:zu", "icon": "blind", "on": False,
+                                              "label": "Alle Fenster und Türen geschlossen", "sublabel": ""}]
+        return {"t": "view", "title": "Offen", "route": route,
                 "layout": "list", "items": neu}
     # Offene zuerst, in der Reihenfolge beim Aufruf der Seite (route reihe,
     # Seiten.aufruf_route): schliesst jemand ein Fenster, springt keine Zeile

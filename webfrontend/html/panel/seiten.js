@@ -312,7 +312,8 @@ function kopfEinpassen(){
     [...box.children].forEach(c=>{ if(c.getBoundingClientRect().right > rechts+1){ c.hidden=true; weg=true; } });
     return weg; };
   if(wxText) wxText.hidden=false;
-  if(passen() && wxText){ wxText.hidden=true; passen(); }
+  const wx=kz.querySelector('.kz-wx'); if(wx) wx.hidden=false;
+  if(passen() && wxText){ wxText.hidden=true; if(passen() && wx){ wx.hidden=true; passen(); } }   // eigene Version: notfalls Wetter ganz weg, Werte gehen vor
 }
 // ---- Werteleiste (ui.valueBar, view.leiste) ----
 // Die Anzeige-Bausteine einer Seite (Messwerte, Zaehler, Texte, Ein/Aus-
