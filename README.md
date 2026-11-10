@@ -85,6 +85,10 @@ im Browser – ganz ohne Programmierung und ohne die Loxone-App.
 - **Pro-Kachel-Styling:** je Kachel Hintergrund, Rahmen, Icon- und Textfarbe,
   Schrift und Icon (eingebaute Icons, Loxone-Icons, eigene). Konfigurierbares
   Aktiv-Overlay (Farbe/Transparenz von Füllung und Rahmen), global oder pro Kachel.
+- **Kacheln direkt schalten (pro Ansicht):** Lichtsteuerung schaltet per Tipp
+  aus bzw. in eine gewählte Stimmung (langer Druck öffnet weiter das Menü), Tore
+  fahren per Tipp auf/zu/stopp statt Detailseite, und auf Wunsch schaltet eine
+  Kachel nur nach 1 s gedrückt halten (Schutz z. B. für „Abwesend“).
 - **Ein Design für alle Geräte:** dieselbe Oberfläche skaliert auf Wandpanel,
   Tablet und Smartphone.
 - **Display nach Anwesenheit:** auf Android-Panels (LoxPanel-App, Fully Kiosk,

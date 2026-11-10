@@ -1273,6 +1273,17 @@ def _sanitize_panels(panels: dict) -> dict:
                         e2["chartStyle"] = ov["chartStyle"]   # Tagesmuster / Tagesspanne
                 if _kachel_breite(ov.get("w")) is not None:
                     e2["w"] = _kachel_breite(ov["w"])   # Breite in Spalten (1 | 2); fehlt = nach Typ
+                # Lichtsteuerung: kurzer Tipp schaltet aus bzw. in diese Stimmung (ID),
+                # langer Druck oeffnet weiter das Menue
+                lt = ov.get("lichtTipp")
+                if isinstance(lt, int) and not isinstance(lt, bool) and 0 < lt < 1000:
+                    e2["lichtTipp"] = lt
+                # Tor direkt fahren (auf / zu / stopp) statt Detailseite
+                if ov.get("direkt") is True:
+                    e2["direkt"] = True
+                # Schutz: die Kachel schaltet nur nach 1 s gedrueckt halten
+                if ov.get("lang") is True:
+                    e2["lang"] = True
                 if e2:
                     ct[cu] = e2
             if ct:

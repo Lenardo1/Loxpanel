@@ -995,3 +995,6 @@
   .pinkey:active{background:rgba(var(--wash,255,255,255),.14);transform:scale(.97);}
   .pinkey.ok{background:var(--glow);color:var(--on-glow,#181008);border-color:transparent;font-weight:700;}
   .pinkey.del{font-size:20px;}
+
+/* Kachel mit Schutz (lang): der Rand fuellt sich waehrend des langen Drueckens */
+.tile.langlaeuft{box-shadow:inset 0 0 0 3px var(--accent,#52b881);transition:box-shadow 1s linear}

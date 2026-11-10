@@ -456,7 +456,17 @@ function render(){
     }
     fitTile(n);
     _kachelM=kachelMass();   // fuer faktorNachziehen: neu einpassen, wenn sich das Mass aendert
+    // Langer Druck: Lichtkachel mit tipp oeffnet nach 0,6 s das Menue (nav); Kachel
+    // mit Schutz (lang) schaltet erst nach 1 s, der Rand fuellt sich dabei.
+    n.onpointerdown=()=>{ const t=n._it||it; n._lang=false; clearTimeout(n._langT);
+      if(t&&t.tipp&&t.nav) n._langT=setTimeout(()=>{ n._lang=true; nav((n._it||it).nav); }, 600);
+      else if(t&&t.lang&&t.cmd){ n.classList.add('langlaeuft');
+        n._langT=setTimeout(()=>{ n._lang=true; n.classList.remove('langlaeuft'); const u=n._it||it;
+          sendCmd(u.cmd.uuid,u.cmd.cmd,(view&&view.secured)||u.secured); }, 1000); } };
+    n.onpointerup=n.onpointercancel=n.onpointerleave=()=>{ clearTimeout(n._langT); n.classList.remove('langlaeuft'); };
     n.onclick=(e)=>{ if(e.target.closest('.tctrls')) return; const t=n._it||it;
+      if(t.tipp){ if(!n._lang) sendCmd(t.tipp.uuid,t.tipp.cmd,(view&&view.secured)||t.secured); n._lang=false; return; }
+      if(t.lang){ if(!n._lang) langHinweis(); n._lang=false; return; }
       if(t.nav) nav(t.nav); else if(t.cmd) sendCmd(t.cmd.uuid,t.cmd.cmd,(view&&view.secured)||t.secured); };
   });
   // Eine LEERE Liste ist eine Aussage ("diese Seite hat keine Sprungmarken"),
@@ -611,3 +621,14 @@ g.addEventListener('wheel', e=>{
   seiteZu(Math.max(0, Math.min(n-1, seiteAktuell()+(e.deltaY>0?1:-1))));
 }, {passive:false});
 
+
+// Kachel mit Schutz (lang): ein kurzer Tipp schaltet nicht, sondern sagt, wie es geht
+function langHinweis(){
+  let b=document.getElementById('langhinweis');
+  if(!b){ b=document.createElement('div'); b.id='langhinweis';
+    b.style.cssText='position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:99999;padding:12px 18px;'+
+      'border-radius:12px;background:rgba(30,40,35,.95);color:#fff;font:600 15px system-ui,sans-serif;pointer-events:none;'+
+      'opacity:0;transition:opacity .25s;box-shadow:0 6px 24px rgba(0,0,0,.4)';
+    b.textContent='Zum Schalten 1 Sekunde gedrückt halten'; document.body.appendChild(b); }
+  b.style.opacity='1'; clearTimeout(b._t); b._t=setTimeout(()=>{ b.style.opacity='0'; }, 1800);
+}
