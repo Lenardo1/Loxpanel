@@ -1284,6 +1284,12 @@ def _sanitize_panels(panels: dict) -> dict:
                 lt = ov.get("lichtTipp")
                 if isinstance(lt, int) and not isinstance(lt, bool) and 0 < lt < 1000:
                     e2["lichtTipp"] = lt
+                # Schutz vor versehentlichem Schalten (eigene Version): nur lang druecken schaltet
+                if ov.get("lang") is True:
+                    e2["lang"] = True
+                # Tor direkt fahren statt Detailseite (eigene Version)
+                if ov.get("direkt") is True:
+                    e2["direkt"] = True
                 if e2:
                     ct[cu] = e2
             if ct:

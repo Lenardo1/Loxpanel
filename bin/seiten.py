@@ -221,6 +221,18 @@ class Seiten:
         wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)
         if wr == "an" and it.get("on") or wr == "aus" and not it.get("on"):
             it["tone"] = "crit"
+        # Tor direkt (eigene Version): fahrend -> Stop, offen -> schliessen, zu -> oeffnen
+        tov = (((prof or {}).get("tiles") or {}).get(uuid)) or {}
+        if t == "Gate" and tov.get("direkt"):
+            ua = c.get("uuidAction")
+            fahrt = self._state(c, "active") or 0
+            it["cmd"] = {"uuid": ua, "cmd": "stop" if fahrt else ("close" if it.get("on") else "open")}
+            if fahrt:
+                it["sublabel"] = "öffnet …" if fahrt > 0 else "schließt …"
+            it.pop("nav", None)
+        # Nur lang druecken schaltet (eigene Version): z. B. Abwesend
+        if prof and (((prof.get("tiles") or {}).get(uuid)) or {}).get("lang") and it.get("cmd"):
+            it["lang"] = True
         # Lichtsteuerung mit Tipp-Stimmung (eigene Version): Tipp schaltet aus bzw.
         # in die gewaehlte Stimmung, langer Druck oeffnet weiter das Menue (nav)
         if t == "LightControllerV2" and prof:

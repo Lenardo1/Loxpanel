@@ -723,6 +723,10 @@ function renderTileEditor(){
       (c.stat?chartStyleRows(c,ov):'')+
       breiteRow(c,ov)+
       lichtTippRow(c,ov)+
+      (c.type==='Gate'?'<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Tor')+'</label><label class="chk" style="margin:0">'+
+        '<input type="checkbox" id="tDirekt"'+(ov.direkt?' checked':'')+'> '+T('Direkt fahren (auf / zu / stopp) statt Detailseite')+'</label></div>':'')+
+      '<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Schutz')+'</label><label class="chk" style="margin:0">'+
+        '<input type="checkbox" id="tLang"'+(ov.lang?' checked':'')+'> '+T('Nur 1 s gedrückt halten schaltet')+'</label></div>'+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
   bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
@@ -741,6 +745,8 @@ function renderTileEditor(){
       if(o.overlay) delete o.overlay; else o.overlay={}; pruneTile(); renderTileEditor(); renderTileList(); markDirty(); }; }
   { const ts=$('#tChartStyle'); if(ts) ts.onchange=()=>setChartStyle(ts.value); }
   { const tw=$('#tWidth'); if(tw) tw.onchange=()=>setTile('w', tw.value?parseInt(tw.value):null); }
+  { const td=$('#tDirekt'); if(td) td.onchange=()=>setTile('direkt', td.checked?true:null); }
+  { const tg=$('#tLang'); if(tg) tg.onchange=()=>setTile('lang', tg.checked?true:null); }
   { const tl=$('#tLichtTipp'); if(tl) tl.onchange=()=>setTile('lichtTipp', tl.value?parseInt(tl.value):null); }
   { const tr=$('#tChartRange'); if(tr) tr.onchange=()=>setTile('chart', tr.value); }
   $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
