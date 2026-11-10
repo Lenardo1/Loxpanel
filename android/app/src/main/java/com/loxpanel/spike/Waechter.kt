@@ -71,6 +71,20 @@ object Waechter {
      *  der ANZEIGE_HAENGT_MELDUNGEN-ten, einmal je Hänger. */
     fun rendererBeenden(meldungen: Int): Boolean = meldungen == ANZEIGE_HAENGT_MELDUNGEN
 
+    /** Die Seite meldet sich alle 10 s (LoxKioskNative.lebt). Bleibt das so
+     *  lange aus, obwohl die Anzeige vorn ist, steht ihr Skript (gesehen nach
+     *  einem Miniserver-Neustart: Uhr stand, Android meldete keinen Hänger). */
+    const val SEITE_STILL_MS = 120_000L
+
+    /** Prüfabstand für [seiteSteht]. */
+    const val SEITE_PRUEF_MS = 30_000L
+
+    /** Ob die Anzeige neu aufgebaut wird: nur wenn sich diese Seite schon einmal
+     *  gemeldet hat (ältere Server ohne Herzschlag bleiben unberührt) und seit
+     *  [letzteMs] länger als SEITE_STILL_MS nichts kam. */
+    fun seiteSteht(jetztMs: Long, letzteMs: Long?): Boolean =
+        letzteMs != null && jetztMs - letzteMs > SEITE_STILL_MS
+
     /** Neustart-Zeitpunkte (ms seit 1970) als Text für die Einstellungen der App
      *  und zurück. Unlesbares fällt weg. */
     fun alsText(neustarts: List<Long>): String = neustarts.joinToString(",")

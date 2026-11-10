@@ -136,4 +136,12 @@ class WaechterTest {
         assertTrue("Android meldet frühestens alle 5 s: mindestens eine halbe Minute",
             Waechter.ANZEIGE_HAENGT_MELDUNGEN * 5 >= 30)
     }
+
+    @Test
+    fun seiteStehtNurNachHerzschlagUndStille() {
+        assertFalse("ohne Herzschlag (alter Server) nie", Waechter.seiteSteht(10_000_000L, null))
+        assertFalse(Waechter.seiteSteht(1_000_000L + Waechter.SEITE_STILL_MS, 1_000_000L))
+        assertTrue(Waechter.seiteSteht(1_000_001L + Waechter.SEITE_STILL_MS, 1_000_000L))
+        assertTrue("länger als die 60 s bis zur Uhr-Seite", Waechter.SEITE_STILL_MS > 60_000L)
+    }
 }

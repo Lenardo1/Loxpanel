@@ -82,6 +82,18 @@ class KioskActivity : Activity(), SensorEventListener {
     private val ui = Handler(Looper.getMainLooper())
     private var errored = false
     private var reloadPending = false
+    /** Letzte Meldung der Seite (elapsedRealtime), null bis zur ersten. */
+    @Volatile private var herzschlag: Long? = null
+    private val seitePruefen = object : Runnable {
+        override fun run() {
+            if (destroyed) return
+            if (Waechter.seiteSteht(SystemClock.elapsedRealtime(), herzschlag)) {
+                Log.w("LPANZEIGE", "Seite meldet sich seit über ${Waechter.SEITE_STILL_MS / 1000} s nicht, Anzeige wird neu aufgebaut")
+                anzeigeNeuAufbauen(web)
+            }
+            ui.postDelayed(this, Waechter.SEITE_PRUEF_MS)
+        }
+    }
     // Basis-Adresse des Servers, für den show() zuletzt geladen hat: Nach
     // „Server ändern“ lädt die Anzeige beim Zurückkommen den neuen.
     private var geladenFuer: String? = null
@@ -290,6 +302,7 @@ class KioskActivity : Activity(), SensorEventListener {
      *  Schleife auf. */
     private fun anzeigeNeuAufbauen(alt: WebView) {
         if (alt !== web) return
+        herzschlag = null
         intercomPage = false
         intercomCapability.clear()
         intercomPageCapability = null
@@ -407,9 +420,14 @@ class KioskActivity : Activity(), SensorEventListener {
         proximity?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
         wake()
         serverUndSeite()
+        // Pause zählt nicht als Stille: ab jetzt neu messen
+        if (herzschlag != null) herzschlag = SystemClock.elapsedRealtime()
+        ui.removeCallbacks(seitePruefen)
+        ui.postDelayed(seitePruefen, Waechter.SEITE_PRUEF_MS)
     }
 
     override fun onPause() {
+        ui.removeCallbacks(seitePruefen)
         intercom.onPause()
         super.onPause()
         sensorManager?.unregisterListener(this)
@@ -599,6 +617,13 @@ class KioskActivity : Activity(), SensorEventListener {
 
     /** JS-Brücke der Visu. */
     inner class KioskBridge {
+        /** Herzschlag der Seite (alle 10 s), siehe Waechter.seiteSteht. */
+        @JavascriptInterface
+        fun lebt() {
+            if (herzschlag == null) Log.i("LPANZEIGE", "Seite meldet sich (Herzschlag), Wächter aktiv")
+            herzschlag = SystemClock.elapsedRealtime()
+        }
+
         /** Nur die lokale Visu kann eine native Gegensprech-Sitzung beginnen. */
         @JavascriptInterface
         fun startIntercomNative(uuid: String, capability: String?): Boolean =

@@ -4,7 +4,7 @@
 
 // ---- Screensaver: Uhr als Startseite, Tippen -> Favoriten ----
 const SAVER_IDLE_MS = 60000;   // nach 60 s Inaktivitaet zurueck zur Uhr
-let idleTimer=null;
+let idleTimer=null, letzteBedienung=Date.now();
 // Minute, in der tickClock die Hausuebersicht zuletzt neu gezeichnet hat
 let hsMinute='';
 function tickClock(){
