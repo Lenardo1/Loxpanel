@@ -489,6 +489,7 @@ function grossElemente(art){ const p=grossPane(), g=el('grid');
 function paneGross(art){
   const sc=document.querySelector('.screen'); if(!sc) return;
   clearTimeout(_grossT); _grossT=null;
+  const gl=el('grid'); if(!art && gl && gl.classList.contains('leer') && grossSplit() && grossPane()) art='pane';   // leere Seite: Widget bleibt gross
   if(art && !(grossSplit() && grossPane() && (art==='pane' || gridGrossOk()))) art=null;
   const vorher=_gross;
   if(art){

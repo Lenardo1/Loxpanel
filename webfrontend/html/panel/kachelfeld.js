@@ -359,7 +359,10 @@ function render(){
   el('grid').classList.toggle('lx', kachelNeu());
   const items = katSichtbar(view.items || []);   // Filter-Modus der Sprungmarken
   const g = el('grid');
-  if(!items.length){ g.classList.remove('hpages','punkte','fuss'); g.innerHTML='<div class="empty">nichts hier</div>'; renderTabs(); return; }
+  // Seite ohne Kacheln mit Widget (eigene Version): das Widget bekommt den ganzen Platz
+  if(!items.length){ g.classList.remove('hpages','punkte','fuss'); g.classList.add('leer'); g.innerHTML='<div class="empty">nichts hier</div>'; renderTabs();
+    setTimeout(()=>{ if(g.classList.contains('leer') && grossSplit() && grossPane()) paneGross('pane'); }, 0); return; }
+  if(g.classList.contains('leer')){ g.classList.remove('leer'); if(_gross==='pane') paneGross(null); }
   // Lage im Raster: Rastpunkt auf die erste Kachel jeder Seite (Liste: jede
   // 4.), breite Kacheln (w2) nur, wo zwei Spalten da sind. Waagerechte
   // Seiten (Tablet): je Seite ein eigenes Raster, Rastpunkt ist die Seite.
