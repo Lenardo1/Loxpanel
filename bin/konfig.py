@@ -1292,6 +1292,9 @@ def _sanitize_panels(panels: dict) -> dict:
                 # Tor direkt fahren statt Detailseite (eigene Version)
                 if ov.get("direkt") is True:
                     e2["direkt"] = True
+                # Kopfzeile/Uhr-Seite: nur zeigen, wenn an (eigene Version, z. B. Muell heute/morgen)
+                if ov.get("nurAn") is True:
+                    e2["nurAn"] = True
                 # Kurzname fuer Kopfzeile und Uhr-Seite (eigene Version)
                 kz = ov.get("kurz")
                 if isinstance(kz, str) and kz.strip():

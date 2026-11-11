@@ -10,6 +10,7 @@ Zustand (self ist die App). Importiert webvisu nicht."""
 from __future__ import annotations
 
 import logging
+import re
 from urllib.parse import quote
 
 import bausteine
@@ -101,7 +102,12 @@ class Seiten:
             for k in ("nav", "controls", "secured"):
                 it.pop(k, None)
             # Kurzname (eigene Version): tiles[uuid].kurz, z. B. "Fenster" statt "Fensterueberwachung"
-            kurz = ((((prof or {}).get("tiles") or {}).get(u)) or {}).get("kurz")
+            tov = (((prof or {}).get("tiles") or {}).get(u)) or {}
+            if tov.get("mit"):
+                self._sammelkachel(u, tov["mit"], it)   # z. B. Muell aus mehreren Abfall-Texten
+            if tov.get("nurAn") and not it.get("on"):
+                continue                                # nur zeigen, wenn aktuell (Muell heute/morgen)
+            kurz = tov.get("kurz")
             if kurz:
                 it["label"] = kurz
             raus.append(it)
@@ -189,8 +195,56 @@ class Seiten:
             return {}
         return {"leiste": [self._control_item(u, prof, **kw) for u in uuids]}
 
+    @staticmethod
+    def _abhol_tage(text: str) -> int | None:
+        """Text eines Abfall-Bausteins -> Tage bis zur Abholung ("heute" 0,
+        "morgen" 1, "in 7 Tagen" 7), sonst None ("Abholung Unbekannt")."""
+        t = str(text or "").lower()
+        if "heute" in t:
+            return 0
+        if "morgen" in t and "übermorgen" not in t:
+            return 1
+        m = re.search(r"in\s+(\d+)\s+tag", t)
+        return int(m.group(1)) if m else None
+
+    @staticmethod
+    def _tonne(name: str) -> str:
+        """Abfallart aus dem Bausteinnamen -> Symbol-Kennung fuer die Kopfzeile."""
+        n = (name or "").lower()
+        if "gewerbe" in n:
+            return "container-papier" if "papier" in n else "container"
+        if "bio" in n:
+            return "bio"
+        if "papier" in n:
+            return "papier"
+        if "gelb" in n or "wertstoff" in n or "plastik" in n:
+            return "gelb"
+        return "rest"
+
     def _sammelkachel(self, uuid: str, mit: list, it: dict) -> None:
         teile = [(uuid, it)] + [(m, self._control_item(m)) for m in mit if m in self.controls]
+        typen = {(self.controls.get(u) or {}).get("type") for u, _ in teile}
+        if typen <= {"TextState", "InfoOnlyText"}:
+            # Abfall (eigene Version): naechste Abholung aus "in N Tagen"-Texten
+            tage = [(self._abhol_tage(x.get("sublabel")), _clean((self.controls.get(u) or {}).get("name")))
+                    for u, x in teile]
+            tage = [(d, n) for d, n in tage if d is not None]
+            it["label"] = "Müll"
+            it.pop("nav", None)
+            it.pop("cmd", None)
+            if not tage:
+                it.update(on=False, sublabel="Kein Termin")
+                return
+            d = min(x[0] for x in tage)
+            namen = ", ".join(n for x, n in tage if x == d)
+            it["on"] = d <= 1
+            # Symbole statt Namen (Kopfzeile): Tonne bzw. Container in ihrer Farbe
+            it["tonnen"] = [self._tonne(n) for x, n in tage if x == d]
+            if d <= 1:
+                it["big"] = "Heute" if d == 0 else "Morgen"
+            it["sublabel"] = (f"Heute: {namen}" if d == 0 else f"Morgen: {namen}" if d == 1
+                              else f"{namen} in {d} Tagen")
+            return
         def person(u):
             n = _clean((self.controls.get(u) or {}).get("name"))
             return n.split(":", 1)[1].strip() if ":" in n else n

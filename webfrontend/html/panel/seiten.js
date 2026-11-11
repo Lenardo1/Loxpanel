@@ -275,11 +275,43 @@ function kopfHoehe(ks){ return kopfAktiv() ? Math.round(KOPF_H*(ks||kachelFaktor
 // weitere Attribute (data-i, data-id der Werteleiste). Als Wert der Messwert, den
 // die Kachel gross zeigt (big, etwa die Ist-Temperatur der Raumregelung), sonst
 // die Zweitzeile: "21,0°" passt in die Zeile, "21,0° → 22,5° · heizt" oft nicht.
+// Abfall-Symbole (eigene Version): Tonne bzw. Container in der Farbe der Abfallart
+// Farbe je Abfallart; [Koerper, Deckel], wo sie verschieden sind (gelbe Tonne: schwarz mit gelbem Deckel)
+const TONNE_FARBE={rest:'#2b2b2b', bio:'#8a5a2e', papier:'#2f6fd0', gelb:['#2b2b2b','#e8c23a'], container:'#3f8f4f', 'container-papier':'#2f6fd0'};
+function tonneSvg(k){
+  const fa=TONNE_FARBE[k]||'#8f959b', f=Array.isArray(fa)?fa[0]:fa, fd=Array.isArray(fa)?fa[1]:fa, c=String(k).startsWith('container');
+  // Stil an jedem Teil: die Kopfzeile setzt fuer Symbole sonst "keine Fuellung"
+  const sti=x=>' style="fill:'+x+';stroke:rgba(255,255,255,.6);stroke-width:.8;stroke-linejoin:round"';
+  const st=sti(f), std=sti(fd);
+  const rad=' style="fill:#1c1c1c;stroke:rgba(255,255,255,.6);stroke-width:.8"';
+  // Gewerbe: 1100-l-Container schraeg von vorn, Deckel nach hinten gewoelbt
+  if(c){ const ton=(h,m)=>{ const n=parseInt(h.slice(1),16), k=v=>Math.max(0,Math.min(255,Math.round(v*m)));
+      return '#'+[n>>16,(n>>8)&255,n&255].map(v=>k(v).toString(16).padStart(2,'0')).join(''); };
+    const sts=sti(ton(f,.75)), stl=sti(ton(fd,1.18)), str=sti(ton(fd,.97));
+    // Reihenfolge = Tiefe: Hinterrad zuerst (die Seitenwand verdeckt seine obere Haelfte),
+    // dann Seite, Front, Deckel mit Randstreifen an der Seite und Kante vorn
+    return '<svg viewBox="0.5 4.5 23 19" class="tonne">'+
+    '<circle'+rad+' cx="19.6" cy="18.6" r="1.4"/>'+
+    '<path'+sts+' d="M17 10 Q17.6 6.4 21.5 7 L21 17.6 L16.4 20.5Z"/>'+
+    '<path'+st+' d="M2 10 L17 10 L16.4 20.5 L2.6 20.5Z"/>'+
+    '<path'+stl+' d="M2 10 Q2.6 6.4 6.5 7 L21.5 7 Q17.6 6.4 17 10Z"/>'+
+    '<path'+str+' d="M17 10 Q17.6 6.4 21.5 7 L21.5 8.1 Q17.6 7.5 17 11.1Z"/>'+
+    '<path'+str+' d="M2 10 L17 10 L17 11.1 L2 11.1Z"/>'+
+    '<rect'+st+' x="7" y="12.6" width="5" height="1.2" rx=".4"/>'+
+    '<circle'+rad+' cx="4.6" cy="21.6" r="1.4"/><circle'+rad+' cx="14.6" cy="21.6" r="1.4"/></svg>'; }
+  // Tonne beim Rausfahren: auf das Rad gekippt (14 Grad), Deckel vorn ca. 45-50 Grad offen
+  return '<svg viewBox="5.8 -5 18 29" class="tonne">'+
+    '<path'+std+' d="M14.3 -4.2 L21.8 4.1 L20.4 5.4 L12.9 -2.9Z"/>'+
+    '<path'+st+' d="M10.1 3.2 L20.3 5.8 L15.7 20.5 L7.3 18.4Z"/>'+
+    '<path'+st+' d="M20.3 6.0 L22.4 6.5 L22.1 7.9 L19.9 7.3Z"/>'+
+    '<circle'+rad+' cx="15.2" cy="20.9" r="2"/></svg>'; }
 function kopfWertHtml(it, attrs){
   const ton=(it.tone==='good')?' good':((it.tone==='crit')?' crit':(it.on?' on':''));
-  const ico = it.iconUrl ? '<span class="ico img" style="--u:url(\''+esc(it.iconUrl)+'\')"></span>'
+  const ico = Array.isArray(it.tonnen) && it.tonnen.length ? '<span class="tonnen">'+it.tonnen.map(tonneSvg).join('')+'</span>'
+    : it.iconUrl ? '<span class="ico img" style="--u:url(\''+esc(it.iconUrl)+'\')"></span>'
     : '<span class="ico">'+svg(ICONS[it.icon]||ICONS.info)+'</span>';
-  return '<div class="kz-w'+ton+'"'+(attrs||'')+(it.color?' style="--ico:'+esc(it.color)+'"':'')+'>'+ico+
+  const muell=Array.isArray(it.tonnen) && it.tonnen.length;
+  return '<div class="kz-w'+(muell?' muell':ton)+'"'+(attrs||'')+(it.color?' style="--ico:'+esc(it.color)+'"':'')+'>'+ico+
     '<span class="vl">'+esc(it.big||it.sublabel||'')+'</span><span class="nm">'+esc(it.label||'')+'</span></div>';
 }
 function kopfWerteHtml(items){ return items.map(it=>kopfWertHtml(it)).join(''); }
@@ -305,7 +337,7 @@ function renderKopfzeile(){
   // Werte nur, wenn die Kopfzeile welche nennt ("header:<uuid>,…") und der
   // Server sie schon geschickt hat; solange nicht, steht dort nichts.
   const items=(svArg(paneRawNow()||'') && Array.isArray(svStatusData)) ? svStatusData : [];
-  if(items.length) html+='<div class="kz-werte">'+items.map(it=>kopfWertHtml(it, it.id?' data-id="'+esc(String(it.id))+'"':'')).join('')+'</div>';
+  if(items.length) html+='<div class="kz-werte">'+items.map(it=>kopfWertHtml(it, (it.id && !it.tonnen)?' data-id="'+esc(String(it.id))+'"':'')).join('')+'</div>';
   kz.innerHTML=html; tickClock(); kopfEinpassen();
   // Tipp auf einen Wert oeffnet seine Detailseite (eigene Version), z. B. welche Fenster offen sind
   kz.querySelectorAll('.kz-w[data-id]').forEach(n=>{ n.style.cursor='pointer'; n.onclick=()=>nav({view:'control',id:n.dataset.id}); });

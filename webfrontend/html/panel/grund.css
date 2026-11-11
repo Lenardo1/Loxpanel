@@ -375,6 +375,11 @@
   .kz-uhr .d{font-size:calc(12px * var(--ks,1));color:var(--muted);margin-top:3px;white-space:nowrap;}
   .kz-wx{display:flex;align-items:center;gap:8px;flex:none;min-width:0;padding-left:14px;border-left:1px solid var(--line);}
   .kz-wx .ico{width:calc(28px * var(--ks,1));height:calc(28px * var(--ks,1));flex:none;color:var(--glow);}
+  .kz-w .tonnen{display:flex;gap:calc(2px * var(--ks,1));flex:none;}   /* Abfall-Symbole (eigene Version) */
+  .kz-w .tonnen .tonne{width:calc(44px * var(--ks,1));height:calc(44px * var(--ks,1));}
+  .kz-w.muell{background:none;border:none;box-shadow:none;padding-left:0;padding-right:0;}   /* Muell: nur die Tonnen, kein Rahmen */
+  .kz-w.muell .nm{display:none;}
+  .kz-w.muell .vl{color:var(--glow);}
   .kz-wx .schirm-ico{color:var(--glow);margin-left:calc(6px * var(--ks,1));}   /* Schirm-Hinweis (eigene Version) */
   .kz-wx.schirm .m .c{color:var(--glow);}
   .kz-wx .ico svg{width:100%;height:100%;}
@@ -397,6 +402,7 @@
   .kz-w.on .vl{color:var(--ico-fixed,var(--an-text,var(--glow)));}   /* Text: --an-text, wo ein Kachel-Set ihn nennt */
   .kz-w.good .ico,.kz-w.good .vl{color:var(--good);}
   .kz-w.crit .ico,.kz-w.crit .vl{color:var(--crit-ink,var(--crit));}
+  .kz-w.crit .ico,.kz-w.crit .vl{color:var(--crit);}   /* eigene Version: auf dunklem Chip helles Rot statt der Schrift fuer helle Warnflaechen */
   .kz-w.on .ico.img{background-color:var(--ico-fixed,var(--glow));}
   .kz-w[hidden]{display:none;}   /* kopfEinpassen(): was nicht passt, bleibt weg */
   /* Werteleiste (ui.valueBar, view.leiste, renderLeiste): die Anzeige-Bausteine

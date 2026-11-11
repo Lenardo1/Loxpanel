@@ -53,3 +53,43 @@ def test_konfig_kurz():
 def test_warnen_ruhig_erlaubt():
     out = konfig._sanitize_theme_ui({"warnen": {U1: "ruhig", U2: "bunt"}})
     assert out["warnen"] == {U1: "ruhig"}
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("text,tage", [("in 7 Tagen", 7), ("in 1 Tag", 1), ("Morgen", 1),
+                                       ("Heute", 0), ("Abholung Unbekannt", None), ("übermorgen", None)])
+def test_abhol_tage(text, tage):
+    assert Seiten._abhol_tage(text) == tage
+
+
+class _Muell(Seiten):
+    def __init__(self, texte):
+        self.controls = {u: {"name": n, "type": "TextState"} for u, (n, _) in texte.items()}
+        self.texte = texte
+
+    def _control_item(self, uuid, prof=None, **kw):
+        return {"id": uuid, "sublabel": self.texte[uuid][1]}
+
+
+def test_muell_morgen():
+    app = _Muell({U1: ("Restmüll", "in 7 Tagen"), U2: ("Gelbe Tonne", "morgen"), U3: ("Altpapier", "Abholung Unbekannt")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2, U3], it)
+    assert it["label"] == "Müll" and it["on"] is True and it["sublabel"] == "Morgen: Gelbe Tonne"
+
+
+def test_muell_spaeter_nicht_an():
+    app = _Muell({U1: ("Restmüll", "in 7 Tagen"), U2: ("Biotonne", "in 14 Tagen")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2], it)
+    assert it["on"] is False and it["sublabel"] == "Restmüll in 7 Tagen"
+
+
+def test_muell_symbole():
+    app = _Muell({U1: ("Biotonne", "morgen"), U2: ("Gewerbemüll Papier", "morgen"), U3: ("Restmüll", "in 3 Tagen")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2, U3], it)
+    assert it["tonnen"] == ["bio", "container-papier"] and it["big"] == "Morgen"
+
