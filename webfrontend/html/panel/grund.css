@@ -375,6 +375,8 @@
   .kz-uhr .d{font-size:calc(12px * var(--ks,1));color:var(--muted);margin-top:3px;white-space:nowrap;}
   .kz-wx{display:flex;align-items:center;gap:8px;flex:none;min-width:0;padding-left:14px;border-left:1px solid var(--line);}
   .kz-wx .ico{width:calc(28px * var(--ks,1));height:calc(28px * var(--ks,1));flex:none;color:var(--glow);}
+  .kz-wx .schirm-ico{color:var(--glow);margin-left:calc(6px * var(--ks,1));}   /* Schirm-Hinweis (eigene Version) */
+  .kz-wx.schirm .m .c{color:var(--glow);}
   .kz-wx .ico svg{width:100%;height:100%;}
   .kz-wx .t{font-size:calc(22px * var(--ks,1));font-weight:600;line-height:1;}
   .kz-wx .m{display:flex;flex-direction:column;font-size:calc(12px * var(--ks,1));color:var(--muted);line-height:1.2;min-width:0;}

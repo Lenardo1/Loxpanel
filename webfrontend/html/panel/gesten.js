@@ -47,6 +47,7 @@ const GESTE_ARTEN=[
 const GESTE_WERT_ARTEN=['licht', 'musik', 'lamellen'];
 let gestenAn=false;        // kommt mit dem theme (Vorgaben/Ansicht)
 let gestenHinweis=false;   // ... mit Hinweis-Symbol unter dem Kachelfeld
+let schirmAn=false;        // Schirm-Hinweis in der Kopfzeile (eigene Version, kommt mit dem theme)
 let geste=null;            // laufende Beruehrung mit zwei Fingern
 let gesteSequenz=false;    // seit zwei Finger lagen, bis alle oben sind: kein Scrollen, kein "zurueck"
 let gesteNach=null;        // Wisch zu Ende, bevor der Server den Startwert schickte

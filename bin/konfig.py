@@ -1189,6 +1189,8 @@ def _sanitize_panels(panels: dict) -> dict:
             cui["gestenRaum"] = _clean_kennung(ui["gestenRaum"])   # Raum der Gesten ausserhalb von Raumseiten
         if isinstance(ui.get("gestenHinweis"), bool):
             cui["gestenHinweis"] = ui["gestenHinweis"]   # Hinweis-Symbol an/aus; fehlt = wie Vorgaben
+        if ui.get("schirm") is True:
+            cui["schirm"] = True            # Schirm-Hinweis in der Kopfzeile (eigene Version)
         if ui.get("tileLayout") == "classic":
             cui["tileLayout"] = "classic"   # bisheriger Kachel-Aufbau; fehlt = neuer
         if ui.get("hausAufbau") in HAUS_AUFBAUTEN and ui["hausAufbau"] != HAUS_AUFBAU_STANDARD:

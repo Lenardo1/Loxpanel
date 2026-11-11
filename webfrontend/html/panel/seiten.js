@@ -283,13 +283,25 @@ function kopfWertHtml(it, attrs){
     '<span class="vl">'+esc(it.big||it.sublabel||'')+'</span><span class="nm">'+esc(it.label||'')+'</span></div>';
 }
 function kopfWerteHtml(items){ return items.map(it=>kopfWertHtml(it)).join(''); }
+// Schirm-Hinweis (eigene Version, Ansicht ui.schirm): regnet es oder ist in den
+// naechsten 6 Stunden Regen/Schnee/Gewitter angesagt, steht beim Wetter ein Schirm
+const SCHIRM_SVG='<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9z"/><path d="M12 12v6.5a2 2 0 0 1-4 0"/>';
+function schirmHinweis(w){
+  if(!schirmAn || !w) return '';
+  const nass=['rain','drizzle','storm','snow'];
+  if(nass.includes(w.icon)) return 'Regen – Schirm mitnehmen';
+  const h=(w.hourly||[]).slice(1,7).find(x=>x && nass.includes(x.icon));
+  return h ? 'Regen ab '+h.h+' Uhr – Schirm mitnehmen' : '';
+}
 function renderKopfzeile(){
   const kz=el('kopfzeile'); if(!kz || !kopfAktiv()) return;
   const d=frontData||{}, w=d.weather;
   let html='<div class="kz-uhr"><span class="t" id="kzTime">--:--</span><span class="d" id="kzDate"></span></div>';
-  if(w){ html+='<div class="kz-wx"><span class="ico">'+wxSvg(w.icon)+'</span><span class="t">'+tdeg(w.temp)+'</span>'+
-    '<span class="m"><span class="c">'+esc(w.cond||'')+'</span>'+
-    ((w.hi!=null||w.lo!=null)?'<span>Heute '+tdeg(w.hi)+' / '+tdeg(w.lo)+'</span>':'')+'</span></div>'; }
+  const schirm=schirmHinweis(w);
+  if(w){ html+='<div class="kz-wx'+(schirm?' schirm':'')+'"><span class="ico">'+wxSvg(w.icon)+'</span><span class="t">'+tdeg(w.temp)+'</span>'+
+    (schirm?'<span class="ico schirm-ico">'+svg(SCHIRM_SVG)+'</span>':'')+
+    '<span class="m"><span class="c">'+esc(schirm||w.cond||'')+'</span>'+
+    (!schirm&&(w.hi!=null||w.lo!=null)?'<span>Heute '+tdeg(w.hi)+' / '+tdeg(w.lo)+'</span>':'')+'</span></div>'; }
   // Werte nur, wenn die Kopfzeile welche nennt ("header:<uuid>,…") und der
   // Server sie schon geschickt hat; solange nicht, steht dort nichts.
   const items=(svArg(paneRawNow()||'') && Array.isArray(svStatusData)) ? svStatusData : [];
