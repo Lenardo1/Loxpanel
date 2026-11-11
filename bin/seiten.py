@@ -238,6 +238,8 @@ class Seiten:
         wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)
         if wr == "an" and it.get("on") or wr == "aus" and not it.get("on"):
             it["tone"] = "crit"
+        elif wr == "ruhig" and it.get("tone") == "good":
+            it.pop("tone")   # "Alles ok" ohne Gruen: nur Abweichungen fallen auf
         # Tor direkt (eigene Version): fahrend -> Stop, offen -> schliessen, zu -> oeffnen
         tov = (((prof or {}).get("tiles") or {}).get(uuid)) or {}
         if t == "Gate" and tov.get("direkt"):

@@ -48,3 +48,8 @@ def test_konfig_kurz():
     roh = {"p": {"tiles": {U1: {"kurz": "  Fenster  "}, U2: {"kurz": ""}, U3: {"kurz": 5}}}}
     tiles = konfig._sanitize_panels(roh)["p"]["tiles"]
     assert tiles == {U1: {"kurz": "Fenster"}}
+
+
+def test_warnen_ruhig_erlaubt():
+    out = konfig._sanitize_theme_ui({"warnen": {U1: "ruhig", U2: "bunt"}})
+    assert out["warnen"] == {U1: "ruhig"}

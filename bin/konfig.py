@@ -1569,7 +1569,7 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     # Warn-Regeln je Baustein (eigene Version): {uuid: "an" | "aus"}
     wn = ui.get("warnen")
     if isinstance(wn, dict):
-        w = {u[:64]: v for u, v in list(wn.items())[:80] if isinstance(u, str) and v in ("an", "aus")}
+        w = {u[:64]: v for u, v in list(wn.items())[:80] if isinstance(u, str) and v in ("an", "aus", "ruhig")}
         if w:
             out["warnen"] = w
     return out
