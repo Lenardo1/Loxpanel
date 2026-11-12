@@ -60,7 +60,8 @@ def kachel_wallbox2(app, uuid, c, it):
     else:
         teile.append("Kein Auto")
     if frei is not None and not frei:
-        teile.append("gesperrt")
+        # in die Namenszeile: die Zustandszeile hat neben den Schnellknoepfen nur eine Zeile
+        it["label"] = (it.get("label") or "Wallbox") + " · gesperrt"
     if isinstance(heute, (int, float)) and heute > 0:
         teile.append("heute " + f"{heute:.1f}".replace(".", ",") + " kWh")
     it.update(on=laedt, sublabel=" · ".join(teile),   # Icon kommt aus Loxone (iconUrl)
