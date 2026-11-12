@@ -321,9 +321,9 @@ const SCHIRM_SVG='<path d="M12 3a9 9 0 0 1 9 9H3a9 9 0 0 1 9-9z"/><path d="M12 1
 function schirmHinweis(w){
   if(!schirmAn || !w) return '';
   const nass=['rain','drizzle','storm','snow'];
-  if(nass.includes(w.icon)) return 'Regen – Schirm mitnehmen';
+  if(nass.includes(w.icon)) return 'Regen';
   const h=(w.hourly||[]).slice(1,7).find(x=>x && nass.includes(x.icon));
-  return h ? 'Regen ab '+h.h+' Uhr – Schirm mitnehmen' : '';
+  return h ? 'Regen ab '+h.h+' Uhr' : '';
 }
 function renderKopfzeile(){
   const kz=el('kopfzeile'); if(!kz || !kopfAktiv()) return;
@@ -333,7 +333,8 @@ function renderKopfzeile(){
   if(w){ html+='<div class="kz-wx'+(schirm?' schirm':'')+'"><span class="ico">'+wxSvg(w.icon)+'</span><span class="t">'+tdeg(w.temp)+'</span>'+
     (schirm?'<span class="ico schirm-ico">'+svg(SCHIRM_SVG)+'</span>':'')+
     '<span class="m"><span class="c">'+esc(schirm||w.cond||'')+'</span>'+
-    (!schirm&&(w.hi!=null||w.lo!=null)?'<span>Heute '+tdeg(w.hi)+' / '+tdeg(w.lo)+'</span>':'')+'</span></div>'; }
+    (schirm ? '<span>Schirm mitnehmen</span>'   // zweizeilig wie Wetterlage / Hoch-Tief
+      : ((w.hi!=null||w.lo!=null)?'<span>Heute '+tdeg(w.hi)+' / '+tdeg(w.lo)+'</span>':''))+'</span></div>'; }
   // Werte nur, wenn die Kopfzeile welche nennt ("header:<uuid>,…") und der
   // Server sie schon geschickt hat; solange nicht, steht dort nichts.
   const items=(svArg(paneRawNow()||'') && Array.isArray(svStatusData)) ? svStatusData : [];

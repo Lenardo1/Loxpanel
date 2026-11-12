@@ -58,7 +58,7 @@ def kachel_wallbox2(app, uuid, c, it):
     elif dran:
         teile.append("Angesteckt")
     else:
-        teile.append("Nicht angesteckt")
+        teile.append("Kein Auto")
     if frei is not None and not frei:
         teile.append("gesperrt")
     if isinstance(heute, (int, float)) and heute > 0:
