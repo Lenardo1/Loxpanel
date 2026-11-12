@@ -290,6 +290,10 @@ class Seiten:
         fn = bausteine.kachel_fuer(t)
         if fn:
             fn(self, uuid, c, it)
+        # Tore (eigene Version): statt des Loxone-Symbols "Tuer offen" ein Garagentor,
+        # offen bzw. geschlossen je nach Zustand
+        if t in ("Gate", "CentralGate") and "door-open" in str(it.get("iconUrl") or ""):
+            it["iconUrl"] = "/icon?p=IconsFilled/" + ("garage.svg" if it.get("on") else "garage-closed-2.svg")
         # Warnen (eigene Version): Vorgaben ui.warnen {uuid: "an"|"aus"} -> rot, wenn der
         # Baustein an (z. B. Fenster offen, Regenwarnung) bzw. aus ist (Alarmanlage unscharf)
         wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)
