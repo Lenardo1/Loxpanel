@@ -30,6 +30,9 @@ def test_sammelkachel_nennt_wer_da_ist():
     _App({U1, U3})._sammelkachel(U1, [U2, U3], it)
     assert it["label"] == "Bewohner" and it["on"] is True
     assert it["sublabel"] == "Anna, Clara da"
+    it = {"on": True}
+    _App({U1, U2, U3})._sammelkachel(U1, [U2, U3], it)
+    assert it["sublabel"] == "Alle da"
     assert "nav" not in it
 
 
@@ -116,3 +119,21 @@ def test_wallbox_schnellknoepfe():
     kachel_wallbox2(_WB(), "u", c, it)
     assert [(k["icon"], k["cmd"]["cmd"], k["on"]) for k in it["controls"]] == \
         [("blitz", "setmode/1", False), ("sonne", "setmode/3", True)]
+
+
+def test_bewohner_an_abwesend():
+    app = _App({U2, U3})
+    app.controls[U2]["name"] = "Bewohner: Ben"
+    app._control_icon_url = lambda c: None
+    it = {"on": False, "cmd": {"uuid": "abw", "cmd": "on"}}
+    app._bewohner_kachel([U2, U3], it)
+    assert it["label"] == "Bewohner" and it["sublabel"] == "Alle da" and it["cmd"]
+    it = {"on": True, "cmd": {"uuid": "abw", "cmd": "off"}}
+    app._bewohner_kachel([U2, U3], it)
+    assert it["sublabel"] == "Abwesend" and it["on"] is False
+
+
+def test_konfig_bewohner():
+    roh = {"p": {"tiles": {U1: {"bewohner": [U2, U3, "x"], "lang": True}}}}
+    assert konfig._sanitize_panels(roh)["p"]["tiles"][U1] == {"bewohner": [U2, U3], "lang": True}
+

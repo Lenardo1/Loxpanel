@@ -224,6 +224,23 @@ class Seiten:
             return "gelb"
         return "rest"
 
+    def _bewohner_kachel(self, personen: list, it: dict) -> None:
+        abwesend = bool(it.get("on"))
+        da = []
+        for u in personen:
+            if u in self.controls and self._control_item(u).get("on"):
+                n = _clean(self.controls[u].get("name"))
+                da.append(n.split(":", 1)[1].strip() if ":" in n else n)
+        it["label"] = "Bewohner"
+        if abwesend:
+            it.update(on=False, sublabel="Abwesend")
+        else:
+            it.update(on=bool(da), sublabel=("Alle da" if len(da) == len(personen) and len(da) > 1
+                                              else (", ".join(da) + " da") if da else "Niemand da"))
+        bild = next((self._control_icon_url(self.controls[u]) for u in personen if u in self.controls), None)
+        if bild:
+            it["iconUrl"] = bild
+
     def _sammelkachel(self, uuid: str, mit: list, it: dict) -> None:
         teile = [(uuid, it)] + [(m, self._control_item(m)) for m in mit if m in self.controls]
         typen = {(self.controls.get(u) or {}).get("type") for u, _ in teile}
@@ -255,7 +272,8 @@ class Seiten:
         da = [person(u) for u, x in teile if x.get("on")]
         it["label"] = kopf.split(":", 1)[0].strip() if ":" in kopf else kopf
         it["on"] = bool(da)
-        it["sublabel"] = (", ".join(da) + " da") if da else "Niemand da"
+        it["sublabel"] = ("Alle da" if len(da) == len(teile) and len(da) > 1
+                          else (", ".join(da) + " da") if da else "Niemand da")
         it.pop("nav", None)
         it.pop("cmd", None)
 
@@ -321,6 +339,14 @@ class Seiten:
         # den Namen derer, die an sind. Name = Teil nach dem Doppelpunkt.
         if tov.get("mit"):
             self._sammelkachel(uuid, tov["mit"], it)
+        # Bewohner an einem Schalter (eigene Version, z. B. Abwesend): die Kachel zeigt,
+        # wer da ist, bzw. "Abwesend"; der Schalter bleibt (mit Schutz: lang druecken)
+        if tov.get("bewohner"):
+            self._bewohner_kachel(tov["bewohner"], it)
+        # Zentral-Licht als Knopf "alles aus" statt Raumliste (eigene Version)
+        if t == "CentralLightController" and tov.get("direkt"):
+            it["cmd"] = {"uuid": c.get("uuidAction"), "cmd": "off"}
+            it.pop("nav", None)
         # Nur lang druecken schaltet (eigene Version): z. B. Abwesend
         if prof and (((prof.get("tiles") or {}).get(uuid)) or {}).get("lang") and it.get("cmd"):
             it["lang"] = True

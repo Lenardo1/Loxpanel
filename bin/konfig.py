@@ -1303,6 +1303,12 @@ def _sanitize_panels(panels: dict) -> dict:
                 kz = ov.get("kurz")
                 if isinstance(kz, str) and kz.strip():
                     e2["kurz"] = kz.strip()[:24]
+                # Bewohner-Anzeige an einem Schalter (eigene Version, z. B. Abwesend)
+                bw = ov.get("bewohner")
+                if isinstance(bw, list):
+                    bw = [m for m in bw if isinstance(m, str) and re.match(r"^[0-9a-f-]{20,40}$", m) and m != cu][:8]
+                    if bw:
+                        e2["bewohner"] = bw
                 # Sammelkachel (eigene Version): weitere Ja/Nein-Bausteine, z. B. Bewohner
                 mit = ov.get("mit")
                 if isinstance(mit, list):
