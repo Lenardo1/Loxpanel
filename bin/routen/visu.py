@@ -100,6 +100,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         # ... mit Hinweis-Symbol (reserviert die Fusszeile unter dem Kachelfeld)
                         "gestenHinweis": prof["gesten"] and prof["gestenHinweis"],
                         "schirm": prof.get("schirm", False),   # Schirm-Hinweis (eigene Version)
+                        "kopfFrei": prof.get("kopfFrei", False),   # Kopfzeile ohne Kaesten (eigene Version)
                         # Klingelton bei einer Klingel: "" aus, "app" nur LoxPanel-App, "alle"
                         "klingelTon": (app.theme.get("ui") or {}).get("klingelTon") or "",
                         "reloadHours": app.panel_reload(prof["id"], roh),

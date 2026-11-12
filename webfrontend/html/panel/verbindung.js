@@ -178,6 +178,7 @@ function connect(){
       gestenAn=(msg.gesten===true);   // Zwei-Finger-Gesten (Vorgaben/Ansicht)
       gestenHinweis=(msg.gestenHinweis===true);
       schirmAn=(msg.schirm===true);
+      kopfFrei=(msg.kopfFrei===true);
       klingelTon=(msg.klingelTon==='app'||msg.klingelTon==='alle')?msg.klingelTon:'';   // Klingelton (Vorgaben)   // ... mit Hinweis-Symbol
       nachtUhrSetzen();               // ihre Symbole auf der Nacht-Uhr
       uiScaleCfg=scaleCfg(msg.scale);
