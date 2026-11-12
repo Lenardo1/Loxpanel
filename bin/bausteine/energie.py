@@ -80,6 +80,8 @@ def kachel_wallbox2(app, uuid, c, it):
                             "on": modus == m["id"]})
     if len(knoepfe) == 2:
         it["controls"] = knoepfe
+        # neben den Knoepfen nur eine Zustandszeile: die Tagesenergie steht auf der Wallbox-Seite
+        it["sublabel"] = it["sublabel"].split(" · heute ")[0]
 
 
 def _kw(v):
