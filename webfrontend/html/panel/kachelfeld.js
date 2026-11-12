@@ -162,7 +162,7 @@ function updateGrid(items){
     else if(bigEl){ const h=bigHtml(it.big); if(bigEl.innerHTML!==h) bigEl.innerHTML=h; }
     if(it.controls){ const tbs=n.querySelectorAll('.tctrls .tb');
       if(tbs.length===it.controls.length) it.controls.forEach((c,ci)=>{ const b=tbs[ci]; if(!b) return;
-        b._cmd=c.cmd; b._secured=it.secured;
+        b._cmd=c.cmd; b._secured=it.secured; b.classList.toggle('an', !!c.on);
         const nh=svgF(ICONS[c.icon]||ICONS.info); if(b.innerHTML!==nh) b.innerHTML=nh; });
       tastenEinpassen(n); }
     fitTile(n);
@@ -394,7 +394,7 @@ function render(){
     const kopf = (lx && it.big!=null) ? '<span class="bigv">'+bigHtml(it.big)+'</span>'
       : (lx && kachelAufbau==='kreis') ? '<span class="kreis">'+icoCell+'</span>' : icoCell;
     const chev = (!lx && it.nav && !it.controls) ? '<span class="chev">'+svg('<path d="m9 6 6 6-6 6"/>')+'</span>' : '';
-    const tasten = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
+    const tasten = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb'+(c.on?' an':'')+'" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
     const ctrls = spielerKachel(it, groessen[_i])
       ? '<div class="tplay">'+(it.cover?'<img class="tcover" src="'+esc(it.cover)+'" alt="">':'')+tasten+'</div>' : tasten;
     const tone = tileTone(it);

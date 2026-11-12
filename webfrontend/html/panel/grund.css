@@ -379,6 +379,7 @@
   .kz-w .tonnen .tonne{width:calc(44px * var(--ks,1));height:calc(44px * var(--ks,1));}
   .kz-w.muell{background:none;border:none;box-shadow:none;padding-left:0;padding-right:0;}   /* Muell: nur die Tonnen, kein Rahmen */
   .kz-w.muell .nm{display:none;}
+  .kz-w.muell .ico{width:calc(36px * var(--ks,1));height:calc(36px * var(--ks,1));color:var(--glow);}
   .kz-w.muell .vl{color:var(--glow);}
   .kz-wx .schirm-ico{color:var(--glow);margin-left:calc(6px * var(--ks,1));}   /* Schirm-Hinweis (eigene Version) */
   .kz-wx.schirm .m .c{color:var(--glow);}
@@ -759,6 +760,7 @@
   .grid.lx:not(.list) .tile>.tctrls{order:3;margin-top:auto;padding-top:calc(10px * var(--ks,1));gap:calc(8px * var(--ks,1));}
   /* Tasten sind Touch-Ziele: sie wachsen mit dem Faktor der Seite, schrumpfen aber nie */
   .grid.lx:not(.list) .tile>.tctrls .tb{flex:1 1 0;width:auto;height:calc(44px * max(1, var(--ksg,1)));border-radius:calc(12px * var(--ks,1));}
+  .tctrls .tb.an{background:rgba(var(--on-rgb,224,162,77),.32);color:var(--glow);}   /* aktiver Knopf (eigene Version, z. B. Wallbox-Modus) */
   .grid.lx:not(.list) .tile>.tctrls .tb svg{width:calc(19px * max(1, var(--ksg,1)));height:calc(19px * max(1, var(--ksg,1)));}
   /* Breite Kachel mit Tasten (spielerKachel(), etwa Audio): die rechte Haelfte
      ist die Spieler-Spalte - oben Sender-Logo bzw. Cover (it.cover), darunter

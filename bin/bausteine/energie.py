@@ -65,6 +65,20 @@ def kachel_wallbox2(app, uuid, c, it):
         teile.append("heute " + f"{heute:.1f}".replace(".", ",") + " kWh")
     it.update(on=laedt, sublabel=" · ".join(teile),   # Icon kommt aus Loxone (iconUrl)
               nav={"view": "control", "id": uuid})
+    # Schnellknoepfe (eigene Version): Voll laden und Nur Sonne, gefunden ueber die
+    # Namen der Lademodi in Loxone; der aktive Modus ist markiert
+    modus = app._state(c, "mode")
+    ua = c.get("uuidAction")
+    knoepfe = []
+    for symbol, worte in (("blitz", ("max", "sofort", "voll", "schnell")),
+                          ("sonne", ("pv", "sonne", "solar", "überschuss", "ueberschuss"))):
+        m = next((m for m in _wallbox_modi((c.get("details") or {}).get("modes"), app._state(c, "modes"))
+                  if any(w in str(m.get("name", "")).lower() for w in worte)), None)
+        if m:
+            knoepfe.append({"icon": symbol, "cmd": {"uuid": ua, "cmd": f"setmode/{m['id']}"},
+                            "on": modus == m["id"]})
+    if len(knoepfe) == 2:
+        it["controls"] = knoepfe
 
 
 def _kw(v):

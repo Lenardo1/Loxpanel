@@ -107,6 +107,9 @@ class Seiten:
                 self._sammelkachel(u, tov["mit"], it)   # z. B. Muell aus mehreren Abfall-Texten
             if tov.get("nurAn") and not it.get("on"):
                 continue                                # nur zeigen, wenn aktuell (Muell heute/morgen)
+            if tov.get("frei"):
+                it["frei"] = True                       # ohne Rahmen, eingebautes Symbol (z. B. Paket)
+                it.pop("iconUrl", None)
             kurz = tov.get("kurz")
             if kurz:
                 it["label"] = kurz

@@ -89,7 +89,7 @@ def kachel_postkasten(app, uuid, c, it):
     mail = bool(app._state(c, "mailReceived"))
     pk = bool(app._state(c, "packetReceived"))
     sub = " · ".join(x for x, f in (("Post da", mail), ("Paket da", pk)) if f) or "Leer"
-    it.update(icon="mail", on=(mail or pk), nav={"view": "control", "id": uuid}, sublabel=sub)
+    it.update(icon="paket" if pk else "mail", on=(mail or pk), nav={"view": "control", "id": uuid}, sublabel=sub)
     if mail or pk:
         it["hinweis"] = {"stufe": "an", "symbol": "mail"}
 

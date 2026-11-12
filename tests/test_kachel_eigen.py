@@ -93,3 +93,26 @@ def test_muell_symbole():
     app._sammelkachel(U1, [U2, U3], it)
     assert it["tonnen"] == ["bio", "container-papier"] and it["big"] == "Morgen"
 
+
+def test_konfig_frei():
+    roh = {"p": {"tiles": {U1: {"frei": True, "nurAn": True}, U2: {"frei": "ja"}}}}
+    assert konfig._sanitize_panels(roh)["p"]["tiles"] == {U1: {"frei": True, "nurAn": True}}
+
+
+
+def test_wallbox_schnellknoepfe():
+    from bausteine.energie import kachel_wallbox2
+
+    class _WB:
+        def __init__(self):
+            self.s = {"mode": 3, "modes": '[{"id":1,"name":"Max. Ladeleistung","value":11},'
+                                          '{"id":2,"name":"Eco"},{"id":3,"name":"PV-Überschuss"}]'}
+
+        def _state(self, c, n):
+            return self.s.get(n)
+
+    c = {"uuidAction": "wb", "details": {"modes": [{"id": i} for i in (1, 2, 3, 99)]}}
+    it = {}
+    kachel_wallbox2(_WB(), "u", c, it)
+    assert [(k["icon"], k["cmd"]["cmd"], k["on"]) for k in it["controls"]] == \
+        [("blitz", "setmode/1", False), ("sonne", "setmode/3", True)]

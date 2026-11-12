@@ -34,6 +34,10 @@ const ICONS = {
   // Hinweise der Hausseite (Server: _haus_hinweise, symbol): Fenster offen, Post da
   window:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18M5 12h14"/>',
   mail:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m3 8 9 6 9-6"/>',
+  // eigene Version: Wallbox-Schnellknoepfe und Paket
+  blitz:'<path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/>',
+  sonne:'<circle cx="12" cy="12" r="4.5"/><circle cx="20.0" cy="12.0" r="1.5"/><circle cx="17.7" cy="17.7" r="1.5"/><circle cx="12.0" cy="20.0" r="1.5"/><circle cx="6.3" cy="17.7" r="1.5"/><circle cx="4.0" cy="12.0" r="1.5"/><circle cx="6.3" cy="6.3" r="1.5"/><circle cx="12.0" cy="4.0" r="1.5"/><circle cx="17.7" cy="6.3" r="1.5"/>',
+  paket:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9M7.5 5.2l9 4.5"/>',
   list:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
 };
 const TABS = [

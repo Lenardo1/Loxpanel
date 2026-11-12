@@ -310,7 +310,7 @@ function kopfWertHtml(it, attrs){
   const ico = Array.isArray(it.tonnen) && it.tonnen.length ? '<span class="tonnen">'+it.tonnen.map(tonneSvg).join('')+'</span>'
     : it.iconUrl ? '<span class="ico img" style="--u:url(\''+esc(it.iconUrl)+'\')"></span>'
     : '<span class="ico">'+svg(ICONS[it.icon]||ICONS.info)+'</span>';
-  const muell=Array.isArray(it.tonnen) && it.tonnen.length;
+  const muell=(Array.isArray(it.tonnen) && it.tonnen.length) || it.frei;
   return '<div class="kz-w'+(muell?' muell':ton)+'"'+(attrs||'')+(it.color?' style="--ico:'+esc(it.color)+'"':'')+'>'+ico+
     '<span class="vl">'+esc(it.big||it.sublabel||'')+'</span><span class="nm">'+esc(it.label||'')+'</span></div>';
 }
@@ -337,7 +337,7 @@ function renderKopfzeile(){
   // Werte nur, wenn die Kopfzeile welche nennt ("header:<uuid>,…") und der
   // Server sie schon geschickt hat; solange nicht, steht dort nichts.
   const items=(svArg(paneRawNow()||'') && Array.isArray(svStatusData)) ? svStatusData : [];
-  if(items.length) html+='<div class="kz-werte">'+items.map(it=>kopfWertHtml(it, (it.id && !it.tonnen)?' data-id="'+esc(String(it.id))+'"':'')).join('')+'</div>';
+  if(items.length) html+='<div class="kz-werte">'+items.map(it=>kopfWertHtml(it, (it.id && !it.tonnen && !it.frei)?' data-id="'+esc(String(it.id))+'"':'')).join('')+'</div>';
   kz.innerHTML=html; tickClock(); kopfEinpassen();
   // Tipp auf einen Wert oeffnet seine Detailseite (eigene Version), z. B. welche Fenster offen sind
   kz.querySelectorAll('.kz-w[data-id]').forEach(n=>{ n.style.cursor='pointer'; n.onclick=()=>nav({view:'control',id:n.dataset.id}); });
