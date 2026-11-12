@@ -293,7 +293,13 @@ class Seiten:
         # Tore (eigene Version): statt des Loxone-Symbols "Tuer offen" ein Garagentor,
         # offen bzw. geschlossen je nach Zustand
         if t in ("Gate", "CentralGate") and "door-open" in str(it.get("iconUrl") or ""):
-            it["iconUrl"] = "/icon?p=IconsFilled/" + ("garage.svg" if it.get("on") else "garage-closed-2.svg")
+            it.pop("iconUrl", None)
+            it.pop("pos", None)          # Ring um das Symbol: der Torzustand steht jetzt im Symbol
+            if t == "Gate":
+                p = round((self._state(c, "position") or 0) * 100)
+                it["icon"] = "torZu" if p <= 0 else ("torAuf" if p >= 100 else "torHalb")
+            else:
+                it["icon"] = "torAuf" if it.get("on") else "torZu"
         # Warnen (eigene Version): Vorgaben ui.warnen {uuid: "an"|"aus"} -> rot, wenn der
         # Baustein an (z. B. Fenster offen, Regenwarnung) bzw. aus ist (Alarmanlage unscharf)
         wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)

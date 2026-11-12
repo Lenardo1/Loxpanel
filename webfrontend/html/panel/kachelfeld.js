@@ -156,6 +156,12 @@ function updateGrid(items){
       if(sub){ if(!subEl){ subEl=document.createElement('div'); subEl.className='sub'; body.appendChild(subEl); }
         if(subEl.textContent!==sub) subEl.textContent=sub; }
       else if(subEl){ subEl.remove(); } }
+    // Symbol aus Loxone, das mit dem Zustand wechselt (eigene Version, z. B. Garagentor
+    // offen/zu): nur die Bildadresse nachziehen
+    const icoImg=n.querySelector('.ico.img');
+    if(icoImg && it.iconUrl){ const u="url('"+it.iconUrl+"')"; if(icoImg.style.getPropertyValue('--u')!==u) icoImg.style.setProperty('--u', u); }
+    else if(!it.iconUrl && it.icon){ const ic=n.querySelector('.head .ico:not(.img)')||n.querySelector('.ico:not(.img)');
+      if(ic && ic._icon!==it.icon){ const h=svg(ICONS[it.icon]||ICONS.info); if(ic._icon!==undefined || ic.innerHTML!==h) ic.innerHTML=h; ic._icon=it.icon; } }
     // Messwert an Stelle des Symbols: kommt oder geht er, aendert sich der Kopf
     const bigEl=n.querySelector('.bigv'), mitBig=kachelNeu() && it.big!=null;
     if(!!bigEl!==mitBig) ok=false;
