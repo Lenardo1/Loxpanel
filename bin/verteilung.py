@@ -31,6 +31,13 @@ VERBINDUNG_STUMM = 40    # s: ohne Nachricht gilt der Server als weg (mehr als z
 VERBINDUNG_HINWEIS = 8   # s: so lange fehlt eine Verbindung, bevor die Leiste erscheint
 
 # Texte der Leiste; {seit} und {stand} setzt die Visu als Uhrzeit ein
+# s nach dem Start des Servers: so lange zeigen die Panels die Karte "Keine
+# Verbindung zum Miniserver" (_einrichtung_stand) noch nicht. Beim naechtlichen
+# Neustart scheitert der erste Versuch gern (Miniserver haelt die alte Sitzung
+# noch, Netz des Containers noch nicht da); der naechste klappt nach MS_RETRY.
+# Bleibt der Fehler laenger, ist er echt und die Karte kommt.
+EINRICHTUNG_KARENZ = 120
+
 VERBINDUNG_TEXTE = {
     "ms": "Miniserver seit {seit} nicht erreichbar",
     "server": "Keine Verbindung zum LoxPanel-Server seit {seit}",
@@ -429,11 +436,14 @@ class Verteilung:
 
     def _einrichtung_stand(self) -> tuple | None:
         """(Titel, Grund) fuer die Karte der Panels nach _einrichtung_info,
-        aber nicht waehrend des ersten Verbindungsversuchs: Beim normalen
-        Start soll nichts aufblitzen. Sonst None."""
+        aber nicht waehrend des ersten Verbindungsversuchs und einen Fehler erst
+        EINRICHTUNG_KARENZ s nach dem Start: Beim normalen Start und beim
+        naechtlichen Neustart soll nichts aufblitzen. Sonst None."""
         info = self._einrichtung_info()
         if info is None or info["stand"] == "verbindet":
             return None
+        if info["stand"] == "fehler" and time.monotonic() - self._gestartet < EINRICHTUNG_KARENZ:
+            return None   # gleich nach dem Start: erst die naechsten Versuche abwarten
         if info["stand"] == "kein_zugang":
             return ("Miniserver einrichten", "Noch kein Miniserver eingetragen.")
         return ("Keine Verbindung zum Miniserver", f"{info['host']}: {info['fehler']}")

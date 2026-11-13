@@ -111,6 +111,7 @@ class App(Statistik, Grafana, BausteinHelfer, Haus, Gesten, Miniserver,
         # beim Verbinden mit dem Miniserver, und welcher Stand zuletzt rausging.
         self._ms_fehler = ""
         self._einrichtung_gemeldet: tuple | None = None
+        self._gestartet = time.monotonic()   # Karenz fuer die Karte (EINRICHTUNG_KARENZ)
         # Verbindungszustand (_verbindung_stand): seit wann der Miniserver weg
         # ist (Unix-Sekunden, None = verbunden oder noch nie versucht), wann er
         # zuletzt etwas schickte, was zuletzt an die Panels ging und wann.
