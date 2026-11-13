@@ -58,6 +58,24 @@ const el = id => document.getElementById(id);
 let ws, stack = [{view:'tab',tab:'favoriten'}], view = null;
 // Touch-Panel: nach der ersten Beruehrung den Mauszeiger ausblenden (Desktop-Maus bleibt)
 addEventListener('touchstart', ()=>document.body.classList.add('touch'), {once:true, passive:true});
+// Kamerastroeme wirklich beenden: Ein <img> an /mjpeg, das aus dem DOM fliegt
+// (innerHTML='' beim Pane-Wechsel, Neuaufbau der Kamera-Seite, Screensaver),
+// laedt in Chromium weiter, bis der Garbage Collector es holt. Bei einem
+// MJPEG-Strom ist das nie fertig: Auf langsamen Tablets (Galaxy Tab S2, WebView
+// im App-Prozess) stapelten sich so mehrere 1080p-Stroeme, der Renderer lief
+// dauerhaft auf 100 % und zeigte gar kein Bild mehr. Ohne src bricht Chromium
+// die Anfrage sofort ab. Verschobene Bilder (isConnected) bleiben unberuehrt.
+function mjpegLoesen(n){
+  if(n.nodeType!==1) return;
+  const bilder = n.tagName==='IMG' ? [n] : (n.firstElementChild ? n.querySelectorAll('img[src*="/mjpeg"]') : []);
+  for(const img of bilder){
+    if(!img.isConnected && (img.getAttribute('src')||'').indexOf('/mjpeg')>=0) img.removeAttribute('src');
+  }
+}
+if(typeof MutationObserver==='function'){
+  new MutationObserver(liste=>{ for(const m of liste) m.removedNodes.forEach(mjpegLoesen); })
+    .observe(document, {childList:true, subtree:true});
+}
 let tabsCfg = ['favoriten','zentral','raeume','kategorien'];
 let tabMeta = {};   // Label/Icon fuer dynamische Tabs (Kategorien), vom Server
 let gridCols = 2;   // effektive Spalten der aktuellen Ansicht (Vollbreit-Pane -> 4)
