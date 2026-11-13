@@ -947,6 +947,11 @@
   html[data-kachelset-leiste="pille"] .tabs>*{position:relative;z-index:1;}
   html[data-kachelset-leiste="pille"] .tab.active{color:var(--ink);}
   html[data-kachelset-leiste="pille"] .tab.active .tico{background-color:var(--ink);}
+  /* eigene Version: aktive Seite deutlicher - Akzentfarbe und leichte Hinterlegung */
+  html[data-kachelset-leiste="pille"] .tab.active{color:var(--glow);}
+  html[data-kachelset-leiste="pille"] .tab.active::after{content:"";position:absolute;left:50%;bottom:calc(6px * var(--ks,1));width:calc(6px * var(--ks,1));height:calc(6px * var(--ks,1));
+    margin-left:calc(-3px * var(--ks,1));border-radius:50%;background:var(--glow);}
+  html[data-kachelset-leiste="pille"] .tab.active .tico{background-color:var(--glow);}
   html[data-kachelset-leiste="pille"] .tabback{color:var(--muted);}
   html[data-kachelset-leiste="pille"] .tabback.on{color:var(--ink);}
   html[data-kachelset-leiste="pille"] .screen.kopf .kopfzeile{background:transparent;border-bottom-color:transparent;}
