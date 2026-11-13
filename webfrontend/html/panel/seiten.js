@@ -441,9 +441,9 @@ function applyPane(){
 // ---- Gross: eine Seite des Splits zeitweise ueber die andere ziehen ----
 // Das Widget (Pane 2) zieht ein Doppeltipp darauf oder der Pfeil am Rand
 // ueber die Kacheln (quer beide Spalten, hochkant beide Zeilen). Umgekehrt
-// zieht der Gegenpfeil ein Anlagenschema oder die Tuersprechanlage auf der
-// Kachelseite ueber das Widget; dort bleibt der Doppeltipp beim Zoom bzw. den
-// Tasten. Nach paneGrossS Sekunden ohne Beruehrung (Panel-Option, 0 = aus)
+// zieht der Gegenpfeil jede Kachelseite (Kacheln, Anlagenschema, Bedienseite,
+// Tuersprechanlage) ueber das Widget; dort bleibt der Doppeltipp bei den
+// Kacheln, dem Zoom bzw. den Tasten. Nach paneGrossS Sekunden ohne Beruehrung (Panel-Option, 0 = aus)
 // geht es von selbst zurueck, jede Beruehrung startet die Zeit neu, der
 // Gegenpfeil oder ein zweiter Doppeltipp holt es sofort zurueck. Klingelt es,
 // wird die Tuersprechanlage von selbst gross (klingelGross). Die verdeckte
@@ -459,9 +459,13 @@ let _grossT=null, _grossSchluessel=null, _grossTipp=null, _grossDown=null;
 function grossPane(){ const pp=el('playerpane'), fp=el('frontpane');
   return (pp && !pp.hidden) ? pp : ((fp && !fp.hidden) ? fp : null); }
 function grossSplit(){ const sc=document.querySelector('.screen'); return !!(sc && sc.classList.contains('split')) && paneGrossS>0; }
-// Kachelseite gross nur fuer Anlagenschema und Tuersprechanlage
-function gridGrossOk(){ const g=el('grid');
-  return !!(g && (g.classList.contains('scheme') || (g.classList.contains('panel') && view && view.tuer) || g.classList.contains('intercom-page'))); }
+// Jede Kachelseite laesst sich gross ziehen (Kacheln, Schema, Bedienseite …),
+// nur nicht die Widget-Seite (dort gibt es kein Raster).
+function gridGrossOk(){ const g=el('grid'), sc=document.querySelector('.screen');
+  return !!(g && view && !view.widget && !(sc && sc.classList.contains('widgettab'))); }
+// Tuersprechanlage auf der Kachelseite: nur sie zieht sich beim Klingeln von selbst gross
+function tuerSeite(){ const g=el('grid');
+  return !!(g && g.classList.contains('panel') && ((view && view.tuer) || g.classList.contains('intercom-page'))); }
 // Woran haengt die grosse Seite: das Widget am Pane-Wert, die Kachelseite an der Route
 function grossSchluessel(art){ return art==='pane' ? 'p:'+(paneRawNow()||'') : 'g:'+(view && view.route ? key(view.route) : ''); }
 // Raster-Zeilen und -Spalten der grossen Seite und der verdeckten
@@ -518,7 +522,7 @@ function klingelGross(){ _klingelGross=Date.now(); grossPruefen(); }
 function grossPruefen(){
   if(_klingelGross){
     if(Date.now()-_klingelGross>KLINGEL_GROSS_MS) _klingelGross=0;
-    else if(view && view.route && view.route.view==='control' && gridGrossOk()){
+    else if(view && view.route && view.route.view==='control' && tuerSeite()){
       _klingelGross=0; paneGross('grid'); return; }
   }
   if(_gross && !(grossSplit() && grossPane() && (_gross==='pane' || gridGrossOk()) && grossSchluessel(_gross)===_grossSchluessel)) paneGross(null);
