@@ -370,6 +370,8 @@ class Ansicht:
             # Schirm-Hinweis in der Kopfzeile (eigene Version)
             "schirm": ui.get("schirm") is True,
             "kopfFrei": ui.get("kopfFrei") is True,
+            "saverAus": ui.get("saverAus") is True,
+            "ohneRaum": ui.get("ohneRaum") is True,
         }
 
     # ---- Config-Seite (Panel-Editor) ----
@@ -387,7 +389,7 @@ class Ansicht:
                        "svPane", "scale", "catFilter", "tileLayout", "tileSet", "tileHue", "tileActive",
                        "grid", "tileSize", "pinMerken", "paneGross",
                        "valueBar", "paneCols", "gesten", "gestenRaum", "gestenHinweis",
-                       "nightClock", "nightClockBright", "hausAufbau", "schirm", "kopfFrei")}
+                       "nightClock", "nightClockBright", "hausAufbau", "schirm", "kopfFrei", "ohneRaum", "saverAus")}
         # Widget je Tab: nur gueltige Tab-Kennung und gueltiger Pane-Wert, und
         # zwar der NORMIERTE ("header:A, B" -> "header:A,B"): Dateien von Hand
         # oder ueber die API koennen Leerzeichen tragen, die das Panel sonst

@@ -377,6 +377,7 @@
   .kz-wx .ico{width:calc(28px * var(--ks,1));height:calc(28px * var(--ks,1));flex:none;color:var(--glow);}
   .kz-w .tonnen{display:flex;gap:calc(2px * var(--ks,1));flex:none;}   /* Abfall-Symbole (eigene Version) */
   .kz-w .tonnen .tonne{width:calc(44px * var(--ks,1));height:calc(44px * var(--ks,1));}
+  #saver.aus{background:#000 !important;} #saver.aus>*{visibility:hidden !important;}   /* Sparmodus: Uhr-Seite schwarz (eigene Version) */
   #kopfzeile.frei .kz-w{background:none;border-color:transparent;box-shadow:none;}   /* Kopfzeile ohne Kaesten (eigene Version) */
   .kz-w.muell{background:none;border:none;box-shadow:none;padding-left:0;padding-right:0;}   /* Muell: nur die Tonnen, kein Rahmen */
   .kz-w.muell .nm{display:none;}

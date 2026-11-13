@@ -293,7 +293,7 @@ class Seiten:
         it: dict = {"id": uuid, "label": name, "on": False, "icon": "info"}
         # Raum-Kennzeichnung: nur wenn die Ansicht mehrere Raeume umfasst (z.B.
         # Kategorie Licht ueber alle Raeume). Zentralbausteine haben keinen Raum.
-        if show_room:
+        if show_room and not ((prof or {}).get("ohneRaum") or ((prof or {}).get("ui") or {}).get("ohneRaum")):   # eigene Version: Raumnamen aus
             rn = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
             if rn:
                 it["room"] = rn

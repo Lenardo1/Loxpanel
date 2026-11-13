@@ -179,6 +179,7 @@ function connect(){
       gestenHinweis=(msg.gestenHinweis===true);
       schirmAn=(msg.schirm===true);
       kopfFrei=(msg.kopfFrei===true);
+      saverAus=(msg.saverAus===true); el('saver').classList.toggle('aus', saverAus);
       klingelTon=(msg.klingelTon==='app'||msg.klingelTon==='alle')?msg.klingelTon:'';   // Klingelton (Vorgaben)   // ... mit Hinweis-Symbol
       nachtUhrSetzen();               // ihre Symbole auf der Nacht-Uhr
       uiScaleCfg=scaleCfg(msg.scale);

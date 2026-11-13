@@ -1193,6 +1193,10 @@ def _sanitize_panels(panels: dict) -> dict:
             cui["schirm"] = True            # Schirm-Hinweis in der Kopfzeile (eigene Version)
         if ui.get("kopfFrei") is True:
             cui["kopfFrei"] = True          # Kopfzeile ohne Kaesten um die Werte (eigene Version)
+        if ui.get("ohneRaum") is True:
+            cui["ohneRaum"] = True          # Kacheln ohne Raumnamen (eigene Version)
+        if ui.get("saverAus") is True:
+            cui["saverAus"] = True          # Uhr-Seite schwarz statt Uhr/Wetter (eigene Version)
         if ui.get("tileLayout") == "classic":
             cui["tileLayout"] = "classic"   # bisheriger Kachel-Aufbau; fehlt = neuer
         if ui.get("hausAufbau") in HAUS_AUFBAUTEN and ui["hausAufbau"] != HAUS_AUFBAU_STANDARD:
