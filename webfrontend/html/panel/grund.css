@@ -80,7 +80,7 @@
   .screen.split.hoch.auto{grid-template-rows:var(--auto-k,1fr) var(--auto-p,1fr) auto;}
   /* Gross (paneGross in seiten.js): eine Seite des Splits liegt zeitweise
      ueber der anderen - .gross das Widget ueber den Kacheln, .grossk die
-     Kachelseite (Anlagenschema, Tuersprechanlage) ueber dem Widget. Zeilen und
+     Kachelseite (jede, auch Schema und Tuersprechanlage) ueber dem Widget. Zeilen und
      Spalten setzt die Visu inline (grossSpannen); die verdeckte Seite bleibt
      im Raster stehen und wird nur verborgen - kein Neuaufbau. */
   .screen.split.gross #grid,
