@@ -103,6 +103,8 @@ class Seiten:
                 it.pop(k, None)
             # Kurzname (eigene Version): tiles[uuid].kurz, z. B. "Fenster" statt "Fensterueberwachung"
             tov = (((prof or {}).get("tiles") or {}).get(u)) or {}
+            if (prof or {}).get("ohneRaum") or ((prof or {}).get("ui") or {}).get("ohneRaum"):
+                it.pop("room", None)                    # eigene Version: auch hier ohne Raumnamen
             if tov.get("mit"):
                 self._sammelkachel(u, tov["mit"], it)   # z. B. Muell aus mehreren Abfall-Texten
             if tov.get("nurAn") and not it.get("on"):
