@@ -339,7 +339,15 @@ async def api_display(request: web.Request) -> web.Response:
         else:
             return web.json_response({"ok": False, "error": "on=1|0 fehlt"}, status=400)
     panel, device = _push_filter(request, d)
-    n = await _push(app, {"t": "display", "on": on}, panel, device)
+    msg = {"t": "display", "on": on}
+    # eigene Version: presence=1|0 aus Loxone (virtueller Ausgang): solange 1, bleibt das Display an
+    pr = str(d.get("presence", request.query.get("presence", ""))).strip().lower()
+    if pr in ("1", "true", "on", "an", "ein", "0", "false", "off", "aus"):
+        msg["presence"] = pr in ("1", "true", "on", "an", "ein")
+    # eigene Version: uhr=1 -> beim Einschalten die Uhr-Seite zeigen statt der Startseite
+    if str(d.get("uhr", request.query.get("uhr", ""))).strip().lower() in ("1", "true", "an", "ja"):
+        msg["uhr"] = True
+    n = await _push(app, msg, panel, device)
     drivers = await app.display_drivers(on, device, panel)
     return web.json_response({"ok": True, "sent": n, "on": on, "drivers": drivers})
 

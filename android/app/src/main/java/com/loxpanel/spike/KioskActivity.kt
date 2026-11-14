@@ -82,6 +82,8 @@ class KioskActivity : Activity(), SensorEventListener {
     private val ui = Handler(Looper.getMainLooper())
     private var errored = false
     private var reloadPending = false
+    /** Display wurde per lockNow ausgeschaltet (echtes Standby, eigene Version). */
+    private var ausStandby = false
     /** Letzte Meldung der Seite (elapsedRealtime), null bis zur ersten. */
     @Volatile private var herzschlag: Long? = null
     private val seitePruefen = object : Runnable {
@@ -144,6 +146,9 @@ class KioskActivity : Activity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         BlePresenceService.starten(this)   // BLE-Presence-Scanner, nur wenn eingerichtet (eigene Version)
+        WachDienst.starten(this)           // Weckdienst fuers echte Standby, nur wenn eingeschaltet (eigene Version)
+        // Nach echtem Standby (lockNow) ueber dem Sperrbildschirm erscheinen und das Display anschalten
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) { setShowWhenLocked(true); setTurnScreenOn(true) }
         annaeherungLesen(intent)
 
         // Bildschirm anlassen: Wir dimmen im Screensaver selbst, damit die App
@@ -407,6 +412,7 @@ class KioskActivity : Activity(), SensorEventListener {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         annaeherungLesen(intent)   // Einstellung per adb auch bei laufender App (singleTask)
+        if (intent.getBooleanExtra("wecken", false)) { ausStandby = false; userWake() }   // vom Weckdienst
     }
 
     override fun onResume() {
@@ -419,6 +425,9 @@ class KioskActivity : Activity(), SensorEventListener {
         // sparsam, daher unkritisch für den Verbrauch).
         proximity?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
         wake()
+        // aus echtem Standby: nur das Display (Overlay weg); ob die Visu ihre Uhr verlaesst,
+        // entscheidet der Weckgrund (onNewIntent "wecken") bzw. der Server
+        if (ausStandby) { ausStandby = false; wake() }
         serverUndSeite()
         // Pause zählt nicht als Stille: ab jetzt neu messen
         if (herzschlag != null) herzschlag = SystemClock.elapsedRealtime()
@@ -568,6 +577,8 @@ class KioskActivity : Activity(), SensorEventListener {
             if (it.hasExtra("annaeherung_ruhe")) e.putInt("ruhe", it.getIntExtra("annaeherung_ruhe", 100).coerceIn(5, 100))
             if (it.hasExtra("annaeherung_halten")) e.putInt("halten", it.getIntExtra("annaeherung_halten", 30).coerceIn(5, 3600))
             e.apply()
+            // Echtes Standby (eigene Version): --ez standby true|false
+            if (it.hasExtra("standby")) WachDienst.setzen(this, it.getBooleanExtra("standby", false))
         }
         annaeherung.ruheProzent = p.getInt("ruhe", 100)
         annaeherung.haltenSek = p.getInt("halten", 30)
@@ -716,6 +727,14 @@ class KioskActivity : Activity(), SensorEventListener {
         saver.visibility = View.VISIBLE
         saver.bringToFront()
         setBrightness(0f)      // praktisch dunkel (LCD -> kein Einbrennen)
+        // Echtes Standby (eigene Version): Display wirklich aus; wecken WachDienst/Beruehrung
+        if (WachDienst.an(this)) {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+            if (dpm.isAdminActive(android.content.ComponentName(this, LockAdmin::class.java))) {
+                ausStandby = true
+                try { dpm.lockNow() } catch (e: Exception) { Log.w("LPSTANDBY", "lockNow: ${e.message}") }
+            }
+        }
     }
 
     /** Backlight zurück (Systemhelligkeit oder Nachtmodus), Overlay weg. */

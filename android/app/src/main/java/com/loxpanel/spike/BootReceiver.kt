@@ -17,6 +17,7 @@ class BootReceiver : BroadcastReceiver() {
             // einem Server im Netz gibt es nichts zu starten (Visu.eigenerServer).
             ServerService.starten(context)
             BlePresenceService.starten(context)   // nur wenn eingerichtet (eigene Version)
+            WachDienst.starten(context)           // Standby-Weckdienst, nur wenn eingeschaltet (eigene Version)
             // Eingebauten Kiosk (unsere Vollbild-WebView) in den Vordergrund holen.
             try {
                 context.startActivity(

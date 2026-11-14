@@ -240,7 +240,9 @@ function connect(){
     if(msg.t==='notify'){ wake(); showNotify(msg.text, msg.level, msg.secs); return; }  // Nachricht einblenden
     if(msg.t==='display'){   // Server schaltet Display (Kiosk-App); presence = Praesenzmelder des Geraets
       if(typeof msg.presence==='boolean'){ DISP.presence=msg.presence; appLeerlauf(); }
-      if(msg.on) wake(); else { clearTimeout(dpmsTimer); pinVergessen(); screenOff(); }
+      // eigene Version: uhr = Display an, aber die Uhr-Seite zeigen (Praesenz im Flur); naeher ran weckt
+      if(msg.on){ if(msg.uhr){ screenOn(); nightWake(); if(!saverOn()) nachRuhe(); } else wake(); }
+      else { clearTimeout(dpmsTimer); pinVergessen(); screenOff(); }
       return; }
     if(msg.t==='setdevice'){ if(msg.name){ try{ localStorage.setItem('lp_device', msg.name); }catch(e){}
         DEVICE_ID=msg.name; kopplungVergessen(); ws.close(); } return; }   // in den Einstellungen benannt -> mit Namen neu verbinden
