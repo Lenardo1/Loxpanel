@@ -244,7 +244,7 @@ const AKZENT_FARBEN=[{n:'Kupfer',v:'#c8885a'},{n:'Gold',v:'#d6a84e'},{n:'Sand',v
   {n:'Eisblau',v:'#6fb0dc'},{n:'Warmweiß',v:'#f1e7d6'},{n:'Grün',v:'#52b881'}];
 function akzentField(p){
   const cur=String(((p.states||{}).active)||'').toLowerCase();
-  return '<div class="field" style="max-width:none;margin-top:14px"><label class="lbl">'+T('Akzentfarbe')+'</label>'+
+  return '<div class="field" style="max-width:none">'+
     '<p class="note" style="margin:0 0 8px">'+T('Farbe für alles, was „an“ ist: Licht an, Fenster offen, Bewohner da, aktive Seite unten.')+'</p>'+
     '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'+
       AKZENT_FARBEN.map(c=>'<button type="button" class="akzSw" data-akz="'+esc(c.v)+'" title="'+esc(T(c.n))+'" '+
