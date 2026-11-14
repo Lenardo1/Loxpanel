@@ -11,7 +11,8 @@ import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.content.Intent
-import android.net.wifi.WifiManager
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import android.os.Build
 import android.os.IBinder
 import android.os.ParcelUuid
@@ -252,10 +253,15 @@ class BlePresenceService : Service() {
     }
 
     @Suppress("DEPRECATION")
-    private fun eigeneIp(): String {
-        val ip = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo.ipAddress
-        return if (ip == 0) "0.0.0.0" else "${ip and 0xff}.${ip shr 8 and 0xff}.${ip shr 16 and 0xff}.${ip shr 24 and 0xff}"
-    }
+    // Ohne ACCESS_WIFI_STATE: WifiManager.connectionInfo wirft auf Samsung/Android 16 eine
+    // SecurityException (im Executor stumm verschluckt -> nie registriert). Darum die
+    // IPv4-Adresse direkt von den Netzwerkschnittstellen holen.
+    private fun eigeneIp(): String = try {
+        NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress ?: "0.0.0.0"
+    } catch (e: Exception) { "0.0.0.0" }
 
     private fun notification(): Notification {
         val kanal = "loxpanel-ble"
