@@ -166,6 +166,8 @@ function updateGrid(items){
     const bigEl=n.querySelector('.bigv'), mitBig=kachelNeu() && it.big!=null;
     if(!!bigEl!==mitBig) ok=false;
     else if(bigEl){ const h=bigHtml(it.big); if(bigEl.innerHTML!==h) bigEl.innerHTML=h; }
+    // Tasten kommen oder gehen (z. B. Wallbox-Modi erst nach dem Laden der States): neu aufbauen
+    if(!!(it.controls && it.controls.length)!==!!n.querySelector('.tctrls')) ok=false;
     if(it.controls){ const tbs=n.querySelectorAll('.tctrls .tb');
       if(tbs.length===it.controls.length) it.controls.forEach((c,ci)=>{ const b=tbs[ci]; if(!b) return;
         b._cmd=c.cmd; b._secured=it.secured; b.classList.toggle('an', !!c.on);
