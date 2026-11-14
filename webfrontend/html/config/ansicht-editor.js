@@ -303,7 +303,7 @@ function renderEditor(){
    '<section class="spane" data-sub="aussehen"><div class="card"><h3>'+T('Aussehen')+'</h3>'+
      '<p class="note">'+T('Überschreibt die Vorgaben nur für diese Ansicht. Leer = Vorgabe.')+'</p>'+
      aussehenGruppe(T('Kachel-Set'), kachelSetKarten(p.ui||{})+'<div id="fKsExtra">'+kachelSetExtraHtml(p.ui||{})+'</div>')+
-     aussehenGruppe(T('Farbe und Aufbau'), baseField(p.ui||{})+
+     aussehenGruppe(T('Farbe und Aufbau'), baseField(p.ui||{})+akzentField(p)+
        '<div class="sizes"><div class="field" style="max-width:none;min-width:280px"><label class="lbl">'+T('Kachel-Aufbau')+'</label>'+
          '<select id="fTileLayout" style="width:100%;max-width:none"'+((p.ui||{}).tileSet?' disabled':'')+'>'+
            '<option value=""'+(((p.ui||{}).tileLayout==='classic')?'':' selected')+'>'+T('Neu (wie die Loxone-App)')+'</option>'+
