@@ -506,6 +506,11 @@ class Kameraverteiler:
     def anzahl(self) -> int:
         return len(self._stroeme)
 
+    def laeuft(self, cam: dict) -> bool:
+        """Ob fuer diese Kamera gerade ein Strom Bilder liefert."""
+        strom = self._stroeme.get(self.schluessel(cam))
+        return strom is not None and strom.zustand == "laeuft"
+
     async def schliessen(self) -> None:
         """Alle Stroeme trennen und ihre Zuschauer entlassen; danach endet jede
         offene /mjpeg-Antwort (Herunterfahren: aiohttp wartet sonst auf sie).
@@ -514,3 +519,24 @@ class Kameraverteiler:
         for strom in list(self._stroeme.values()):
             await strom.beenden()
         self._stroeme.clear()
+
+
+PRUEFEN_S = 4.0            # so lange darf die Probe einer Kamera dauern
+
+
+async def kamera_pruefen(cam: dict, frist: float = PRUEFEN_S) -> bool:
+    """Liefert die Kamera ({"url", "user", "pass"}) ein Bild? Ein Abruf wie
+    beim Strom (eigene Sitzung, Basic-Auth), der nach der Antwort gleich
+    trennt: True bei 200 mit Bild- oder multipart-Typ. Fuer die Vorauswahl im
+    Konfigurator, damit eine Intercom ohne erreichbare Kamera nicht als erste
+    Kamera eingetragen wird."""
+    sess = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=frist))
+    try:
+        auth = aiohttp.BasicAuth(str(cam.get("user") or ""), str(cam.get("pass") or "")) if cam.get("user") else None
+        async with sess.get(str(cam.get("url") or ""), auth=auth) as antwort:
+            typ = antwort.headers.get("Content-Type", "").lower()
+            return antwort.status == 200 and (typ.startswith("image/") or typ.startswith("multipart/"))
+    except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, OSError):
+        return False
+    finally:
+        await sess.close()

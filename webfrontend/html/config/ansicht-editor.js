@@ -570,9 +570,21 @@ function cameraOptions(sel){
   return (META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type))
     .map(c=>'<option value="'+esc(c.uuid)+'"'+(sel===c.uuid?' selected':'')+'>'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('');
 }
+// Vorauswahl, wenn ein Kamera-Widget neu eingetragen wird (Einrichten,
+// Seiten-Editor, Pane). Die Anlage hat oft mehrere Intercom-Bausteine, von
+// denen nur einer eine erreichbare Kamera hat; die erste in der Struktur war
+// dann eine ohne Bild, und nach jedem Neueinrichten fehlte das Kamerabild.
+// Reihenfolge: schon verwendet und liefert ein Bild > liefert ein Bild
+// (/api/meta kamera, Probe des Servers) > schon verwendet > die erste.
 function firstCamera(){
-  const z=(META.controls||[]).find(c=>INTERCOM_TYPEN.includes(c.type));
-  return z?z.uuid:'';
+  const alle=(META.controls||[]).filter(c=>INTERCOM_TYPEN.includes(c.type));
+  if(!alle.length) return '';
+  const genutzt=new Set();
+  (JSON.stringify(PANELS||{}).match(/camera:[^"|]*/g)||[]).forEach(v=>
+    v.replace(/^camera:(page:|stack:)?/,'').split(',').forEach(u=>{ if(u) genutzt.add(u); }));
+  const z=alle.find(c=>c.kamera===true && genutzt.has(c.uuid)) || alle.find(c=>c.kamera===true)
+       || alle.find(c=>genutzt.has(c.uuid)) || alle[0];
+  return z.uuid;
 }
 
 // ---- Skalierung (Profil und Geraet) ----
@@ -858,12 +870,12 @@ function kameraWahlHtml(v, pk, opt){
   const frei=alle.filter(c=>t.cams.indexOf(c.uuid)<0), voll=t.cams.length>=KAMERA_MAX;
   let h='<div class="ccrow" style="margin:4px 0 0 0;flex-wrap:wrap"><span class="ccnm">'+T('Kameras')+'</span>'+
     (frei.length&&!voll ? '<select class="kw-add"'+pkA+'><option value="">'+T('＋ Kamera hinzufügen …')+'</option>'+
-        frei.map(c=>'<option value="'+esc(c.uuid)+'">'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+'</option>').join('')+'</select>'
+        frei.map(c=>'<option value="'+esc(c.uuid)+'">'+esc(c.name)+(c.roomName?' ('+esc(c.roomName)+')':'')+(c.kamera===false?' – '+T('kein Bild'):'')+'</option>').join('')+'</select>'
       : '<span class="ccmut">'+(voll ? T('Mehr Kameras gehen nicht gleichzeitig.')
           : (alle.length<2 ? T('Nur ein Intercom-Baustein in der Anlage.') : ''))+'</span>')+'</div>';
   h+='<div class="picked" style="margin:6px 0 2px">'+(t.cams.length
     ? t.cams.map(u=>{ const c=(META.controls||[]).find(x=>x.uuid===u);
-        return '<span class="chip on kw-chip"'+pkA+' data-kwu="'+esc(u)+'">'+esc(c?c.name:u)+
+        return '<span class="chip on kw-chip"'+pkA+' data-kwu="'+esc(u)+'">'+esc(c?c.name:u)+(c&&c.kamera===false?' – '+T('kein Bild'):'')+
           '<span class="rm">'+esc((c&&c.roomName)||'')+'</span>'+(t.cams.length>1?'<span class="x">×</span>':'')+'</span>'; }).join('')
     : '<span class="none">'+T('Noch nichts gewählt – oben hinzufügen.')+'</span>')+'</div>';
   if(t.cams.length>=2 && opt.modus!==false)
