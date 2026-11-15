@@ -100,6 +100,12 @@
             </intent-filter>
         </receiver>
 
+        <!-- Fremde App nach dem Hochfahren oeffnen (eigene Version), Einstellen nur per adb. -->
+        <receiver
+            android:name=".StartApp"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
+
         <!-- Geraeteadministrator (nur force-lock) fuers echte Display-Aus bei
              Inaktivitaet. Aktivierung: adb shell dpm set-active-admin com.loxpanel.spike/.LockAdmin -->
         <receiver

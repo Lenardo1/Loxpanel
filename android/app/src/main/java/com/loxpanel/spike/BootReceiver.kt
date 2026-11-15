@@ -20,8 +20,9 @@ class BootReceiver : BroadcastReceiver() {
             WachDienst.starten(context)           // Standby-Weckdienst, nur wenn eingeschaltet (eigene Version)
             // Eingebauten Kiosk (unsere Vollbild-WebView) in den Vordergrund holen –
             // nur wenn die Anzeige eingerichtet ist. Ein Gerät, auf dem nur der
-            // BLE-Scanner läuft (z. B. Tablet mit Loxone-App), bleibt so unberührt.
-            if (!Visu.eingerichtet(context)) return
+            // BLE-Scanner läuft (z. B. Tablet mit Loxone-App), öffnet stattdessen die
+            // per adb eingestellte App (StartApp), sonst nichts.
+            if (!Visu.eingerichtet(context)) { StartApp.oeffnen(context); return }
             try {
                 context.startActivity(
                     Intent(context, KioskActivity::class.java)
