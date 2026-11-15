@@ -66,7 +66,11 @@ class LoxSicht : AccessibilityService() {
         val wurzeln = try {
             windows.mapNotNull { it.root }.filter { it.packageName?.toString() == "com.loxone.kerberos" }
         } catch (_: Exception) { emptyList() }
-        if (wurzeln.isEmpty()) return
+        if (wurzeln.isEmpty()) {
+            // Loxone-App nicht zu sehen (andere App, Startbildschirm, Einstellungen): Wetter weg
+            if (zuletzt != "fremd") { zuletzt = "fremd"; Log.i("LPSICHT", "Loxone-App nicht vorn") }
+            WetterOverlay.sichtbar(false); return
+        }
         // Ein Durchgang über den oberen Rand: Miniserver-Name in der Kopfzeile (links ab ~84 px)
         // und der Kopf des offenen Menüs („INTERN VERBUNDEN“ o. ä., darüber der Name ganz links).
         // Der Baum der Loxone-App ist tief (~47 Ebenen); Zweige unterhalb des Randes fallen weg.
