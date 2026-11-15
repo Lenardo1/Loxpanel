@@ -144,4 +144,13 @@ class WaechterTest {
         assertTrue(Waechter.seiteSteht(1_000_001L + Waechter.SEITE_STILL_MS, 1_000_000L))
         assertTrue("länger als die 60 s bis zur Uhr-Seite", Waechter.SEITE_STILL_MS > 60_000L)
     }
+
+    @Test
+    fun seiteNieGestartet() {
+        val t0 = 1_000_000L
+        assertFalse("noch keine Seite geladen", Waechter.seiteNieGestartet(t0 + 999_999L, null, null))
+        assertFalse(Waechter.seiteNieGestartet(t0 + Waechter.SEITE_START_MS, t0, null))
+        assertTrue(Waechter.seiteNieGestartet(t0 + Waechter.SEITE_START_MS + 1, t0, null))
+        assertFalse("hat sich gemeldet", Waechter.seiteNieGestartet(t0 + 999_999L, t0, t0 + 5_000L))
+    }
 }

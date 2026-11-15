@@ -85,6 +85,14 @@ object Waechter {
     fun seiteSteht(jetztMs: Long, letzteMs: Long?): Boolean =
         letzteMs != null && jetztMs - letzteMs > SEITE_STILL_MS
 
+    /** So lange darf eine frisch geladene Seite brauchen, bis sie sich zum ersten Mal meldet. */
+    const val SEITE_START_MS = 180_000L
+
+    /** Ob eine Seite gar nicht angelaufen ist (eigene Version): seit dem Laden [geladenMs]
+     *  kein Herzschlag. Gesehen am Eingang: "--:--", keine Verbindung, stundenlang. */
+    fun seiteNieGestartet(jetztMs: Long, geladenMs: Long?, letzteMs: Long?): Boolean =
+        letzteMs == null && geladenMs != null && jetztMs - geladenMs > SEITE_START_MS
+
     /** Neustart-Zeitpunkte (ms seit 1970) als Text für die Einstellungen der App
      *  und zurück. Unlesbares fällt weg. */
     fun alsText(neustarts: List<Long>): String = neustarts.joinToString(",")

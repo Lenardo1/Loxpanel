@@ -86,12 +86,17 @@ class KioskActivity : Activity(), SensorEventListener {
     private var naheZuletzt: Boolean? = null
     /** Display wurde per lockNow ausgeschaltet (echtes Standby, eigene Version). */
     private var ausStandby = false
+    /** Wann die Seite zuletzt geladen wurde (elapsedRealtime), fuer Waechter.seiteNieGestartet. */
+    @Volatile private var seiteGeladen: Long? = null
     /** Letzte Meldung der Seite (elapsedRealtime), null bis zur ersten. */
     @Volatile private var herzschlag: Long? = null
     private val seitePruefen = object : Runnable {
         override fun run() {
             if (destroyed) return
-            if (Waechter.seiteSteht(SystemClock.elapsedRealtime(), herzschlag)) {
+            if (Waechter.seiteNieGestartet(SystemClock.elapsedRealtime(), seiteGeladen, herzschlag)) {
+                Log.w("LPANZEIGE", "Seite hat sich seit dem Laden nicht gemeldet, Anzeige wird neu aufgebaut")
+                anzeigeNeuAufbauen(web)
+            } else if (Waechter.seiteSteht(SystemClock.elapsedRealtime(), herzschlag)) {
                 Log.w("LPANZEIGE", "Seite meldet sich seit über ${Waechter.SEITE_STILL_MS / 1000} s nicht, Anzeige wird neu aufgebaut")
                 anzeigeNeuAufbauen(web)
             }
@@ -385,6 +390,8 @@ class KioskActivity : Activity(), SensorEventListener {
     private fun show() {
         errored = false
         geladenFuer = Visu.basis(this)
+        herzschlag = null
+        seiteGeladen = SystemClock.elapsedRealtime()
         web.loadUrl(Visu.startAdresse(this))
     }
 
