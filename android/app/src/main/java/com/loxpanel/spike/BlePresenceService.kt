@@ -71,7 +71,12 @@ class BlePresenceService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForeground(2, notification())
+        // Aus dem Hintergrund verweigert Android 14+ den Standort-Dienst ohne
+        // ACCESS_BACKGROUND_LOCATION mit einer SecurityException - die riss bisher
+        // die ganze App mit (Weckdienst, Wetter). Jetzt nur dieser Dienst aus.
+        try { startForeground(2, notification()) } catch (e: Exception) {
+            Log.w(TAG, "Scanner nicht gestartet: ${e.message}"); stopSelf(); return START_NOT_STICKY
+        }
         val p = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         intent?.let {
             if (it.getBooleanExtra("aus", false)) {
