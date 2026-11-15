@@ -11,7 +11,8 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
-            intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED
+            intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED   // nach App-Update: Dienste wieder starten
         ) {
             // Den eigenen Server nur, wenn er auf diesem Gerät laufen soll; mit
             // einem Server im Netz gibt es nichts zu starten (Visu.eigenerServer).
