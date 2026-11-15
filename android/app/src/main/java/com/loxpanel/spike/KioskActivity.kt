@@ -156,6 +156,9 @@ class KioskActivity : Activity(), SensorEventListener {
         // Bildschirm anlassen: Wir dimmen im Screensaver selbst, damit die App
         // aktiv bleibt und den Näherungssensor auswerten kann (sofortiges Wecken).
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // eigene Version: Fenster schwarz statt weiss - beim Einschalten aus dem Standby
+        // blitzte sonst kurz ein weisses Viereck auf, bevor die Seite gezeichnet ist
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
 
         web = neueWebView()
 
@@ -168,7 +171,7 @@ class KioskActivity : Activity(), SensorEventListener {
 
         fehler = fehlerSeite()
 
-        root = FrameLayout(this)
+        root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         root.addView(web, vollbild())
         root.addView(fehler, vollbild())
         root.addView(saver, vollbild())
