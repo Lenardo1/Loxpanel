@@ -93,6 +93,7 @@ object WetterText {
     }
 
     /** Einträge, die nur im geöffneten Menü der Loxone-App stehen (LoxSicht). */
+    val MENUE_MARKER = listOf("Automatik Designer", "Hilfe und Feedback", "Zur Standard-Ansicht gehen")
     fun istMenue(text: String): Boolean = text.trim() in setOf(
         "Automatik Designer", "Zur Standard-Ansicht gehen", "Hilfe und Feedback", "Batteriestatus Geräte",
         "INTERN VERBUNDEN", "EXTERN VERBUNDEN")

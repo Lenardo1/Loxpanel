@@ -102,6 +102,8 @@ class WetterOverlay : Service() {
     private var lp: WindowManager.LayoutParams? = null
     private var offen = false
     @Volatile private var anzahlTage = 4
+    @Volatile private var geladen = false
+    @Volatile private var letzteDaten: String? = null
     private var kompaktBreite = 0   // gemessene Breite des Feldes (px), 0 = noch nicht gemessen
     private val symbole = HashMap<String, String>()   // Dateiname -> SVG (eingefärbt)
     private val schliessen = Runnable { umschalten(false) }
@@ -153,7 +155,20 @@ class WetterOverlay : Service() {
             settings.javaScriptEnabled = true
             isVerticalScrollBarEnabled = false; isHorizontalScrollBarEnabled = false
             addJavascriptInterface(Bruecke(), "LoxWetter")
+            // Daten, die vor dem Laden der Seite kamen, danach nachreichen
+            webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    geladen = true
+                    letzteDaten?.let { d -> view?.evaluateJavascript("zeigen($d)", null) }
+                }
+            }
             loadUrl("file:///android_asset/wetter/wetter.html")
+            // Berührung außerhalb des Feldes (ohne Lage, die gibt Android nicht heraus): LoxSicht
+            // sieht sofort nach, ob das Loxone-Menü aufgeht.
+            setOnTouchListener { _, ev ->
+                if (ev.actionMasked == android.view.MotionEvent.ACTION_OUTSIDE) LoxSicht.schnell()
+                false
+            }
         }
         val typ = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -161,7 +176,7 @@ class WetterOverlay : Service() {
         // Nur das eigene Feld nimmt Berührungen an (NOT_TOUCH_MODAL), alles daneben geht an die App.
         lp = WindowManager.LayoutParams(0, 0, typ,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.OPAQUE
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -194,7 +209,7 @@ class WetterOverlay : Service() {
                 val px = ((css + 4) * resources.displayMetrics.density).toInt()
                 if (px != kompaktBreite && px > 0) {
                     kompaktBreite = px
-                    if (!offen) { groesse(false); web?.let { w -> try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(w, lp) } catch (_: Exception) {} } }
+                    if (!offen && web?.visibility == android.view.View.VISIBLE) { groesse(false); web?.let { w -> try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(w, lp) } catch (_: Exception) {} } }
                 }
             }
         }
@@ -205,8 +220,9 @@ class WetterOverlay : Service() {
         val w = web ?: return; val l = lp ?: return
         if (!v && offen) umschalten(false)
         w.visibility = if (v) android.view.View.VISIBLE else android.view.View.INVISIBLE
-        l.flags = if (v) l.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-            else l.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        // Ausgeblendet auf 1×1 px schrumpfen (statt NOT_TOUCHABLE): so meldet Android weiter jede
+        // Berührung draußen, und LoxSicht merkt sofort, wenn das Menü wieder zugeht.
+        if (v) groesse(offen) else { l.width = 1; l.height = 1 }
         try { (getSystemService(WINDOW_SERVICE) as WindowManager).updateViewLayout(w, l) } catch (_: Exception) {}
     }
 
@@ -266,7 +282,9 @@ class WetterOverlay : Service() {
             }
             anzahlTage = days.length()
             val daten = JSONObject().put("cur", cur).put("days", days).put("icons", iconsJ)
-            haupt.post { web?.evaluateJavascript("zeigen(${daten})", null) }
+            val text = daten.toString()
+            letzteDaten = text
+            haupt.post { if (geladen) web?.evaluateJavascript("zeigen($text)", null) }
         } catch (e: Exception) {
             Log.w(TAG, "Weather4Lox nicht geholt: ${e.message}")
         }
