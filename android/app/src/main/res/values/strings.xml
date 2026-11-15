@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lox_sicht_beschreibung">LoxPanel blendet das Wetter über der Loxone-App aus, wenn dort das Menü oder eine Detailansicht offen ist. Beobachtet nur die Loxone-App.</string>
+</resources>

@@ -27,8 +27,8 @@ class StartApp : BroadcastReceiver() {
             WachDienst.setzen(context, an)
             Log.i(TAG, "Weckdienst ${if (an) "an" else "aus"}")
         }
-        // Wetter-Einblendung über der Loxone-App: --es wetter "<breite> <länge>" [--ei wetterX/wetterY]
-        if (intent.hasExtra("wetter") || intent.hasExtra("wetterX") || intent.hasExtra("wetterY"))
+        // Wetter-Einblendung über der Loxone-App: --es wetter <Weather4Lox-URL> --es wetterIcons <Miniserver-URL> [--ei wetterX/Y/B/H]
+        if (listOf("wetter", "wetterIcons", "wetterX", "wetterY", "wetterB", "wetterH").any { intent.hasExtra(it) })
             WetterOverlay.setzen(context, intent)
         val paket = intent.getStringExtra("paket")?.trim() ?: return
         prefs(context).edit().putString(PAKET, paket).apply()
