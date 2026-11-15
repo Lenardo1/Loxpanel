@@ -14,11 +14,19 @@ import android.util.Log
  * Einstellen nur per adb (DUMP hat die adb-Shell, gewöhnliche Apps nicht):
  *   adb shell am broadcast -n com.loxpanel.spike/.StartApp --es paket com.loxone.kerberos
  * Aus: --es paket ""
+ * Weckdienst (Port 2971, Display an/aus per HTTP) ohne Anzeige: --ez standby true
  * Aus dem Hintergrund darf die App nur mit SYSTEM_ALERT_WINDOW starten:
  *   adb shell appops set com.loxpanel.spike SYSTEM_ALERT_WINDOW allow
  */
 class StartApp : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Weckdienst (Display an/aus per HTTP, z. B. vom Loxone-Bewegungsmelder) ohne die
+        // Anzeige ein-/ausschalten: --ez standby true|false
+        if (intent.hasExtra("standby")) {
+            val an = intent.getBooleanExtra("standby", false)
+            WachDienst.setzen(context, an)
+            Log.i(TAG, "Weckdienst ${if (an) "an" else "aus"}")
+        }
         val paket = intent.getStringExtra("paket")?.trim() ?: return
         prefs(context).edit().putString(PAKET, paket).apply()
         Log.i(TAG, if (paket.isEmpty()) "Start-App aus" else "Start-App nach dem Hochfahren: $paket")

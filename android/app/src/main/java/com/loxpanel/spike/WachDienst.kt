@@ -97,18 +97,40 @@ class WachDienst : Service(), SensorEventListener {
     private fun antworten(c: Socket) {
         c.use {
             it.soTimeout = 3000
-            val puffer = ByteArray(4096)
-            val n = try { it.getInputStream().read(puffer) } catch (_: Exception) { -1 }
-            val anfrage = if (n > 0) String(puffer, 0, n, Charsets.UTF_8) else ""
-            when (WachBefehl.befehl(anfrage)) {
+            val anfrage = lesen(it)
+            val befehl = WachBefehl.befehl(anfrage)
+            if (befehl == null) Log.i(TAG, "Unbekannte Anfrage: ${anfrage.lineSequence().firstOrNull()?.take(120)}")
+            when (befehl) {
                 true -> wecken("HTTP", visu = false)   // nur Display an; was die Visu zeigt (Uhr), bestimmt der Server
-                false -> Unit   // Schlafen regelt die Anzeige (Schoner nach Leerlauf)
+                // Schlafen regelt sonst die Anzeige (Schoner nach Leerlauf). Ohne eingerichtete
+                // Anzeige (Tablet mit Loxone-App, nur Scanner) schaltet der Befehl das Display aus.
+                false -> if (!Visu.eingerichtet(this)) schlafen("HTTP")
                 null -> Unit
             }
             val body = "{\"ok\":true}"
             it.getOutputStream().write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" +
                 "Content-Length: ${body.length}\r\nConnection: close\r\n\r\n$body").toByteArray())
         }
+    }
+
+    /** Anfrage lesen, bis Kopf und (laut Content-Length) Inhalt da sind – der Loxone-
+     *  Miniserver schickt den Inhalt eines POST gern in einem eigenen Paket. */
+    private fun lesen(c: Socket): String {
+        val ein = c.getInputStream()
+        val puffer = java.io.ByteArrayOutputStream()
+        val stueck = ByteArray(2048)
+        try {
+            while (puffer.size() < 16384) {
+                val n = ein.read(stueck); if (n <= 0) break
+                puffer.write(stueck, 0, n)
+                val text = puffer.toString("UTF-8")
+                val kopfEnde = text.indexOf("\r\n\r\n").let { i -> if (i >= 0) i + 4 else text.indexOf("\n\n").let { j -> if (j >= 0) j + 2 else -1 } }
+                if (kopfEnde < 0) continue
+                val laenge = Regex("(?im)^content-length:\\s*(\\d+)").find(text.substring(0, kopfEnde))?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                if (puffer.size() - kopfEnde >= laenge) break
+            }
+        } catch (_: Exception) { }
+        return puffer.toString("UTF-8")
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -128,11 +150,24 @@ class WachDienst : Service(), SensorEventListener {
         @Suppress("DEPRECATION")
         pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
             "loxpanel:wecken").acquire(5000)
+        // Ohne eingerichtete Anzeige nur das Display an: vorn bleibt, was vorher vorn war
+        // (z. B. die Loxone-App), statt der LoxPanel-Einrichtung.
+        if (!Visu.eingerichtet(this)) return
         try {
             startActivity(Intent(this, KioskActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 .putExtra(if (visu) "wecken" else "anzeigen", true))
         } catch (e: Exception) { Log.w(TAG, "Anzeige nicht geholt: ${e.message}") }
+    }
+
+    /** Display aus per lockNow (braucht LockAdmin als Geraeteadministrator). */
+    private fun schlafen(grund: String) {
+        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+        if (!dpm.isAdminActive(android.content.ComponentName(this, LockAdmin::class.java))) {
+            Log.w(TAG, "Schlafen ($grund) geht nicht: LockAdmin nicht aktiv"); return
+        }
+        Log.i(TAG, "Schlafen ($grund)")
+        try { dpm.lockNow() } catch (e: Exception) { Log.w(TAG, "lockNow: ${e.message}") }
     }
 
     private fun notification(): Notification {
