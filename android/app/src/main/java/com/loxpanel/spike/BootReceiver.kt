@@ -18,6 +18,7 @@ class BootReceiver : BroadcastReceiver() {
             ServerService.starten(context)
             BlePresenceService.starten(context)   // nur wenn eingerichtet (eigene Version)
             WachDienst.starten(context)           // Standby-Weckdienst, nur wenn eingeschaltet (eigene Version)
+            WetterOverlay.starten(context)        // Wetter über einer fremden App, nur wenn eingestellt (eigene Version)
             // Eingebauten Kiosk (unsere Vollbild-WebView) in den Vordergrund holen –
             // nur wenn die Anzeige eingerichtet ist. Ein Gerät, auf dem nur der
             // BLE-Scanner läuft (z. B. Tablet mit Loxone-App), öffnet stattdessen die

@@ -91,6 +91,16 @@
                 android:value="wake the wall-panel display from standby" />
         </service>
 
+        <!-- Wetter-Einblendung ueber einer fremden App (eigene Version), Einstellen per adb (StartApp). -->
+        <service
+            android:name=".WetterOverlay"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="weather overlay above the home-automation app on a wall panel" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
