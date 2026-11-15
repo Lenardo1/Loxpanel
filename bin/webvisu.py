@@ -196,6 +196,8 @@ class App(Statistik, Grafana, BausteinHelfer, Haus, Gesten, Miniserver,
         # "user", "pass"} oder {"grund"}; gilt bis zur naechsten Struktur
         self.ms_video: dict[str, dict] = {}
         self._video_sperre = asyncio.Lock()
+        # Ergebnis der Kamera-Probe je Intercom (kameras_pruefen): (Zeitpunkt, Bild ja/nein)
+        self.kamera_ok: dict[str, tuple[float, bool]] = {}
         # /mjpeg: je Kamera EIN Strom, verteilt an alle Zuschauer (kamerastrom.py)
         self.kamerastroeme = Kameraverteiler()
         self._auth_gen = 0               # zaehlt jede Anmeldung (-> _renew_token)

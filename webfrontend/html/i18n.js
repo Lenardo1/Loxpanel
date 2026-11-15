@@ -196,6 +196,7 @@
       "Kameras": "Cameras",
       "Mehr Kameras gehen nicht gleichzeitig.": "No more cameras at the same time.",
       "＋ Kamera hinzufügen …": "＋ Add camera …",
+      "kein Bild": "no picture",
       "Nur ein Intercom-Baustein in der Anlage.": "Only one intercom block in the installation.",
       "Gestapelt (untereinander)": "Stacked (one below the other)",
       "Noch nichts gewählt – oben hinzufügen.": "Nothing selected yet – add above.",

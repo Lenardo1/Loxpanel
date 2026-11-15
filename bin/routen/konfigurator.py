@@ -64,6 +64,10 @@ async def api_meta(request: web.Request) -> web.Response:
              "color": app.cats[cu].get("color")}         # Loxone-Voreinstellungsfarbe der Kategorie
             for cu in app.cats_with]
     panels = {pid: app._panel_export(raw) for pid, raw in app.panels.items()}
+    # Welche Intercom liefert ein Bild? Laeuft neben dem Grafana-Katalog
+    # (unten) und ist ebenso kurz begrenzt; was bis dahin fehlt, bleibt offen
+    # (kamera: null) und der Konfigurator waehlt wie bisher die erste.
+    kamera_probe = asyncio.ensure_future(asyncio.wait_for(app.kameras_pruefen(), 6))
     controls = []
     for u, c in app.controls.items():
         if not c.get("name"):
@@ -94,6 +98,16 @@ async def api_meta(request: web.Request) -> web.Response:
     except asyncio.TimeoutError:
         grafana = {"ok": False, "error": "Grafana antwortet nicht", "panels": []}
         app.gf_katalog = (time.monotonic(), grafana)   # nicht bei jedem Laden erneut warten
+    try:
+        kameras = await kamera_probe
+    except asyncio.TimeoutError:
+        kameras = {}
+    except Exception:
+        log.exception("Kamera-Probe fuer den Konfigurator fehlgeschlagen")
+        kameras = {}
+    for c in controls:
+        if c["uuid"] in kameras:
+            c["kamera"] = kameras[c["uuid"]]   # Intercom: liefert ihre Kamera ein Bild?
     return web.json_response({
         "rooms": rooms, "cats": cats, "controls": controls, "grafana": grafana,
         # Zeitraeume der Verlaufs-Diagramme (Schluessel, Anzeige) fuer die Auswahl

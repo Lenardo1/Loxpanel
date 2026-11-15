@@ -210,6 +210,7 @@ class Miniserver:
         # Neue Struktur heisst meist: in Loxone Config gespeichert. Die Kamera
         # der Intercoms kann sich geaendert haben, also neu fragen.
         self.ms_video = {}
+        self.kamera_ok = {}
         self.playerid_by_action = {}
         self.audiohost_by_action = {}
         for _u, _c in self.controls.items():

@@ -8,14 +8,19 @@ Die Methoden sind ein Mixin (Intercomdienst): App erbt sie und arbeitet mit ihne
 auf ihrem Zustand (self ist die App). Importiert webvisu nicht."""
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from urllib.parse import urlsplit
 
 from bausteine.gemeinsam import INTERCOM_TYPES
 from bausteine.intercom import KEIN_VIDEO
+from kamerastrom import kamera_pruefen
 from miniserver import KEIN_SIP, OhneGesicherteDetails, ZugangFehler
 
 log = logging.getLogger("loxpanel.webvisu")   # derselbe Logger wie der Server: die Methoden gehoeren zu App
+
+KAMERA_PRUEF_S = 600.0     # so lange gilt das Ergebnis einer Kamera-Probe (kameras_pruefen)
 
 
 def _sip_zugang(details: dict) -> dict | None:
@@ -128,6 +133,28 @@ class Intercomdienst:
                 self.ms_video[uuid] = cam
                 self._dirty = True       # Intercom-Seite neu: Bild oder Grund
         return cam if cam.get("url") else None
+
+    async def kameras_pruefen(self) -> dict[str, bool]:
+        """Je Intercom: liefert ihre Kamera gerade ein Bild? Fuer die
+        Vorauswahl im Konfigurator (firstCamera): Die Anlage kann mehrere
+        Intercom-Bausteine haben, von denen nur einer eine erreichbare Kamera
+        hat; die erste in der Struktur ist dann oft eine ohne Bild. Ein
+        laufender Strom zaehlt ohne Probe, sonst ein kurzer Abruf. Das Ergebnis
+        gilt KAMERA_PRUEF_S lang (kamera_ok), damit nicht jedes Oeffnen des
+        Konfigurators die Tuerstationen anfragt."""
+        jetzt = time.monotonic()
+
+        async def eine(uuid: str) -> tuple[str, bool]:
+            alt = self.kamera_ok.get(uuid)
+            if alt and jetzt - alt[0] < KAMERA_PRUEF_S:
+                return uuid, alt[1]
+            cam = await self.intercom_video(uuid)
+            ok = bool(cam) and (self.kamerastroeme.laeuft(cam) or await kamera_pruefen(cam))
+            self.kamera_ok[uuid] = (time.monotonic(), ok)
+            return uuid, ok
+
+        uuids = [u for u, c in self.controls.items() if c.get("type") in INTERCOM_TYPES]
+        return dict(await asyncio.gather(*(eine(u) for u in uuids)))
 
     def intercom_blocks(self, uuid: str):
         """Volle Intercom-Ansicht (Video + Tuer-/Ausgang-Buttons + Klingel-Banner)
