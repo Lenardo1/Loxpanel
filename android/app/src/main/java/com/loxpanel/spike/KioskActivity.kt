@@ -82,6 +82,8 @@ class KioskActivity : Activity(), SensorEventListener {
     private val ui = Handler(Looper.getMainLooper())
     private var errored = false
     private var reloadPending = false
+    /** Letzter Zustand des Naeherungssensors, null bis zum ersten Wert (eigene Version). */
+    private var naheZuletzt: Boolean? = null
     /** Display wurde per lockNow ausgeschaltet (echtes Standby, eigene Version). */
     private var ausStandby = false
     /** Letzte Meldung der Seite (elapsedRealtime), null bis zur ersten. */
@@ -423,6 +425,7 @@ class KioskActivity : Activity(), SensorEventListener {
         // Näherungssensor abonnieren (falls vorhanden) -> weckt aus dem Screensaver.
         // FASTEST für flottes Aufwecken bei Annäherung (Proximity ist on-change +
         // sparsam, daher unkritisch für den Verbrauch).
+        naheZuletzt = null   // erster Wert nach dem Anmelden ist der gespeicherte, kein echtes Herankommen
         proximity?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
         wake()
         // aus echtem Standby: nur das Display (Overlay weg); ob die Visu ihre Uhr verlaesst,
@@ -561,8 +564,14 @@ class KioskActivity : Activity(), SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_PROXIMITY) return
         val near = event.values.isNotEmpty() &&
             event.values[0] < (proximity?.maximumRange ?: 5f)
-        if (near) annaeherungNah()
-        if (near && (saverOn || visuSaver)) userWake()
+        // eigene Version: nur ein echter Wechsel fern -> nah weckt. Den ersten Wert nach dem
+        // Anmelden liefert Android aus dem Speicher (stand am Eingang noch auf "nah") - er
+        // holte nach jedem Aufwachen sofort die Startseite statt der Uhr.
+        val vorher = naheZuletzt
+        naheZuletzt = near
+        if (vorher == null || !near || vorher) return
+        annaeherungNah()
+        if (saverOn || visuSaver) userWake()
     }
 
     // ---- Helligkeit nach Annaeherung (eigene Version, Marco) ----
