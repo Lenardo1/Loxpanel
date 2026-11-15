@@ -150,9 +150,10 @@ class WachDienst : Service(), SensorEventListener {
         @Suppress("DEPRECATION")
         pm.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
             "loxpanel:wecken").acquire(5000)
-        // Ohne eingerichtete Anzeige nur das Display an: vorn bleibt, was vorher vorn war
-        // (z. B. die Loxone-App), statt der LoxPanel-Einrichtung.
-        if (!Visu.eingerichtet(this)) return
+        // Ohne eingerichtete Anzeige nur das Display an und die eingestellte App (StartApp,
+        // z. B. Loxone) nach vorn - sie kann inzwischen beendet worden sein (WebView-Update
+        // im Hintergrund beendet die Loxone-App). Läuft sie, holt das nur ihre Aufgabe nach vorn.
+        if (!Visu.eingerichtet(this)) { StartApp.oeffnen(this); return }
         try {
             startActivity(Intent(this, KioskActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
