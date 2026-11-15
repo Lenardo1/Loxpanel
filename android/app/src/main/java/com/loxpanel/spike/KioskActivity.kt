@@ -429,6 +429,10 @@ class KioskActivity : Activity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
+        // Begleit-Tablet (eigene Version): keine Anzeige, das App-Symbol führt zur Begleiter-Seite
+        if (!Visu.eingerichtet(this) && BegleiterDienst.gewaehlt(this)) {
+            startActivity(Intent(this, BegleiterEinrichtung::class.java)); finish(); return
+        }
         annaeherungLesen(null)   // Werte aus der Einstellungsseite (DisplayEinstellung)
         intercom.onResume()
         enterImmersive()

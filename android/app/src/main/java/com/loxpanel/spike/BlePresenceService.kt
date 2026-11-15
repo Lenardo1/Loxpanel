@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit
 class BlePresenceService : Service() {
     companion object {
         private const val TAG = "LPBLE"
-        private const val PREFS = "blepresence"
+        const val PREFS = "blepresence"
         private const val PORT = 8099
         const val VERSION = "1.5.5-loxpanel"
 
@@ -52,7 +52,7 @@ class BlePresenceService : Service() {
             }
 
         fun starten(ctx: Context) {
-            if (!eingerichtet(ctx)) return
+            if (!eingerichtet(ctx) || BegleiterDienst.bleAus(ctx)) return   // im Konfigurator (Begleit-Tablet) ausgeschaltet
             val i = Intent(ctx, BlePresenceService::class.java)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i) else ctx.startService(i)

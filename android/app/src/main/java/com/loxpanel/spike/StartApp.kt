@@ -30,6 +30,8 @@ class StartApp : BroadcastReceiver() {
         // Wetter-Einblendung über der Loxone-App: --es wetter <Weather4Lox-URL> --es wetterIcons <Miniserver-URL> [--ei wetterX/Y/B/H]
         if (listOf("wetter", "wetterIcons", "wetterX", "wetterY", "wetterB", "wetterH").any { intent.hasExtra(it) })
             WetterOverlay.setzen(context, intent)
+        // Begleit-Tablet: Server und Name für die Einstellungen aus dem Konfigurator
+        if (intent.hasExtra("begleiterServer") || intent.hasExtra("begleiterName")) BegleiterDienst.setzen(context, intent)
         val paket = intent.getStringExtra("paket")?.trim() ?: return
         prefs(context).edit().putString(PAKET, paket).apply()
         Log.i(TAG, if (paket.isEmpty()) "Start-App aus" else "Start-App nach dem Hochfahren: $paket")

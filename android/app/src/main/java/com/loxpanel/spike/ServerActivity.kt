@@ -45,6 +45,7 @@ class ServerActivity : Activity() {
 
     private lateinit var hier: RadioButton
     private lateinit var netz: RadioButton
+    private lateinit var begleit: RadioButton
     private lateinit var adresse: EditText
     private lateinit var meldung: TextView
     private lateinit var weiter: Button
@@ -86,8 +87,14 @@ class ServerActivity : Activity() {
             "Die App zeigt die Visu des Servers unter dieser Adresse. Der Konfigurator meldet " +
                 "das Gerät dort unter „Neues Gerät gefunden“ und vergibt Namen und Ansicht."
         )
+        begleit = wahl(
+            "Nur im Hintergrund (Begleit-Tablet)",
+            "Vorn bleibt eine andere App, z. B. die Loxone-App. LoxPanel blendet dort das Wetter ein, " +
+                "schaltet das Display über den Bewegungsmelder und arbeitet als BLE-Scanner. Adresse = LoxPanel-Server."
+        )
         gruppe.addView(hier)
         gruppe.addView(netz)
+        if (!warEingerichtet) gruppe.addView(begleit)
         spalte.addView(gruppe)
 
         adresse = EditText(this).apply {
@@ -153,12 +160,13 @@ class ServerActivity : Activity() {
     }
 
     private fun wahlZeigen() {
-        adresse.isEnabled = netz.isChecked
-        adresse.alpha = if (netz.isChecked) 1f else 0.5f
+        val mitAdresse = netz.isChecked || begleit.isChecked
+        adresse.isEnabled = mitAdresse
+        adresse.alpha = if (mitAdresse) 1f else 0.5f
         meldung.text = ""
         trotzdem.visibility = View.GONE
         ungeprueft = null
-        if (netz.isChecked) adresse.requestFocus()
+        if (mitAdresse) adresse.requestFocus()
     }
 
     /** „Weiter“: eigener Server sofort, Server im Netz erst nach einer Prüfung. */
@@ -174,6 +182,13 @@ class ServerActivity : Activity() {
         if (s == null) {
             meldung.text = "Bitte die Adresse des Servers eintragen, zum Beispiel 192.168.1.10:${Visu.PORT} " +
                 "(ohne Port gilt ${Visu.PORT}). Die Zeile steht im Konfigurator unter Geräte → „Gerät verbinden“."
+            return
+        }
+        if (begleit.isChecked) {
+            // Begleit-Tablet: Server merken, Name und Berechtigungen auf der nächsten Seite
+            getSharedPreferences("begleiter", MODE_PRIVATE).edit().putString("server", s).apply()
+            startActivity(android.content.Intent(this, BegleiterEinrichtung::class.java))
+            finish()
             return
         }
         weiter.isEnabled = false

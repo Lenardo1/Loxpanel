@@ -72,15 +72,20 @@ class LoxSicht : AccessibilityService() {
         // Der Baum der Loxone-App ist tief (~47 Ebenen); Zweige unterhalb des Randes fallen weg.
         var name = false; var menue = false
         val r = Rect()
+        // Grenzen in dp (gemessen am A8: Name bei 84..273 px, 21..75 px Höhe, Dichte 1,5),
+        // damit es auf Tablets mit anderer Auflösung genauso greift
+        val d = resources.displayMetrics.density
+        val rand = (93 * d).toInt(); val oben = (53 * d).toInt()
+        val links = (40 * d).toInt()..(93 * d).toInt(); val hoehe = (13 * d).toInt()..(67 * d).toInt()
         fun gehen(n: AccessibilityNodeInfo?, tiefe: Int) {
             if (n == null || (name && menue) || tiefe > 120) return
             if (!leeren) try { n.refresh() } catch (_: Exception) {}
             n.getBoundsInScreen(r)
-            if (r.top >= 140 || r.bottom <= 0) return
+            if (r.top >= rand || r.bottom <= 0) return
             val t = n.text?.toString()
             if (!t.isNullOrBlank()) {
                 if (WetterText.istMenue(t)) menue = true
-                else if (r.top < 80 && r.left in 60..140 && r.height() in 20..100) name = true
+                else if (r.top < oben && r.left in links && r.height() in hoehe) name = true
             }
             for (i in 0 until n.childCount) gehen(n.getChild(i), tiefe + 1)
         }

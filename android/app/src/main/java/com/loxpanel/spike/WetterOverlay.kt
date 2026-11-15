@@ -70,7 +70,9 @@ class WetterOverlay : Service() {
             intent.getStringExtra("wetter")?.let { e.putString("ort", it.trim()) }
             intent.getStringExtra("wetterIcons")?.let { e.putString("icons", it.trim()) }
             for (k in listOf("wetterX", "wetterY", "wetterB", "wetterH"))
-                if (intent.hasExtra(k)) e.putInt(k, intent.getIntExtra(k, 0))
+                if (intent.hasExtra(k)) { val v = intent.getIntExtra(k, -1); if (v < 0) e.remove(k) else e.putInt(k, v) }
+            intent.getStringExtra("wetterFarbe")?.let { if (Regex("^#[0-9a-fA-F]{6}$").matches(it)) e.putString("farbeHex", it) }
+            intent.getStringExtra("wetterFarbeName")?.let { e.putString("farbe", it) }
             e.apply()
             ctx.stopService(Intent(ctx, WetterOverlay::class.java))
             if (an(ctx)) starten(ctx)
@@ -150,8 +152,9 @@ class WetterOverlay : Service() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun zeigen() {
         val pr = p(this)
+        val farbe = pr.getString("farbeHex", "#0e0e0e") ?: "#0e0e0e"
         val w = WebView(this).apply {
-            setBackgroundColor(Color.rgb(14, 14, 14))
+            setBackgroundColor(try { Color.parseColor(farbe) } catch (_: Exception) { Color.rgb(14, 14, 14) })
             settings.javaScriptEnabled = true
             isVerticalScrollBarEnabled = false; isHorizontalScrollBarEnabled = false
             addJavascriptInterface(Bruecke(), "LoxWetter")
@@ -159,6 +162,7 @@ class WetterOverlay : Service() {
             webViewClient = object : android.webkit.WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     geladen = true
+                    view?.evaluateJavascript("farbe('$farbe')", null)
                     letzteDaten?.let { d -> view?.evaluateJavascript("zeigen($d)", null) }
                 }
             }
@@ -216,8 +220,9 @@ class WetterOverlay : Service() {
     }
 
     /** Ein-/Ausblenden (LoxSicht). Ausgeblendet nimmt das Feld keine Berührungen an. */
-    fun anzeigen(v: Boolean) {
+    fun anzeigen(sicht: Boolean) {
         val w = web ?: return; val l = lp ?: return
+        val v = sicht || BegleiterDienst.menueEgal(this)   // Ausblenden im Konfigurator abgeschaltet
         if (!v && offen) umschalten(false)
         w.visibility = if (v) android.view.View.VISIBLE else android.view.View.INVISIBLE
         // Ausgeblendet auf 1×1 px schrumpfen (statt NOT_TOUCHABLE): so meldet Android weiter jede

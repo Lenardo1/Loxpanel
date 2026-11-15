@@ -78,6 +78,7 @@ from routen.geraete import (  # noqa: E402
     api_agent_announce, api_agent_command, api_agents, api_device_name, api_device_switch, api_devices_get,
     api_display, api_geraet_ble, api_goto, api_mode, api_notify, api_reload, api_save_devices, api_testtone,
     api_vorschau_beenden, install_script)
+from routen.begleiter import api_begleiter, api_begleiter_melden  # noqa: E402
 from routen.medien import bellimg_handler, cover_handler, icon_handler, loxicons_handler, loxlib_handler  # noqa: E402
 from routen.system import api_diagnose, api_health  # noqa: E402
 
@@ -475,6 +476,9 @@ def main() -> None:
     a.router.add_post("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/testtone", api_testtone)
     a.router.add_post("/api/geraet/ble", api_geraet_ble)   # BLE-Presence-Scanner der App (eigene Version)
+    a.router.add_post("/api/begleiter/melden", api_begleiter_melden)   # Begleit-Tablets (eigene Version)
+    a.router.add_get("/api/begleiter", api_begleiter)
+    a.router.add_post("/api/begleiter", api_begleiter)
     a.router.add_get("/api/reload", api_reload)
     a.router.add_post("/api/reload", api_reload)
     a.router.add_get("/api/goto", api_goto)
