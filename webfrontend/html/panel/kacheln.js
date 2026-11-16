@@ -420,7 +420,8 @@ function spielerEinpassen(tile, tc){
 }
 function tastenEinpassen(tile){
   const tc=tile&&tile.querySelector('.tctrls'); if(!tc || !tile.clientHeight) return;
-  if(view && view.layout==='list'){ tc.hidden=false; tile._kt=null; tile.style.removeProperty('--ks'); return; }
+  // ... ebenso im Aufbau "zeile" (Kachel-Set): rechts in der Zeile
+  if((view && view.layout==='list') || zeilenAufbau()){ tc.hidden=false; tile.classList.remove('ohnetasten'); tile._kt=null; tile.style.removeProperty('--ks'); return; }
   if(tile.classList.contains('spieler')){ spielerEinpassen(tile, tc); return; }
   const kt=tastenFaktor(tile), an=kt>=KS_MIN-0.005;
   tc.hidden=!an; tile.classList.toggle('ohnetasten', !an);
@@ -474,7 +475,7 @@ function fitTile(tile){
     setzeStufe(vorher);
   };
   textStufen();
-  if(kachelNeu()){
+  if(kachelNeu() && !zeilenAufbau()){   // eine Zeile ("zeile") kappt mit "...", sie laeuft nicht unten ueber
     for(const stufe of ['eng1','eng2','eng3']){
       if(tile.scrollHeight<=h+1) break;
       tile.classList.add(stufe);

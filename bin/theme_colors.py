@@ -435,11 +435,15 @@ def _derive(grundfarbe: str) -> tuple | None:
 #
 #   aufbau  Kachel: "lx" (neuer Aufbau, flach), "mitte" (Symbol mittig, Text
 #           darunter, die aktive Kachel kippt ganz um), "kreis" (wie lx, das
-#           Symbol in einem Kreis). panel.html haengt die Regeln an
+#           Symbol in einem Kreis), "zeile" (flache breite Zeile: Symbol
+#           links, Zustand und Name daneben, Tasten rechts; das Raster rechnet
+#           die Visu dafuer immer selbst, siehe ansicht.py gridAuto).
+#           panel.html haengt die Regeln an
 #           html[data-kachelset-aufbau], nie an den Namen des Sets.
 #   leiste  Tab-Leiste: "pille" (unten, als Pille), "oben" (nur Symbole ueber
-#           dem Raster), "links" (Seitenleiste mit Symbol und Name), Regeln an
-#           html[data-kachelset-leiste].
+#           dem Raster), "links" (Seitenleiste mit Symbol und Name), "reiter"
+#           (unten als Pille mit Symbol und Name, der aktive Tab gefuellt),
+#           Regeln an html[data-kachelset-leiste].
 #   farben  feste Farben; fehlende Rollen rechnet _ergaenzen() nach.
 #   masse   Radien, Schatten, Kreis, Leisten, Rahmen: CSS-Variablen ohne Farbe.
 #           Ein Mass mit "-schmal" gilt auf schmalen Schirmen (raster.js
@@ -447,7 +451,8 @@ def _derive(grundfarbe: str) -> tuple | None:
 #           braucht (Leistenhoehe, Seitenleiste, Rahmen, Abstand, Innenrand),
 #           liest der Konfigurator aus /api/meta, die Visu aus dem CSS.
 #   groessen  Standardgroessen der Kachel (wie GROESSEN_STANDARD), die das Set
-#           mitbringt; eine eingestellte Groesse geht vor.
+#           mitbringt; eine an der Ansicht eingestellte Groesse geht vor, die
+#           der Vorgaben nicht (ansicht.py _ui_mit_vorgaben).
 #   satz    statt fester Farben eine Rechnung aus einem Farbton (touch_satz),
 #           dazu farbton (Standard, Schnellwahl) und aktiv (Standard, Auswahl).
 #   label, info  Name und Beschreibung im Konfigurator (i18n.js uebersetzt sie).
@@ -462,7 +467,13 @@ def _derive(grundfarbe: str) -> tuple | None:
 #   --taste           Flaeche der Tasten in Kachel und Detailseite (und des Kreises)
 #   --kreis-an-symbol Symbol im Kreis einer aktiven Kachel (Aufbau "kreis")
 #   --kachel-an-muted Zweitzeile auf der aktiven Kachel (Aufbau "mitte")
-#   --tab-an, --tab-aus  Symbole der Leiste "oben"
+#   --tab-an, --tab-aus  Symbole der Leiste "oben"; --tab-aus auch Schrift und
+#                     Symbol der inaktiven Tabs der Leiste "reiter"
+#   --tab-an-flaeche, --tab-an-ink  gefuellter aktiver Tab der Leiste "reiter"
+#                     und Schrift/Symbol darauf
+#   --kachel-flaeche, --taste-flaeche  durchscheinende Flaeche von Kachel und
+#                     Taste (Aufbau "zeile"), ohne sie --tile und --taste
+#   --feld-verlauf    Verlauf hinter den Kacheln statt der Flaeche --screen
 #   --rahmen          Rahmen um das Feld (Leiste "oben") und Grund ausserhalb
 #                     des Kastens. Nur Flaeche, nie Grund von Text: Text steht
 #                     auf --bg (Uhr-Seite, PIN), und --bg traegt --ink wie
@@ -476,7 +487,11 @@ def _derive(grundfarbe: str) -> tuple | None:
 #   hoechstens so breit wie ohne das Mass),
 #   --rahmen-seite, --rahmen-unten, --feld-radius (Leiste "oben": Rahmen um
 #   das Feld der Kacheln), --rail-breite (Leiste "links"), --kreis-d,
-#   --kreis-anteil (Aufbau "kreis": Kreis und Anteil des Symbols daran)
+#   --kreis-anteil (Aufbau "kreis": Kreis und Anteil des Symbols daran),
+#   --zeile-h, --zeile-spalte (Aufbau "zeile": feste Hoehe einer Zeile und
+#   kleinste Breite einer Spalte; daraus rechnet raster.js Zeilen und Spalten),
+#   --tab-schrift (Leiste "reiter": Schriftgrad der Tab-Namen),
+#   --font (Schrift des Sets; eine im Profil gewaehlte Schrift geht vor)
 KACHEL_SETS = {
     "loxone": {
         "label": "Loxone-App (dunkel)",
@@ -497,6 +512,41 @@ KACHEL_SETS = {
                   "--pille-h": "68px", "--pille-h-schmal": "52px",
                   "--leiste-voll-ab": "820px", "--pille-tab-breite": "130px",
                   "--tab-symbol": "28px", "--tab-symbol-schmal": "22px"},
+    },
+    # Farben, Masse und Schrift an der Loxone-App (Android 17.2, dunkles Design)
+    # ausgemessen: 1 px dort = 1 CSS-px hier. Die App legt Kachel und Taste
+    # durchscheinend auf einen Verlauf; --tile und --taste sind die deckenden
+    # Mittelwerte fuer die Kontrastrechnung, --kachel-flaeche, --taste-flaeche
+    # und --feld-verlauf die Werte, die die Visu malt.
+    "loxapp": {
+        "label": "Loxone-App (Zeilen)",
+        "info": "Flache breite Zeilen wie in der Loxone-App: Symbol links, Zustand und Name daneben, "
+                "Tasten rechts; die Tab-Leiste als Pille mit Namen, der aktive Tab grün gefüllt.",
+        "aufbau": "zeile", "leiste": "reiter",
+        "farben": {
+            "--bg": "#0e0e0e", "--screen": "#111111",
+            "--feld-verlauf": "linear-gradient(180deg,rgb(14,14,14) 0%,rgb(20,20,20) 100%)",
+            "--tile": "#1d1d1d", "--kachel-flaeche": "rgba(255,255,255,.05)",
+            "--taste": "#141414", "--taste-flaeche": "rgba(0,0,0,.3)",
+            "--tabbar": "#000000", "--line": "rgba(255,255,255,.1)", "--wash": "255,255,255",
+            "--ink": "#ffffff", "--muted": "#d2d2d2",
+            "--tab-an-flaeche": "#8dff70", "--tab-an-ink": "#000000", "--tab-aus": "#808080",
+            "--glow": "#ffe647", "--good": "#8dff70", "--accent": "#8dff70",
+            "--warn": "#ff7d30", "--crit": "#ff0054", "--crit-dot": "#ff0054",
+            "--crit-fill": "#4d1a16", "--crit-ink": "#ffffff", "--crit-muted": "#ffb3ad",
+            "--cool": "#0fa4ff", "--on-glow": "#000000", "--on-accent": "#000000",
+        },
+        "masse": {"--kachel-radius": "16px", "--taste-radius": "8px",
+                  "--zeile-h": "72px", "--zeile-spalte": "420px",
+                  "--kachel-abstand": "12px", "--kachel-abstand-schmal": "8px",
+                  "--feld-innen": "16px", "--feld-innen-schmal": "8px",
+                  "--tabs-hoehe": "92px", "--tabs-hoehe-schmal": "64px",
+                  "--pille-h": "68px", "--pille-h-schmal": "52px",
+                  "--pille-tab-breite": "170px",
+                  "--tab-symbol": "21px", "--tab-symbol-schmal": "20px", "--tab-schrift": "15.4px",
+                  "--font": '"Figtree","Inter","Roboto",system-ui,sans-serif'},
+        # Schrift der App 18/14 px, am Tablet mit Schriftgroesse 1,1 des Systems
+        "groessen": {"iconSize": 32, "nameSize": 19.8, "subSize": 15.4},
     },
     "touch": {
         "label": "Touch (Farbton wählbar)",

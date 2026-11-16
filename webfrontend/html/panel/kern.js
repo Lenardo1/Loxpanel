@@ -18,6 +18,10 @@ const ICONS = {
   // Linien und ergaeben gefuellt nur flache Keile.
   triup:'<path d="M12 6.5 19.5 17h-15z"/>',
   tridown:'<path d="M12 17.5 4.5 7h15z"/>',
+  // Aufbau "zeile": duenner Winkel wie in der Loxone-App (svg, nicht svgF),
+  // dort ausgemessen - breit und flach, Auf etwas ueber, Ab etwas unter der Mitte
+  zauf:'<path d="M2.3 14.4 12 5.6l9.7 8.8"/>',
+  zab:'<path d="M2.3 7.4 12 16.5l9.7-9.1"/>',
   music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   // zwei Finger, daneben hoch/runter: Hinweis-Symbol der Gesten
   zweiFinger:'<path d="M7 21v-9.5a1.5 1.5 0 0 1 3 0V21"/><path d="M10 21V8.5a1.5 1.5 0 0 1 3 0V21"/><path d="M18 3v10M16 5l2-2 2 2M16 11l2 2 2-2"/>',
@@ -105,8 +109,8 @@ let chartMode = 'stack';
 function abosVergessen(){ curEnergyUuid=''; curCameraUuid=''; curPlayerZone=''; curSvStatus=''; curChartKey=''; }
 let themeSplit = true;   // Split-Screen an/aus (aus = 4"-Panel: nur die Visu, keine Pane 2)
 let tileLayout = '';     // Kachel-Aufbau: '' = neu (Standard), 'classic' = der bisherige
-// Kachel-Set (theme-Nachricht): Art der Kachel ('lx'|'mitte'|'kreis') und der
-// Tab-Leiste ('pille'|'oben'|'links'), '' ohne Set. Als data-kachelset-aufbau
+// Kachel-Set (theme-Nachricht): Art der Kachel ('lx'|'mitte'|'kreis'|'zeile') und der
+// Tab-Leiste ('pille'|'oben'|'links'|'reiter'), '' ohne Set. Als data-kachelset-aufbau
 // und data-kachelset-leiste am <html>; daran haengen die Regeln im CSS.
 let kachelAufbau = '', kachelLeiste = '';
 let kachelMasse = {};   // Variablen der theme-Nachricht (Masse des Sets fuer raster.js leisteMass)

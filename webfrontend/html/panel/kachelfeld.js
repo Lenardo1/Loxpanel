@@ -27,6 +27,11 @@ function tileTone(it){ return it.tone==='good'?' good':(it.tone==='crit'?' crit'
 // Neuer Kachel-Aufbau (.lx): Standard, ausser das Profil waehlt "classic". Die
 // Listen-Ansicht behaelt ihren Aufbau.
 function kachelNeu(){ return tileLayout!=='classic' && !(view && view.layout==='list'); }
+// Aufbau "zeile" (Kachel-Set): flache breite Zeile - Symbol links, Zustand und
+// Name daneben, Tasten rechts. Jede Kachel ist eine Zeile (keine breiten oder
+// hohen), ohne Messwert an Stelle des Symbols und ohne Mini-Verlauf; das
+// Raster rechnet raster.js aus Zeilenhoehe und Spaltenbreite (autoRaster).
+function zeilenAufbau(){ return kachelAufbau==='zeile' && kachelNeu(); }
 // Zeile zum Namen. Zeigt die Kachel einen Messwert gross (it.big), wiederholt
 // die Zeile ihn nicht (it.bigSub).
 function subText(it){
@@ -47,18 +52,43 @@ function zustandVorn(it){ return kachelNeu() && (!it.cmd || !!kachelAufbau) && !
 // zweite Zeile ist nur eine Beschreibung (bi, weicht in enger Kachel zuerst),
 // Messwert an Stelle des Symbols (bigk)
 function aufbauKlassen(it){
+  if(zeilenAufbau()) return it.schalter ? ' zs' : '';   // "zeile" ordnet seine Texte selbst (kachelTexte); zs: Schalter mit Wippe
   if(!kachelNeu()) return '';
   const bigk=it.big!=null ? ' bigk' : '';   // Messwert an Stelle des Symbols (Aufbau "kreis": breite Kachel)
   if(kachelAufbau==='mitte') return bigk;   // "mitte" ordnet seine Texte selbst (kachelTexte)
   return (zustandVorn(it)?' zv':'')+(it.subInfo && subText(it)?' bi':'')+bigk;
+}
+// Symbol einer Taste auf der Kachel: gefuellt (svgF); im Aufbau "zeile" sind
+// die Pfeile duenne Winkel wie in der Loxone-App (zauf/zab, als Linie).
+const ZEILE_PFEIL={triup:'zauf', up:'zauf', tridown:'zab', down:'zab'};
+function tastenSymbol(icon){
+  const z=zeilenAufbau() && ZEILE_PFEIL[icon];
+  return z ? svg(ICONS[z]) : svgF(ICONS[icon]||ICONS.info);
+}
+// Aufbau "zeile", zwei Tasten Auf und Ab (im Lauf steht an einer davon Stopp):
+// die App zeigt Ab links und Auf rechts, der Server schickt Auf zuerst.
+function tastenAufAb(it){
+  const c=it.controls;
+  return zeilenAufbau() && !!c && c.length===2 && c.every(x => ZEILE_PFEIL[x.icon] || x.icon==='stop')
+    && c.some(x => ZEILE_PFEIL[x.icon]);
 }
 // Texte der Kachel fuer render() und updateGrid(): Haupttext (.name) und
 // Zweitzeile (.sub). Aufbau "mitte" (Kachel-Set): Haupttext ist der Zustand
 // (neben einem Messwert der, den der Server dazu nennt: "Soll 22,0°"), sonst
 // der Name; die Zweitzeile nennt "Name · Raum" ohne den Teil, der schon
 // Haupttext ist. Beschreibt die Zeile nur (subInfo), bleibt der Name vorn.
+// Aufbau "zeile" genauso, alles einzeilig; ein Messwert steht vor seinem
+// Zustand im Haupttext ("25,4° · Soll 22,0°"), die Beschreibung in der Zweitzeile.
+// Ein Schalter (Wippe) zeigt Ein/Aus an der Wippe: vorn bleibt sein Name.
 function kachelTexte(it){
   const sub=subText(it);
+  if(zeilenAufbau()){
+    const flach=sub.replace(/\n/g,' · '), info=it.subInfo ? flach : '';
+    const zst=(it.subInfo || (it.schalter && /^(Ein|Aus)$/.test(flach))) ? '' : flach;
+    const haupt=it.big!=null ? [String(it.big), zst].filter(Boolean).join(' · ') : zst;
+    const zweit=haupt ? [it.label, info, it.room] : [info, it.room];
+    return {name:haupt||it.label, sub:[...new Set(zweit.filter(Boolean))].join(' · ')};
+  }
   if(kachelAufbau!=='mitte' || !kachelNeu()) return {name:it.label, sub:sub};
   const zustand=(!it.subInfo && sub) ? sub : '';
   const zweit=zustand ? [it.label, it.room] : [sub ? sub.replace(/\n/g,' · ') : '', it.room];
@@ -163,7 +193,7 @@ function updateGrid(items){
     else if(!it.iconUrl && it.icon){ const ic=n.querySelector('.head .ico:not(.img)')||n.querySelector('.ico:not(.img)');
       if(ic && ic._icon!==it.icon){ const h=svg(ICONS[it.icon]||ICONS.info); if(ic._icon!==undefined || ic.innerHTML!==h) ic.innerHTML=h; ic._icon=it.icon; } }
     // Messwert an Stelle des Symbols: kommt oder geht er, aendert sich der Kopf
-    const bigEl=n.querySelector('.bigv'), mitBig=kachelNeu() && it.big!=null;
+    const bigEl=n.querySelector('.bigv'), mitBig=kachelNeu() && !zeilenAufbau() && it.big!=null;
     if(!!bigEl!==mitBig) ok=false;
     else if(bigEl){ const h=bigHtml(it.big); if(bigEl.innerHTML!==h) bigEl.innerHTML=h; }
     // Tasten kommen oder gehen (z. B. Wallbox-Modi erst nach dem Laden der States): neu aufbauen
@@ -171,13 +201,16 @@ function updateGrid(items){
     if(it.controls){ const tbs=n.querySelectorAll('.tctrls .tb');
       if(tbs.length===it.controls.length) it.controls.forEach((c,ci)=>{ const b=tbs[ci]; if(!b) return;
         b._cmd=c.cmd; b._secured=it.secured; b.classList.toggle('an', !!c.on);
-        const nh=svgF(ICONS[c.icon]||ICONS.info); if(b.innerHTML!==nh) b.innerHTML=nh; });
+        const nh=tastenSymbol(c.icon); if(b.innerHTML!==nh) b.innerHTML=nh; });
+      const tc=n.querySelector('.tctrls'); if(tc && tbs.length) tc.classList.toggle('aufab', tastenAufAb(it));
       tastenEinpassen(n); }
     fitTile(n);
     if(!updateTileRing(n,it)) ok=false;   // Positionsring live nachziehen
     // Mini-Verlauf: dazu oder weg -> neu aufbauen, sonst nur bei Aenderung neu zeichnen
-    const spEl=n.querySelector('.tspark'), bdEl=n.querySelector(kachelNeu()?'.tsline':'.tsbadge'), bd=it.spark&&it.spark.badge;
-    if(!!it.spark!==!!spEl || !!bd!==!!bdEl) ok=false;
+    // (Aufbau "zeile" zeigt keinen)
+    const mitSpark=!!it.spark && !zeilenAufbau();
+    const spEl=n.querySelector('.tspark'), bdEl=n.querySelector(kachelNeu()?'.tsline':'.tsbadge'), bd=mitSpark&&it.spark.badge;
+    if(mitSpark!==!!spEl || !!bd!==!!bdEl) ok=false;
     else if(spEl){ paintSpark(spEl,it.spark);
       n.querySelectorAll('.tsbadge,.tsline').forEach(e=>{ if(e.textContent!==bd) e.textContent=bd; }); }
   });
@@ -262,9 +295,12 @@ function rasterLage(groessen, cols, rows){ return LoxRaster.rasterLage(groessen,
 // Groesse einer Kachel im Raster (Punkt 10): breit nur, wo zwei Spalten da sind,
 // hoch (immer auch breit) nur, wo zwei Zeilen da sind; Listen kennen beides nicht
 function kachelGroesse(it){
-  if(view && view.layout==='list') return {w:1, h:1};
+  if((view && view.layout==='list') || zeilenAufbau()) return {w:1, h:1};
   return LoxRaster.groesse({w:it.w===2?2:1, h:it.h===2?2:1}, gridCols, gridRows);
 }
+// ... vor dem Raster (dessen Rechnung die Groessen braucht): wie eingestellt,
+// im Aufbau "zeile" ist jede Kachel eine Zeile
+function kachelGroesseRoh(it){ return zeilenAufbau() ? {w:1, h:1} : {w:it.w===2?2:1, h:it.h===2?2:1}; }
 function kachelKlassen(g){ return (g.w===2?' w2':'')+(g.h===2?' h2':''); }
 // Breite Kachel mit Tasten im neuen Aufbau: rechts die Spieler-Spalte (Cover
 // und Tasten, CSS .spieler), nicht in der Liste und nicht im klassischen Aufbau
@@ -304,7 +340,10 @@ function autoRaster(widget){
     tabsH:links ? 0 : (tabs?tabs.offsetHeight:0), railW:railW,
     rahmenX:scs ? px(scs.paddingLeft)+px(scs.paddingRight)-railW : 0, rahmenY:scs ? px(scs.paddingTop)+px(scs.paddingBottom) : 0,
     kopfH:kopfHoehe, leisteH:leisteHoehe, widget:widget, paneCols:paneCols, paneShare:paneShare,
-    breiten:_lastBreiten, seitenQuer:seitenQuer()});
+    breiten:_lastBreiten, seitenQuer:seitenQuer(),
+    // Aufbau "zeile" (Kachel-Set): Zeilen und Spalten aus den Massen des Sets
+    zeile:kachelAufbau==='zeile' ? {h:LoxRaster.setMass(kachelMasse, '--zeile-h', vp.w, 72),
+                                    spalte:LoxRaster.setMass(kachelMasse, '--zeile-spalte', vp.w, 420)} : null});
 }
 // Lage + Raster als Vergleichswert fuer den resize-Nachzug (s. render()).
 // Dazu die Blaetterrichtung (seitenQuer): ein Fenster, das quer ueber die
@@ -335,7 +374,7 @@ function render(){
   _lastWidget = _widget;
   // Kacheln der Seite mit ihrer Breite (fuer das Wachsen im automatischen
   // Raster): keine auf Widget-, Front- und Listenseiten
-  _lastBreiten = (!view.widget && !view.front && view.layout!=='list') ? katSichtbar(view.items||[]).map(it=>({w:it.w===2?2:1, h:it.h===2?2:1})) : [];
+  _lastBreiten = (!view.widget && !view.front && view.layout!=='list') ? katSichtbar(view.items||[]).map(kachelGroesseRoh) : [];
   schmalEinrichten();   // Masse fuer schmale Schirme (Kachel-Set) vor der Rasterrechnung
   _lastRaster = rasterKey(_widget);
   [gridCols, gridRows] = rasterFuer(_widget);
@@ -397,12 +436,16 @@ function render(){
             (posv>0 ? '<circle class="val" cx="50" cy="50" r="46" stroke-dasharray="'+
               ringDash(posv)+'"/>' : '')+
           '</g></svg>'+icoHtml+'</span>';
-    const lx = kachelNeu(), tx = kachelTexte(it), sub = tx.sub;
-    // Aufbau "kreis" (Kachel-Set): das Symbol steht in einem Kreis
-    const kopf = (lx && it.big!=null) ? '<span class="bigv">'+bigHtml(it.big)+'</span>'
+    const lx = kachelNeu(), zl = zeilenAufbau(), tx = kachelTexte(it), sub = tx.sub;
+    // Aufbau "kreis" (Kachel-Set): das Symbol steht in einem Kreis; Aufbau
+    // "zeile": immer das Symbol, der Messwert steht im Text
+    const kopf = (lx && !zl && it.big!=null) ? '<span class="bigv">'+bigHtml(it.big)+'</span>'
       : (lx && kachelAufbau==='kreis') ? '<span class="kreis">'+icoCell+'</span>' : icoCell;
     const chev = (!lx && it.nav && !it.controls) ? '<span class="chev">'+svg('<path d="m9 6 6 6-6 6"/>')+'</span>' : '';
-    const tasten = it.controls ? '<div class="tctrls">'+it.controls.map((c,i)=>'<span class="tb'+(c.on?' an':'')+'" data-c="'+i+'">'+svgF(ICONS[c.icon]||ICONS.info)+'</span>').join('')+'</div>' : '';
+    // Aufbau "zeile": ein Schalter zeigt rechts die Wippe der Loxone-App (.zschalter,
+    // Stellung aus .on der Kachel) - kein .tctrls, der Tipp gilt der ganzen Zeile.
+    const tasten = it.controls ? '<div class="tctrls'+(tastenAufAb(it)?' aufab':'')+'">'+it.controls.map((c,i)=>'<span class="tb'+(c.on?' an':'')+'" data-c="'+i+'">'+tastenSymbol(c.icon)+'</span>').join('')+'</div>'
+      : (zeilenAufbau() && it.schalter) ? '<div class="zschalter"><i></i></div>' : '';
     const ctrls = spielerKachel(it, groessen[_i])
       ? '<div class="tplay">'+(it.cover?'<img class="tcover" src="'+esc(it.cover)+'" alt="">':'')+tasten+'</div>' : tasten;
     const tone = tileTone(it);
@@ -419,11 +462,11 @@ function render(){
     // im Text (im Kopf stuende sie neben dem Raum).
     const kachel = '<div class="tile'+tone+aufbauKlassen(it)+kachelKlassen(groessen[_i])+spielerKlasse(it, groessen[_i])+(snapAt(_i)?' snap':'')+'" data-id="'+esc(it.id)+'"'+(it.catKey?' data-cat="'+esc(it.catKey)+'"':'')+st+'>'+
               '<div class="head">'+kopf+(!lx&&it.spark&&it.spark.badge?'<span class="tsbadge">'+esc(it.spark.badge)+'</span>':'')+
-                (lx&&it.room&&kachelAufbau!=='mitte'?'<span class="room">'+esc(it.room)+'</span>':'')+chev+'</div>'+
-              (it.spark?'<div class="tspark"></div>':'')+
+                (lx&&it.room&&kachelAufbau!=='mitte'&&!zl?'<span class="room">'+esc(it.room)+'</span>':'')+chev+'</div>'+
+              (it.spark&&!zl?'<div class="tspark"></div>':'')+
               '<div class="body">'+
               (!lx&&it.room?'<div class="room">'+esc(it.room)+'</div>':'')+
-              (it.spark&&it.spark.badge?'<div class="room tsline">'+esc(it.spark.badge)+'</div>':'')+
+              (it.spark&&it.spark.badge&&!zl?'<div class="room tsline">'+esc(it.spark.badge)+'</div>':'')+
               '<div class="name"'+nst+'>'+esc(tx.name)+'</div>'+
               (sub?'<div class="sub">'+esc(sub)+'</div>':'')+'</div>'+
               ctrls+

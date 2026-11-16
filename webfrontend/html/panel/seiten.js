@@ -35,10 +35,12 @@ function renderTabs(){
              : (roomCatTabs && roomCatTabs.length ? roomCatTabs : null);
   // Seitenleiste (Kachel-Set "links"): Symbol und Name, Zurueck steht unten.
   // Mit Kachel-Set ist Zurueck ein Symbol wie die Tabs, ohne den Kreis.
-  const links = kachelLeiste==='links';
-  const nm = t => links ? '<span class="tnm">'+esc(t||'')+'</span>' : '';
+  // Leiste "reiter": Symbol und Name nebeneinander in der Pille, Zurueck als
+  // runder Knopf ohne Namen rechts daneben - er zaehlt nicht zur Pille.
+  const links = kachelLeiste==='links', reiter = kachelLeiste==='reiter';
+  const nm = t => (links || reiter) ? '<span class="tnm">'+esc(t||'')+'</span>' : '';
   const backHtml = '<div class="tabback'+(stack.length>1?' on':'')+'" id="tabback">'+
-    (kachelLeiste ? svg('<path d="M15 5l-7 7 7 7"/>')+nm('Zurück') : '‹')+'</div>';
+    (kachelLeiste ? svg('<path d="M15 5l-7 7 7 7"/>')+(links ? nm('Zurück') : '') : '‹')+'</div>';
   let items;
   if(ct){
     const tabsHtml = ct.map(c => {
@@ -48,13 +50,14 @@ function renderTabs(){
       const ico = c.iconUrl
         ? '<span class="tico" style="--u:url(\''+esc(c.iconUrl)+'\')"></span>'
         : '<span class="tlbl">'+esc(c.label||'')+'</span>';
-      return '<div class="tab'+(katFilter===c.key?' active':'')+'" data-cat="'+esc(c.key)+'" title="'+esc(c.label||'')+'">'+ico+nm(c.label)+'</div>';
+      // "reiter" ohne Bild: der Name steht schon als .tlbl da, nicht doppelt.
+      return '<div class="tab'+(katFilter===c.key?' active':'')+'" data-cat="'+esc(c.key)+'" title="'+esc(c.label||'')+'">'+ico+((reiter && !c.iconUrl) ? '' : nm(c.label))+'</div>';
     });
     // Zurueck-Button IMMER mittig: links ceil(N/2), rechts floor(N/2) Tabs; die
     // fehlende Zelle rechts mit einem leeren Spacer auffuellen, damit beide
     // Seiten gleich breit sind (1->links, 2->je einer, 3->2+1, 4->symmetrisch).
     const N=tabsHtml.length, leftN=Math.ceil(N/2), pad=leftN-(N-leftN);
-    if(links) items = tabsHtml.concat([backHtml]);
+    if(links || reiter) items = tabsHtml.concat([backHtml]);
     else {
       items = tabsHtml.slice(0,leftN).concat([backHtml]).concat(tabsHtml.slice(leftN));
       for(let s=0;s<pad;s++) items.push('<div class="tabspacer" aria-hidden="true"></div>');
@@ -86,10 +89,10 @@ function renderTabs(){
         : svg(fallback);
       return '<div class="'+cls+'" data-tab="'+esc(tk)+'" title="'+esc(m.label||'')+'">'+ico+nm(m.label)+'</div>';
     }).filter(Boolean);
-    items.splice(links ? items.length : Math.floor(items.length/2), 0, backHtml);
+    items.splice((links || reiter) ? items.length : Math.floor(items.length/2), 0, backHtml);
   }
   el('tabs').innerHTML = items.join('');
-  el('tabs').style.setProperty('--tab-n', items.length);   // Pille so breit wie ihre Eintraege (--pille-tab-breite)
+  el('tabs').style.setProperty('--tab-n', items.length-(reiter?1:0));   // Pille so breit wie ihre Eintraege (--pille-tab-breite)
   if(ct) el('tabs').querySelectorAll('.tab[data-cat]').forEach(n => n.onclick=()=>katTipp(n.dataset.cat));
   else   el('tabs').querySelectorAll('.tab').forEach(n => n.onclick=()=>goTab(n.dataset.tab));
   const tb = el('tabs').querySelector('#tabback'); if(tb) tb.onclick = back;

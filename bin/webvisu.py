@@ -63,7 +63,7 @@ from ansicht import Ansicht  # noqa: E402  # Profil, Theme, Export
 from seiten import Seiten  # noqa: E402  # Seiten, Kacheln, Detailseiten
 # Routen-Handler je Thema (routen/); main() traegt sie unten in die Routentabelle ein.
 from routen.oberflaeche import (  # noqa: E402
-    config_css, config_index, config_js, i18n_js, index, panel_teil, raster_js, settings_index)
+    config_css, config_index, config_js, i18n_js, index, panel_teil, raster_js, schrift, settings_index)
 from routen.visu import ws_handler  # noqa: E402
 from routen.konfigurator import (  # noqa: E402
     api_entwurf, api_kachelset, api_meta, api_save_panels, api_save_theme, api_types)
@@ -433,6 +433,7 @@ def main() -> None:
     a.router.add_get("/config.css", config_css)
     a.router.add_get("/config/{name}", config_js)
     a.router.add_get("/panel/{name}", panel_teil)
+    a.router.add_get("/schrift/{name}", schrift)
     a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_get("/api/kachelset", api_kachelset)

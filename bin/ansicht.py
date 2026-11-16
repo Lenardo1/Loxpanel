@@ -27,6 +27,18 @@ def _kachel_klassisch(ui: dict) -> bool:
     return ui.get("tileLayout") == "classic" and not _clean_kachel_set(ui.get("tileSet"))
 
 
+def _ui_mit_vorgaben(vorgaben: dict, eigen: dict) -> dict:
+    """Vorgaben, vom Profil ueberschrieben. Groessen, die das Kachel-Set
+    mitbringt, gehen dabei vor die der Vorgaben: sein Aufbau ist auf sie
+    ausgelegt (Zeilenhoehe, Kreis). Erst eine Groesse am Profil schlaegt sie."""
+    ui = {**vorgaben, **eigen}
+    _set = theme_colors.KACHEL_SETS.get(_clean_kachel_set(ui.get("tileSet")) or "") or {}
+    for k in _set.get("groessen") or {}:
+        if not eigen.get(k):
+            ui.pop(k, None)
+    return ui
+
+
 def _hex_rgb(value) -> str | None:
     """#RRGGBB / #RGB -> \"r,g,b\" (fuer rgba() mit variabler Deckkraft). None bei ungueltig."""
     h = str(value or "").lstrip("#")
@@ -221,7 +233,8 @@ class Ansicht:
                 v["--on-accent"] = theme_colors.schrift_auf(_gewaehlt("good"))
         # Groessen in px: Panel, sonst global, sonst der Standard des Kachel-Aufbaus
         std = GROESSEN_STANDARD["classic" if _kachel_klassisch(ui) else "neu"]
-        # ... ein Kachel-Set bringt eigene Standardgroessen mit (KACHEL_SETS "groessen")
+        # ... ein Kachel-Set bringt eigene Standardgroessen mit (KACHEL_SETS "groessen"),
+        # sie gehen vor die globalen (_ui_mit_vorgaben)
         _ks_e = theme_colors.KACHEL_SETS.get(_clean_kachel_set(ui.get("tileSet")) or "") or {}
         std = {**std, **(_ks_e.get("groessen") or {})}
         for _var, _key in (("--ico-size", "iconSize"), ("--name-size", "nameSize"),
@@ -289,7 +302,7 @@ class Ansicht:
         prof = entwurf if entwurf is not None else \
             (self.panels.get(pid or "") or self.panels.get("default") or {})
         pid = pid if pid and (entwurf is not None or pid in self.panels) else "default"
-        ui = {**self.theme.get("ui", {}), **(prof.get("ui") or {})}
+        ui = _ui_mit_vorgaben(self.theme.get("ui", {}), prof.get("ui") or {})
         states = {**self.theme.get("states", {}), **(prof.get("states") or {})}
         tabs = [t for t in (prof.get("tabs") or ui.get("tabs") or []) if _is_tab(t)] or \
             ["favoriten", "zentral", "raeume", "kategorien"]
@@ -331,8 +344,11 @@ class Ansicht:
             "tileSetLeiste": theme_colors.kachel_set_art(_clean_kachel_set(ui.get("tileSet")))[1],
             # Automatisches Raster: Zielgroesse einer Kachel in px; 0 = festes
             # Raster aus cols/rows (4"-Panel und jedes Profil ohne "auto").
+            # Ein Kachel-Set mit Aufbau "zeile" rechnet Zeilen und Spalten immer
+            # selbst (raster.js autoRaster, Option zeile), auch ohne "auto".
             "gridAuto": ((_clean_kachelziel(ui.get("tileSize")) or KACHEL_ZIEL_STANDARD)
-                         if ui.get("grid") == "auto" else 0),
+                         if (ui.get("grid") == "auto" or theme_colors.kachel_set_art(
+                             _clean_kachel_set(ui.get("tileSet")))[0] == "zeile") else 0),
             # Feste Breite des Widgets im automatischen Raster in Kachelspalten
             # (hochkant Zeilen); 0 = Automatik, rund PANE_ANTEIL der Spalten.
             "paneCols": _clean_pane_spalten(ui.get("paneCols")) or 0,

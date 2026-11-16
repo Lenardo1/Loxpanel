@@ -1,4 +1,17 @@
 /* LoxPanel-Visu, Stylesheet grund.css: Grundgeruest: Kasten, Panes, Kopfzeile und Werteleiste, Kachelfeld, Kacheln, Kachel-Sets, Leisten. Geladen aus panel.html als /panel/grund.css, in dieser Reihenfolge. */
+  /* Schrift des Kachel-Sets "Loxone-App (Zeilen)" (--font): Figtree, SIL Open
+     Font License 1.1 (schrift/OFL.txt), ausgeliefert vom Server (/schrift/).
+     Die Loxone-App setzt eine eigene, geschuetzte Schrift; Figtree kommt ihr
+     am naechsten. size-adjust gleicht die Laufweite an, die Overrides die
+     Lage der Grundlinie in der Zeile (Ober-/Unterlaenge der App-Schrift;
+     sie zaehlen vom mit size-adjust verkleinerten Schriftgrad). Geladen wird
+     die Datei erst, wenn ein Set die Schrift auch nennt. */
+  @font-face{font-family:"Figtree";font-style:normal;font-weight:400;font-display:swap;
+    src:url(/schrift/figtree-latin-400-normal.woff2) format("woff2");
+    size-adjust:98.6%;ascent-override:92.7%;descent-override:18.59%;line-gap-override:0%;}
+  @font-face{font-family:"Figtree";font-style:normal;font-weight:600;font-display:swap;
+    src:url(/schrift/figtree-latin-600-normal.woff2) format("woff2");
+    size-adjust:98.5%;ascent-override:85%;descent-override:26.29%;line-gap-override:0%;}
   :root{
     /* Sichtbare Hoehe: 100dvh folgt auf iOS/Android den ein- und ausfahrenden
        Browser-Leisten, 100vh ist dort die groesste Hoehe und schneidet die
@@ -801,8 +814,8 @@
   /* Kachel-Sets (ui.tileSet, theme_colors.KACHEL_SETS): ein fertiger Look.
      Farben und Masse kommen als Variablen mit der theme-Nachricht, die Regeln
      haengen an der Art des Sets, nie an seinem Namen: html[data-kachelset-
-     aufbau] (Kachel: lx, mitte, kreis) und html[data-kachelset-leiste]
-     (Tab-Leiste: pille, oben, links). Ohne Set fehlen beide Attribute.
+     aufbau] (Kachel: lx, mitte, kreis, zeile) und html[data-kachelset-leiste]
+     (Tab-Leiste: pille, oben, links, reiter). Ohne Set fehlen beide Attribute.
      Masse mit "-schmal" gelten auf schmalen Schirmen (.schmal am Kasten,
      schmalEinrichten), die der Tab-Leiste auch auf niedrigen (.niedrig);
      die --k-* am Kasten loesen das auf (ein Mass, das sich selbst als
@@ -816,12 +829,14 @@
   html[data-kachelset-aufbau] .screen{box-shadow:none;
     --k-abstand:var(--kachel-abstand,10px);--k-innen:var(--feld-innen,10px);
     --k-tabs-h:var(--tabs-hoehe,auto);--k-tab-symbol:var(--tab-symbol,28px);--k-pille-h:var(--pille-h,43px);
+    --k-zeile-h:var(--zeile-h,72px);
     --k-rahmen-seite:var(--rahmen-seite,0px);--k-rahmen-unten:var(--rahmen-unten,0px);--k-feld-radius:var(--feld-radius,0px);
     --k-rail:var(--rail-breite,0px);--k-kreis:var(--kreis-d,52px);}
   html[data-kachelset-aufbau] .screen.schmal{
     --k-abstand:var(--kachel-abstand-schmal,var(--kachel-abstand,10px));--k-innen:var(--feld-innen-schmal,var(--feld-innen,10px));
     --k-tabs-h:var(--tabs-hoehe-schmal,var(--tabs-hoehe,auto));--k-tab-symbol:var(--tab-symbol-schmal,var(--tab-symbol,28px));
     --k-pille-h:var(--pille-h-schmal,var(--pille-h,43px));
+    --k-zeile-h:var(--zeile-h-schmal,var(--zeile-h,72px));
     --k-rahmen-seite:var(--rahmen-seite-schmal,var(--rahmen-seite,0px));--k-rahmen-unten:var(--rahmen-unten-schmal,var(--rahmen-unten,0px));
     --k-feld-radius:var(--feld-radius-schmal,var(--feld-radius,0px));
     --k-rail:var(--rail-breite-schmal,var(--rail-breite,0px));--k-kreis:var(--kreis-d-schmal,var(--kreis-d,52px));}
@@ -919,16 +934,19 @@
   html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .bigv small{color:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
   html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .ico.img{background-color:var(--kachel-an-ink,var(--ink));}
   html[data-kachelset-aufbau="mitte"] .grid.lx:not(.list) .tile.on .tspark .mm{fill:var(--kachel-an-muted,var(--kachel-an-ink,var(--ink)));}
-  /* Leisten pille und oben: Hoehe und Symbole aus dem Set (--tabs-hoehe,
-     --tab-symbol); autoRaster misst die Leiste, rechnet also mit. Der
-     Zurueck-Knopf ist ein Symbol wie die Tabs (renderTabs). */
+  /* Leisten pille, oben und reiter: Hoehe und Symbole aus dem Set
+     (--tabs-hoehe, --tab-symbol); autoRaster misst die Leiste, rechnet also
+     mit. Der Zurueck-Knopf ist ein Symbol wie die Tabs (renderTabs). */
   html[data-kachelset-leiste="pille"] #tabs,
-  html[data-kachelset-leiste="oben"] #tabs{height:var(--k-tabs-h,auto);align-items:stretch;}
+  html[data-kachelset-leiste="oben"] #tabs,
+  html[data-kachelset-leiste="reiter"] #tabs{height:var(--k-tabs-h,auto);align-items:stretch;}
   html[data-kachelset-leiste="pille"] .tab,
   html[data-kachelset-leiste="oben"] .tab{padding:0;}
   html[data-kachelset-leiste="pille"] .tab svg,html[data-kachelset-leiste="pille"] .tab .tico,
   html[data-kachelset-leiste="oben"] .tab svg,html[data-kachelset-leiste="oben"] .tab .tico,
-  html[data-kachelset-leiste="pille"] .tabback svg,html[data-kachelset-leiste="oben"] .tabback svg{
+  html[data-kachelset-leiste="reiter"] .tab svg,html[data-kachelset-leiste="reiter"] .tab .tico,
+  html[data-kachelset-leiste="pille"] .tabback svg,html[data-kachelset-leiste="oben"] .tabback svg,
+  html[data-kachelset-leiste="reiter"] .tabback svg{
     width:var(--k-tab-symbol,28px);height:var(--k-tab-symbol,28px);}
   html[data-kachelset-leiste="pille"] .tabback,
   html[data-kachelset-leiste="oben"] .tabback{flex:1;align-self:stretch;width:auto;height:auto;margin:0;border:0;border-radius:0;
@@ -1084,3 +1102,104 @@
   html[data-kachelset-leiste="links"] .tabspacer{display:none;}
   html[data-kachelset-leiste="links"] .tabback{margin:auto 0 0;width:auto;border:0;background:transparent;font-size:inherit;}
   html[data-kachelset-leiste="links"] .tabback.on{color:var(--ink);}
+  /* Aufbau "zeile" (wie die Loxone-App, Masse dort ausgemessen): jede Kachel
+     eine flache Zeile fester Hoehe (--zeile-h) - Symbol links, daneben fett
+     der Zustand (ohne Zustand der Name) und grau darunter der Name, die
+     Tasten rechts auf dunkler Flaeche. autoRaster zaehlt aus --zeile-h und
+     --zeile-spalte nur, wie viele Zeilen und Spalten passen (Option zeile),
+     der Rest der Hoehe bleibt unten frei; jede Kachel ist 1x1, die Texte
+     ordnet kachelTexte(). Die Zeile scheint durch (--kachel-flaeche) und
+     liegt auf dem Verlauf des Feldes (--feld-verlauf). Der Text bleibt weiss
+     und grau, die Farbe des Zustands traegt nur das Symbol; ein zu langer
+     Text endet mit "...". Der Positionsring entfaellt, die Stellung steht im
+     Text. crit behaelt seine Regeln. */
+  html[data-kachelset-aufbau="zeile"] .screen{background:var(--feld-verlauf,var(--screen));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list):not(.hpages){align-content:start;
+    grid-auto-rows:min(var(--k-zeile-h,72px), calc((100% - (var(--rows,2) - 1) * var(--gap)) / var(--rows,2)));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list).hpages .page{align-content:start;
+    grid-template-rows:repeat(var(--rows,2),minmax(0,var(--k-zeile-h,72px)));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list).snapy{scroll-padding-top:var(--pad);}
+  /* Symbol 16 px vom Rand, Text 20 px daneben, Tasten 12 px vom rechten Rand - der Rahmen zaehlt mit */
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile{flex-direction:row;align-items:center;justify-content:flex-start;
+    gap:20px;padding:0 calc(12px - var(--tile-bw,1px)) 0 calc(16px - var(--tile-bw,1px));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile:not(.crit){background:var(--kachel-flaeche,var(--tile));border-color:transparent;}
+  /* gedrueckt hellt die Zeile auf statt zu schrumpfen - nicht, wenn der Finger auf einer Taste liegt */
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile:active{transform:none;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile:not(.crit):active:not(:has(.tb:active)){background:rgba(var(--wash,255,255,255),.15);}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile .head{flex:0 0 auto;align-items:center;justify-content:center;
+    width:calc(var(--ico-size,32px) * var(--ks,1));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile .posring{display:none;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile .body{order:0;flex:1 1 auto;min-width:0;margin-top:0;}
+  /* Laufweite am Tablet gemessen (WebView setzt Buchstaben auf Bruchteile von
+     Pixeln, ohne Sperrung liefe der Titel 2 % schmaler als in der App) */
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile .name{display:block;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;font-weight:600;line-height:1.3333;letter-spacing:.0105em;word-spacing:-.08em;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile .sub{display:block;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;margin-top:0;font-weight:400;line-height:1.2857;letter-spacing:.005em;word-spacing:-.1em;color:var(--muted);}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile.crit .sub{color:var(--crit-muted,var(--muted));}
+  /* Tasten 44 px mit 6 px Abstand; Auf/Ab stehen wie in der App: Ab links,
+     Auf rechts (.aufab aus render()), die Pfeile als duenner Winkel (zauf/zab) */
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls{order:0;flex:0 0 auto;margin:0;padding:0;gap:6px;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls.aufab{flex-direction:row-reverse;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls .tb{flex:0 0 auto;width:44px;height:44px;
+    border-radius:var(--taste-radius,8px);background:var(--taste-flaeche,var(--taste,var(--tile)));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls .tb:active{background:rgba(var(--wash,255,255,255),.15);}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls .tb svg{width:21px;height:21px;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.tctrls .tb svg[stroke]{stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;}
+  /* Schalter (.zs, render()): rechts die Wippe der App - ein Feld wie eine
+     Taste, darin ein schmaler Knopf, aus links und weiss, an rechts und
+     gruen. Getippt wird wie immer auf die ganze Zeile. Den Zustand zeigt die
+     Wippe, "Ein"/"Aus" steht darum nicht im Text (kachelTexte). */
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.zschalter{flex:0 0 auto;width:44px;height:44px;padding:5px;
+    border-radius:10px;background:var(--taste-flaeche,var(--taste,var(--tile)));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile>.zschalter i{display:block;width:13px;height:34px;
+    border:2px solid rgba(var(--wash,255,255,255),.4);border-radius:8px;background:var(--ink) padding-box;
+    transition:transform .2s,background-color .2s;}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile.on>.zschalter i{background-color:var(--good);transform:translateX(19.5px);}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile.zs.on .ico,
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile.zs.on .icowrap{color:var(--ico-fixed,var(--good));}
+  html[data-kachelset-aufbau="zeile"] .grid.lx:not(.list) .tile.zs.on .ico.img{background-color:var(--ico-fixed,var(--good));}
+  /* Leiste "reiter" (wie die Loxone-App, Masse dort ausgemessen): unten eine
+     Pille (--pille-h) mit Symbol und Name je Tab, der aktive Tab gefuellt
+     (--tab-an-flaeche, Schrift --tab-an-ink), die anderen in --tab-aus. Die
+     Pille steht oben in der Leiste und allein in der Mitte des Schirms, der
+     Rest der Leistenhoehe ist der Abstand zum Rand; Zurueck ist ein runder
+     Knopf rechts daneben und zaehlt nicht zu --tab-n (renderTabs). Die Pille
+     ist wie bei "pille" nur ein ::before, breit je Tab --pille-tab-breite
+     plus ihr Innenrand; die Tabs sind darin gleich breit. Schmal stehen
+     Pille und Knopf zusammen in der Mitte, und nur der aktive Tab zeigt
+     seinen Namen. Die Farbe der Bild-Symbole (.tico, Maske) steht direkt an
+     der Variable, nicht ueber currentColor. */
+  html[data-kachelset-leiste="reiter"] #tabs{align-items:flex-start;}
+  html[data-kachelset-leiste="reiter"] .tabs{position:relative;border-top:0;background:transparent;
+    --reiter-knopf:var(--k-pille-h,68px);--reiter-luecke:30px;--reiter-innen:4px;
+    --reiter-neben:calc(var(--reiter-knopf) + var(--reiter-luecke));
+    --pille-b:min(100% - 24px - 2 * var(--reiter-neben), var(--tab-n,4) * var(--pille-tab-breite,170px) + 2 * var(--reiter-innen));
+    --pille-rand:calc((100% - var(--pille-b)) / 2);
+    padding-left:calc(var(--pille-rand) + var(--reiter-innen));padding-right:calc(var(--pille-rand) - var(--reiter-neben));}
+  html[data-kachelset-leiste="reiter"] .screen.schmal .tabs{--reiter-luecke:10px;
+    --pille-b:min(100% - 24px - var(--reiter-neben), var(--tab-n,4) * var(--pille-tab-breite,170px) + 2 * var(--reiter-innen));
+    --pille-rand:calc((100% - var(--pille-b) - var(--reiter-neben)) / 2);
+    padding-right:var(--pille-rand);}
+  html[data-kachelset-leiste="reiter"] .tabs::before{content:"";position:absolute;z-index:0;pointer-events:none;
+    top:0;height:var(--k-pille-h,68px);left:var(--pille-rand);width:var(--pille-b);
+    border-radius:999px;background:var(--tabbar);}
+  html[data-kachelset-leiste="reiter"] .tabs>*{position:relative;z-index:1;}
+  html[data-kachelset-leiste="reiter"] .tab{flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;
+    gap:15px;height:calc(var(--k-pille-h,68px) - 2 * var(--reiter-innen));margin:var(--reiter-innen) 0 0;padding:0 10px;
+    border-radius:999px;color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="reiter"] .tab svg,html[data-kachelset-leiste="reiter"] .tab .tico{flex:none;}
+  html[data-kachelset-leiste="reiter"] .tab .tico{background-color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="reiter"] .tab .tnm,
+  html[data-kachelset-leiste="reiter"] .tab .tlbl{display:block;min-width:0;max-width:none;padding:0;font-size:var(--tab-schrift,15px);font-weight:400;
+    line-height:1.2857;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;overflow-wrap:normal;}
+  html[data-kachelset-leiste="reiter"] .tab.active{background:var(--tab-an-flaeche,var(--accent));
+    color:var(--tab-an-ink,var(--on-accent));}
+  html[data-kachelset-leiste="reiter"] .tab.active .tico{background-color:var(--tab-an-ink,var(--on-accent));}
+  html[data-kachelset-leiste="reiter"] .screen.schmal .tab{flex:1 1 auto;gap:8px;padding:0 6px;}
+  html[data-kachelset-leiste="reiter"] .screen.schmal .tab:not(.active) .tnm{display:none;}
+  html[data-kachelset-leiste="reiter"] .tabback{flex:0 0 var(--reiter-knopf);align-self:flex-start;
+    width:var(--reiter-knopf);height:var(--reiter-knopf);margin:0 0 0 calc(var(--reiter-luecke) + var(--reiter-innen));
+    border:0;border-radius:50%;background:var(--tabbar);color:var(--tab-aus,var(--muted));}
+  html[data-kachelset-leiste="reiter"] .tabback.on{color:var(--ink);background:var(--tabbar);}
+  html[data-kachelset-leiste="reiter"] .screen.kopf .kopfzeile{background:transparent;border-bottom-color:transparent;}

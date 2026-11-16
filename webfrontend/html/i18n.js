@@ -836,6 +836,9 @@
       'Touch (Farbton wählbar)': 'Touch (choose a hue)',
       'Kacheln in einem Farbton, Symbol mittig, die aktive Kachel kippt ganz um; die Tab-Leiste steht nur mit Symbolen oben.':
         'Tiles in one hue, icon centred, the active tile flips completely; the tab bar sits at the top with icons only.',
+      'Loxone-App (Zeilen)': 'Loxone app (rows)',
+      'Flache breite Zeilen wie in der Loxone-App: Symbol links, Zustand und Name daneben, Tasten rechts; die Tab-Leiste als Pille mit Namen, der aktive Tab grün gefüllt.':
+        'Flat wide rows as in the Loxone app: icon on the left, state and name next to it, buttons on the right; the tab bar as a pill with names, the active tab filled green.',
       'Kreide (hell)': 'Chalk (light)',
       'Weiße Kacheln auf hellem Grund, das Symbol im Kreis, die Tabs als Seitenleiste links.':
         'White tiles on a light background, the icon in a circle, the tabs as a sidebar on the left.',
@@ -971,6 +974,7 @@
       'Größe': 'Size',
       'Auf diesem Gerät zeigt die Visu sie': 'On this device the visu shows it as',
       'dafür fehlen Spalten oder Zeilen.': 'there are not enough columns or rows for more.',
+      'Dieses Kachel-Set zeigt jede Kachel als Zeile, eine Größe gibt es nicht.': 'This tile set shows every tile as a row, there is no size to choose.',
       'Reihenfolge': 'Order',
       'nach vorn': 'forward',
       'nach hinten': 'backward',
@@ -1030,6 +1034,8 @@
       'Gilt für alle Ansichten, die unter Verhalten nichts eintragen.': 'Applies to all views that leave it empty under Behaviour.',
       'Baustein nicht mehr in der Anlage': 'Block no longer in the installation',
       'aus den Vorgaben': 'from the defaults',
+      'vom Kachel-Set': 'from the tile set',
+      'vom Kachel-Set in {liste}': 'from the tile set in {liste}',
       'aus der Ansicht {a}': 'from the view {a}',
       'Ansicht {a}': 'view {a}',
       'gilt für {n} von {m} Ansichten': 'applies to {n} of {m} views',

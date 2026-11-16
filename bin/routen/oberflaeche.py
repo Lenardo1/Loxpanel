@@ -27,6 +27,7 @@ RASTER_JS = _WEB / "raster.js"   # Rasterrechnung fuer Visu und Konfigurator (Pu
 CONFIG_CSS = _WEB / "config.css"  # Stylesheet des Konfigurators
 CONFIG_JS = _WEB / "config"       # die Teile des Konfigurator-Skripts, config.html laedt sie der Reihe nach
 PANEL_TEILE = _WEB / "panel"      # Stylesheets und Skriptteile der Visu, panel.html laedt sie der Reihe nach
+SCHRIFTEN = _WEB / "schrift"      # Schriftdateien der Kachel-Sets (woff2), grund.css bindet sie ein
 
 
 def _web_file(path: Path, ctype: str) -> web.Response:
@@ -92,6 +93,25 @@ async def panel_teil(request: web.Request) -> web.Response:
     if not m:
         raise web.HTTPNotFound()
     return _web_file(PANEL_TEILE / name, _TEIL_TYPEN[m.group(1)])
+
+
+_SCHRIFT_NAME = re.compile(r"^[a-z][a-z0-9-]*\.woff2$")
+
+
+async def schrift(request: web.Request) -> web.Response:
+    """Eine Schriftdatei der Visu (webfrontend/html/schrift/<name>.woff2), die
+    ein Kachel-Set mitbringt (--font). Nur schlichte Namen, damit kein Pfad
+    aus dem Ordner herausfuehrt; die Datei aendert sich nur mit dem Image und
+    darf darum im Browser liegen bleiben."""
+    name = request.match_info["name"]
+    if not _SCHRIFT_NAME.match(name):
+        raise web.HTTPNotFound()
+    try:
+        daten = (SCHRIFTEN / name).read_bytes()
+    except OSError:
+        raise web.HTTPNotFound()
+    return web.Response(body=daten, content_type="font/woff2",
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 async def settings_index(request: web.Request) -> web.Response:
