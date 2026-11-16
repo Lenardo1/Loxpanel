@@ -129,8 +129,14 @@ function festesRaster(e){
 // teilen sich den Rest; Spalten werden dabei weniger, keine wird abgeschnitten.
 // Ein Rahmen um das Feld (Leiste "oben": rahmenX links und rechts zusammen,
 // rahmenY unten) geht genauso ab.
+// Flache Zeilen (Kachel-Set mit Aufbau "zeile", e.zeile = {h, spalte}): statt
+// etwa quadratischer Kacheln so viele Spalten, wie mit der Mindestbreite
+// spalte nebeneinander passen, und so viele Zeilen, wie mit der Hoehe h
+// passen. Die Zeile ist genau h hoch (das CSS setzt sie fest, --k-zeile-h),
+// der Rest der Hoehe bleibt unten frei, der Kachelfaktor ist 1; gewachsen und
+// geschrumpft wird nicht: die Seite ist eine Liste, mehr Kacheln heisst blaettern.
 // e: {w, h, ziel, wachsen, gap, pad, tabsH, punkteH, fussH, widget, paneCols,
-//     paneShare, breiten, seitenQuer, kopfH(ks), leisteH(ks), railW, rahmenX, rahmenY}
+//     paneShare, breiten, seitenQuer, kopfH(ks), leisteH(ks), railW, rahmenX, rahmenY, zeile}
 // fussH: Fusszeile mit Hinweis-Symbol (fussH()), die Seitenpunkte stehen darin.
 // -> {cols, rows, k, p, ks, gesamt, kb, hoch, pPx?}: k und p sind die Anteile von
 // Kacheln und Widget an der Aufteilung, pPx die Hoehe des Widgets hochkant.
@@ -143,6 +149,7 @@ function autoRaster(e){
   const gap=e.gap||0, pad=e.pad||0, tabsH=e.tabsH||0, punkteH=e.punkteH||0, fuss=e.fussH||0;
   const widget=!!e.widget, paneCols=e.paneCols||0, paneShare=e.paneShare||0;
   const breiten=e.breiten||[], kopfH=e.kopfH||(()=>0), leisteH=e.leisteH||(()=>0);
+  const zeile=(e.zeile && e.zeile.h>0 && e.zeile.spalte>0) ? e.zeile : null;
   const hoch=hoehe>w;
   const anzahl=(laenge,kachel)=>Math.max(1, Math.round((laenge-2*pad+gap)/(kachel+gap)));
   const abgeben=n=>Math.min(n-1, Math.max(1, paneCols>0 ? paneCols : Math.round(n*paneShare)));
@@ -152,9 +159,19 @@ function autoRaster(e){
   // Kopfzeile wird dann hoechstens ein paar Pixel niedriger).
   const fuer=(gesamt, punkte)=>{
     const kb=(w-2*pad-(gesamt-1)*gap)/gesamt, ksw=kachelFaktorFuer(kb);
-    const h=hoehe-tabsH-kopfH(ksw)-leisteH(ksw)-Math.max(punkte?punkteH:0, fuss);
-    const rows=anzahl(h, kb), zh=(h-2*pad-(rows-1)*gap)/rows;   // zh: Hoehe einer Kachelzeile
-    const ks=kachelFaktorFuer(kb, zh);
+    let rows, zh, ks;   // zh: Hoehe einer Kachelzeile
+    if(zeile){
+      // feste Zeilenhoehe, Faktor 1: so viele Zeilen, wie ganz passen (eine
+      // passt immer, auf einem zu niedrigen Schirm wird sie flacher)
+      ks=1;
+      const h=hoehe-tabsH-kopfH(ks)-leisteH(ks)-Math.max(punkte?punkteH:0, fuss);
+      rows=Math.max(1, Math.floor((h-2*pad+gap)/(zeile.h+gap)));
+      zh=Math.min(zeile.h, (h-2*pad-(rows-1)*gap)/rows);
+    } else {
+      const h=hoehe-tabsH-kopfH(ksw)-leisteH(ksw)-Math.max(punkte?punkteH:0, fuss);
+      rows=anzahl(h, kb); zh=(h-2*pad-(rows-1)*gap)/rows;
+      ks=kachelFaktorFuer(kb, zh);
+    }
     let r;
     if(!widget) r={cols:gesamt, rows:rows, k:1, p:0, ks:ks};
     else if(hoch){   // hochkant: Widget unter den Kacheln, seine Hoehe in px (p Zeilen samt Abstand)
@@ -177,6 +194,7 @@ function autoRaster(e){
     return 3*(zellen-belegt)>zellen;
   };
   const rechne=punkte=>{
+    if(zeile) return fuer(Math.max(1, Math.floor((w-2*pad+gap)/(zeile.spalte+gap))), punkte);
     let r=fuer(anzahl(w, ziel), punkte);
     if((!widget || paneCols>0) && passt(r.cols,r.rows)){
       for(let c=r.gesamt-1; c>=1; c--){

@@ -15,6 +15,29 @@
     <!-- Damit BootReceiver die Kiosk-Anzeige aus dem Hintergrund starten darf
          (umgeht Androids Background-Activity-Launch-Sperre). -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- BLE-Presence-Scanner (eigene Version): Bluetooth-Suche braucht bis
+         Android 11 BLUETOOTH(_ADMIN) und den Standort, ab 12 BLUETOOTH_SCAN. -->
+    <!-- Grundhelligkeit am Geraet einstellen (DisplayEinstellung, eigene Version) -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- BLE-Scanner (FGS Typ location) auch aus dem Hintergrund starten (Hochfahren, App-Update):
+         Android 14 verlangt dafuer Standort im Hintergrund. Erteilen per adb pm grant. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Begleit-Einrichtung: Akku-Optimierung per Systemdialog abschalten -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Andere Apps sehen (Android 11+): StartApp oeffnet eine eingestellte Fremd-App (Loxone). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:label="LoxPanel"
@@ -26,6 +49,7 @@
         <activity
             android:name=".KioskActivity"
             android:exported="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode|navigation|keyboard">
@@ -47,6 +71,12 @@
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- Einrichtung als Begleit-Tablet (eigene Version): ohne adb -->
+        <activity
+            android:name=".BegleiterEinrichtung"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- Status-/Debug-Screen (kein Launcher mehr): via 'adb am start .MainActivity'. -->
         <activity
             android:name=".MainActivity"
@@ -61,14 +91,73 @@
                 android:value="on-device LoxPanel web server for wall-panel kiosk" />
         </service>
 
+        <!-- BLE-Presence-Scanner (eigene Version). Einrichten nur per adb:
+             DUMP hat die adb-Shell, gewoehnliche Apps nicht. -->
+        <service
+            android:name=".BlePresenceService"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:foregroundServiceType="location" />
+
+        <!-- Weckdienst fuers echte Standby (eigene Version): HTTP-Wecken im WallPanel-Format
+             auf Port 2971 und Naeherungssensor bei ausgeschaltetem Display. -->
+        <service
+            android:name=".WachDienst"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="wake the wall-panel display from standby" />
+        </service>
+
+        <!-- Wetter-Einblendung ueber einer fremden App (eigene Version), Einstellen per adb (StartApp). -->
+        <service
+            android:name=".WetterOverlay"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="weather overlay above the home-automation app on a wall panel" />
+        </service>
+
+        <!-- Bedienungshilfe: sieht nur die Loxone-App, blendet das Wetter bei offenem Menue aus (eigene Version). -->
+        <service
+            android:name=".LoxSicht"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lox_sicht" />
+        </service>
+
+        <!-- Begleit-Tablet: Einstellungen aus dem LoxPanel-Konfigurator holen (eigene Version). -->
+        <service
+            android:name=".BegleiterDienst"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="fetch wall-panel settings from the local LoxPanel server" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Fremde App nach dem Hochfahren oeffnen (eigene Version), Einstellen nur per adb. -->
+        <receiver
+            android:name=".StartApp"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
 
         <!-- Geraeteadministrator (nur force-lock) fuers echte Display-Aus bei
              Inaktivitaet. Aktivierung: adb shell dpm set-active-admin com.loxpanel.spike/.LockAdmin -->

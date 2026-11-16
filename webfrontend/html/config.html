@@ -129,6 +129,12 @@
           <p class="note" data-i18n>Geräte ohne Namen. Das Gerät zeigt seinen Code unter „Dieses Gerät einrichten“ – hier daneben den Namen vergeben, damit das Gerät dauerhaft gelistet und per Betriebsmodus umgeschaltet werden kann.</p>
           <div id="ag_anon"></div>
         </div>
+        <!-- Begleit-Tablets (eigene Version): LoxPanel-App nur im Hintergrund, vorn eine andere App -->
+        <div class="card" id="begleiterKarte" hidden>
+          <h3 data-i18n>Begleit-Tablets</h3>
+          <p class="note" data-i18n>Tablets, auf denen die LoxPanel-App nur im Hintergrund läuft und vorn eine andere App zeigt (z. B. die Loxone-App): Wetter über der App, Display per Bewegungsmelder, BLE-Scanner. Änderungen holt sich das Tablet innerhalb einer Minute.</p>
+          <div id="begleiter"></div>
+        </div>
         <details class="card discl" id="modusHilfe">
           <summary><b data-i18n>So schaltet Loxone die Ansicht um</b><span class="note" style="display:block;margin-top:2px" data-i18n>Betriebsmodus, Display-Steuerung und Präsenzmelder erklärt.</span></summary>
           <div class="discl-body">
@@ -404,6 +410,7 @@
 <script src="/config/einrichten.js"></script>
 <script src="/config/einstellungen.js"></script>
 <script src="/config/geraete.js"></script>
+<script src="/config/begleiter.js"></script>
 <script src="/config/sicherung.js"></script>
 <script src="/config/start.js"></script>
 <!-- Gerät verbinden (Einrichtung neu, Schritt 5): gvOpen(), drei Wege mit je einer Zeile zum Kopieren -->

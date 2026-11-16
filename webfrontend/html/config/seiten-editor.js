@@ -83,6 +83,12 @@ function gestenHinweisGilt(u){
   const an=(k, std)=>typeof u[k]==='boolean' ? u[k] : !!(META||{})[std];
   return an('gesten', 'gestenStandard') && an('gestenHinweis', 'gestenHinweisStandard');
 }
+// Kachel-Set mit Aufbau "zeile": jede Kachel ist eine Zeile (1 x 1), das Raster
+// rechnet die Visu immer selbst - die gespeicherte Groesse bleibt stehen und
+// gilt wieder mit einem anderen Set.
+function seZeile(u){ const s=kachelSetMeta(u.tileSet); return (s && s.aufbau==='zeile') ? s : null; }
+function seGr(e, r){ return r.zeile ? {w:1, h:1} : LoxRaster.groesse(e, r.cols, r.rows); }
+function seLage(liste, r){ return LoxRaster.rasterLage(r.zeile ? liste.map(()=>({w:1, h:1})) : liste, r.cols, r.rows); }
 // Raster am Vorschaugeraet, wie rasterFuer()/autoRaster() der Visu es rechnen.
 // Widget nur mit Split (die Kopfzeile ist keines: sie nimmt eine Zeile Hoehe);
 // waagerechte Seiten mit Punkten wie seitenQuer(): Split und kein quadratischer Schirm.
@@ -90,12 +96,14 @@ function seRaster(ctx, a){
   const u=ctx.ui(), g=ctx.geraet(), M=LoxRaster.VISU_MASSE, art=sePaneArt(u.pane);
   const kopf=art==='header', widget=u.split && !!art && !kopf, leiste=a.leiste.length>0;
   const quer=u.split && !LoxRaster.quadratisch(g.vw, g.vh), lm=leisteMasse(u.tileSet, g.vw, g.vh);
-  const basis={art:art, kopf:kopf, widget:widget, leiste:leiste, quer:quer, hoch:g.vh>g.vw, tabLeiste:lm};
-  if(u.auto){
+  const zs=seZeile(u), zm=n=>LoxRaster.setMass(zs.masse||{}, n, g.vw, 0);
+  const basis={art:art, kopf:kopf, widget:widget, leiste:leiste, quer:quer, hoch:g.vh>g.vw, tabLeiste:lm, zeile:!!zs};
+  if(u.auto || zs){
     const r=LoxRaster.autoRaster(Object.assign({}, M, lm, {w:g.vw, h:g.vh, ziel:u.ziel, wachsen:kachelZiel().wachsen||1,
       widget:widget, paneCols:u.paneCols||0, paneShare:(META.paneCols||{}).anteil||0, seitenQuer:quer,
       fussH:LoxRaster.fussH(u.hinweis, quer, g.vw, M.hinweisH),
-      breiten:a.raster.map(e=>({w:e.w, h:e.h})),
+      breiten:a.raster.map(e=>zs ? {w:1, h:1} : {w:e.w, h:e.h}),
+      zeile:zs ? {h:zm('--zeile-h')||72, spalte:zm('--zeile-spalte')||420} : null,
       kopfH:kopf?(ks=>Math.round(LoxRaster.KOPF_H*ks)):null, leisteH:leiste?(ks=>Math.round(LoxRaster.LEISTE_H*ks)):null}));
     return Object.assign(basis, r, {auto:true});
   }
@@ -328,7 +336,7 @@ function seFlaecheHtml(ctx, st, a, r, lage){
     h+='<div class="se-zelle" style="'+seKasten(seZelle(geo, z, s, 1, 1), g)+'"></div>';
   a.raster.forEach((e,i)=>{
     const z=lage.zeile[i]; if(Math.floor(z/R)!==st.blatt) return;
-    const gr=LoxRaster.groesse(e, r.cols, r.rows), c=seCtrl(e.id), an=st.sel===e.id;
+    const gr=seGr(e, r), c=seCtrl(e.id), an=st.sel===e.id;
     const mass=(gr.w>1||gr.h>1)?'<span class="se-mass">'+gr.w+' × '+gr.h+'</span>':'';
     const spieler=seSpieler(c, gr, ctx.ui());
     const play=spieler ? '<span class="se-play">'+(c.cover?'<img src="'+esc(c.cover)+'" alt="">':'')+
@@ -372,12 +380,13 @@ function seFeldHtml(ctx, st, a, r){
   const e=a.raster.find(x=>x.id===st.sel), m=seZustand(ctx.pkey).meldung;
   let h='<div class="grph">'+T('Ausgewählt')+'</div>'+(m?'<p class="hint se-meldung">'+esc(m)+'</p>':'');
   if(!e) return h+'<p class="hint">'+T('Kachel antippen, um Größe und Reihenfolge zu ändern.')+'</p>';
-  const c=seCtrl(e.id), i=a.raster.indexOf(e), eff=LoxRaster.groesse(e, r.cols, r.rows);
+  const c=seCtrl(e.id), i=a.raster.indexOf(e), eff=seGr(e, r);
   h+='<p class="se-name"><b>'+esc(c.name)+'</b><span>'+esc([c.roomName, c.type].filter(Boolean).join(' · '))+'</span></p>'+
+    (r.zeile ? '<p class="hint">'+esc(T('Dieses Kachel-Set zeigt jede Kachel als Zeile, eine Größe gibt es nicht.'))+'</p>' :
     '<label class="lbl">'+T('Größe')+'</label><div class="seg se-groesse">'+[[1,1],[2,1],[2,2]].map(([w,hh])=>{
       const an=e.w===w && e.h===hh;
-      return '<button type="button" data-se-gr="'+w+','+hh+'" aria-pressed="'+an+'"'+(an?' class="on"':'')+'>'+w+' × '+hh+'</button>'; }).join('')+'</div>'+
-    ((eff.w!==e.w||eff.h!==e.h)?'<p class="hint">'+esc(T('Auf diesem Gerät zeigt die Visu sie')+' '+eff.w+' × '+eff.h+' – '+T('dafür fehlen Spalten oder Zeilen.'))+'</p>':'')+
+      return '<button type="button" data-se-gr="'+w+','+hh+'" aria-pressed="'+an+'"'+(an?' class="on"':'')+'>'+w+' × '+hh+'</button>'; }).join('')+'</div>')+
+    ((!r.zeile && (eff.w!==e.w||eff.h!==e.h))?'<p class="hint">'+esc(T('Auf diesem Gerät zeigt die Visu sie')+' '+eff.w+' × '+eff.h+' – '+T('dafür fehlen Spalten oder Zeilen.'))+'</p>':'')+
     '<label class="lbl">'+T('Reihenfolge')+'</label><div class="se-knoepfe">'+
       '<button type="button" class="minibtn" data-se-mv="-1"'+(i>0?'':' disabled')+'>'+T('nach vorn')+'</button>'+
       '<button type="button" class="minibtn" data-se-mv="1"'+(i<a.raster.length-1?'':' disabled')+'>'+T('nach hinten')+'</button></div>'+
@@ -455,7 +464,7 @@ function seZeichnen(host){
   teil('liste').innerHTML=a.pg.widget?'':sePalListeHtml(ctx, a);
   teil('wid').innerHTML=a.pg.widget?'':seWidHtml(ctx);
   if(a.pg.widget){ teil('mitte').innerHTML=seMitteHtml(ctx, st, a, null, null); teil('feld').innerHTML=''; host._seLage=null; return; }
-  const r=seRaster(ctx, a), lage=LoxRaster.rasterLage(a.raster, r.cols, r.rows);
+  const r=seRaster(ctx, a), lage=seLage(a.raster, r);
   if(st.folgen){ const i=a.raster.findIndex(e=>e.id===st.folgen); if(i>-1) st.blatt=Math.floor(lage.zeile[i]/Math.max(1,r.rows)); st.folgen=null; }
   teil('mitte').innerHTML=seMitteHtml(ctx, st, a, r, lage);
   teil('feld').innerHTML=seFeldHtml(ctx, st, a, r);
@@ -603,9 +612,9 @@ function seZiel(z, x, y){
   const s=Math.max(0, Math.min(r.cols-1, Math.floor((dx-geo.raster.x-M.pad+M.gap/2)/(geo.cw+M.gap))));
   const zr=Math.max(0, Math.min(R-1, Math.floor((dy-geo.raster.y-M.pad+M.gap/2)/(geo.ch+M.gap))));
   const zeile=seZustand(host._se.key).blatt*R+zr;
-  let i=a.raster.findIndex((e,k)=>{ const gr=LoxRaster.groesse(e, r.cols, r.rows);
+  let i=a.raster.findIndex((e,k)=>{ const gr=seGr(e, r);
     return zeile>=lage.zeile[k] && zeile<lage.zeile[k]+gr.h && s>=lage.spalte[k] && s<lage.spalte[k]+gr.w; });
-  if(i>-1){ const gr=LoxRaster.groesse(a.raster[i], r.cols, r.rows), mitte=geo.raster.x+M.pad+(lage.spalte[i]+gr.w/2)*(geo.cw+M.gap);
+  if(i>-1){ const gr=seGr(a.raster[i], r), mitte=geo.raster.x+M.pad+(lage.spalte[i]+gr.w/2)*(geo.cw+M.gap);
     if(dx>mitte) i++; }
   else i=a.raster.filter((e,k)=>lage.zeile[k]<zeile || (lage.zeile[k]===zeile && lage.spalte[k]<s)).length;
   const alt=a.raster.findIndex(e=>e.id===z.id);
@@ -623,7 +632,7 @@ function seMarke(z){
   const {a, r, geo}=host._seLage, g=host._se.geraet(), R=Math.max(1, r.rows), st=seZustand(host._se.key);
   const neu=a.raster.filter(e=>e.id!==z.id), e=a.raster.find(x=>x.id===z.id) || {id:z.id, w:seStdBreite(host._se.tiles(), z.id), h:1};
   neu.splice(z.ziel.i, 0, e);
-  const l=LoxRaster.rasterLage(neu, r.cols, r.rows), k=z.ziel.i, gr=LoxRaster.groesse(e, r.cols, r.rows);
+  const l=seLage(neu, r), k=z.ziel.i, gr=seGr(e, r);
   if(Math.floor(l.zeile[k]/R)!==st.blatt){ m.hidden=true; return; }
   m.setAttribute('style', seKasten(seZelle(geo, l.zeile[k]-st.blatt*R, l.spalte[k], gr.w, gr.h), g)); m.hidden=false;
 }
@@ -722,6 +731,11 @@ function renderTileEditor(){
         '<div class="ovctrl">'+overlayFields(ov.overlay,'tov_')+'</div></div>'+
       (c.stat?chartStyleRows(c,ov):'')+
       breiteRow(c,ov)+
+      lichtTippRow(c,ov)+
+      (c.type==='Gate'?'<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Tor')+'</label><label class="chk" style="margin:0">'+
+        '<input type="checkbox" id="tDirekt"'+(ov.direkt?' checked':'')+'> '+T('Direkt fahren (auf / zu / stopp) statt Detailseite')+'</label></div>':'')+
+      '<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Schutz')+'</label><label class="chk" style="margin:0">'+
+        '<input type="checkbox" id="tLang"'+(ov.lang?' checked':'')+'> '+T('Nur 1 s gedrückt halten schaltet')+'</label></div>'+
       '<div class="frow" style="margin-top:4px"><button class="minibtn" id="tileReset">Kachel zurücksetzen</button></div>'+
     '</div></div>';
   bindColor('bg'); bindColor('border'); bindColor('iconColor'); bindColor('textColor');
@@ -740,12 +754,27 @@ function renderTileEditor(){
       if(o.overlay) delete o.overlay; else o.overlay={}; pruneTile(); renderTileEditor(); renderTileList(); markDirty(); }; }
   { const ts=$('#tChartStyle'); if(ts) ts.onchange=()=>setChartStyle(ts.value); }
   { const tw=$('#tWidth'); if(tw) tw.onchange=()=>setTile('w', tw.value?parseInt(tw.value):null); }
+  { const td=$('#tDirekt'); if(td) td.onchange=()=>setTile('direkt', td.checked?true:null); }
+  { const tg=$('#tLang'); if(tg) tg.onchange=()=>setTile('lang', tg.checked?true:null); }
+  { const tl=$('#tLichtTipp'); if(tl) tl.onchange=()=>setTile('lichtTipp', tl.value?parseInt(tl.value):null); }
   { const tr=$('#tChartRange'); if(tr) tr.onchange=()=>setTile('chart', tr.value); }
   $('#tileReset').onclick=()=>{ if(PANELS[cur].tiles) delete PANELS[cur].tiles[tileSel]; renderTileEditor(); renderTileList(); markDirty(); };
   renderIconPick('builtin'); drawPrev();
 }
 // Breite der Kachel in Spalten: zwei fuer Audio, Raumregelung und Energiefluss
 // (Standard nach Typ, Liste vom Server: META.kachelBreit), je Kachel uebersteuerbar
+// Lichtsteuerung (eigene Version): was ein kurzer Tipp auf die Kachel tut. Standard =
+// Menue oeffnen; mit Stimmung schaltet der Tipp aus/ein, langer Druck oeffnet das Menue.
+function lichtTippRow(c,ov){
+  if(c.type!=='LightControllerV2') return '';
+  const lc=(META.lichtStimmungen||[]).find(x=>x.uuid===c.uuid), moods=(lc&&lc.moods)||[{id:777,name:'Viel Licht'}];
+  const cur=ov.lichtTipp?String(ov.lichtTipp):'';
+  return '<div class="frow" style="margin-top:4px"><label class="lbl">'+T('Antippen')+'</label>'+
+    '<select id="tLichtTipp"><option value=""'+(cur===''?' selected':'')+'>'+T('Menü öffnen (Standard)')+'</option>'+
+    moods.map(m=>'<option value="'+esc(String(m.id))+'"'+(cur===String(m.id)?' selected':'')+'>'+
+      esc(T('Schalten: aus / ')+m.name)+'</option>').join('')+'</select></div>'+
+    '<div class="hint" style="margin:2px 0 6px">'+T('Mit „Schalten“: kurz tippen schaltet aus bzw. in die Stimmung, lang drücken öffnet das Menü.')+'</div>';
+}
 function breiteRow(c,ov){
   const breit=(META.kachelBreit||[]).indexOf(c.type)>=0, cur=ov.w?String(ov.w):'';
   const opts=[['',T('Standard')+' ('+(breit?T('breit'):T('schmal'))+')'],['1',T('1 Spalte')],['2',T('2 Spalten (breit)')]];

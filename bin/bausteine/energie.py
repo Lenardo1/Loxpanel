@@ -5,6 +5,7 @@ Die Helfer (app._state, app._fmt_num ...) sind Mixins: die allgemeinen in helfer
 die dieser Familie in der Klasse unten; App erbt sie ueber bausteine.BausteinHelfer."""
 from __future__ import annotations
 
+import json
 import math
 import time
 from datetime import datetime
@@ -36,6 +37,132 @@ def kachel_fronius(app, uuid, c, it):
               sublabel=(app._fmt_num(prod, "%.2fkW") if prod is not None else "PV-Anlage"))
     if prod is None:
         it["subInfo"] = True
+
+
+@kachel("Wallbox2")
+def kachel_wallbox2(app, uuid, c, it):
+    """Wallbox (Baustein Wallbox, neue Generation; eigene Version): laedt / angesteckt /
+    frei, dazu Leistung und die Energie dieses Ladevorgangs bzw. heute."""
+    laedt = bool(app._state(c, "active"))
+    dran = bool(app._state(c, "connected"))
+    frei = app._state(c, "enabled")
+    kw = app._state(c, "actual") or 0
+    try:
+        kw = float(kw)
+    except (TypeError, ValueError):
+        kw = 0.0
+    heute = app._state(c, "totalDay")
+    teile = []
+    if laedt:
+        teile.append("Lädt " + f"{kw:.1f}".replace(".", ",") + " kW")
+    elif dran:
+        teile.append("Angesteckt")
+    else:
+        teile.append("Kein Auto")
+    if frei is not None and not frei:
+        # in die Namenszeile: die Zustandszeile hat neben den Schnellknoepfen nur eine Zeile
+        it["label"] = (it.get("label") or "Wallbox") + " · gesperrt"
+    if isinstance(heute, (int, float)) and heute > 0:
+        teile.append("heute " + f"{heute:.1f}".replace(".", ",") + " kWh")
+    it.update(on=laedt, sublabel=" · ".join(teile),   # Icon kommt aus Loxone (iconUrl)
+              nav={"view": "control", "id": uuid})
+    # Schnellknoepfe (eigene Version): Voll laden und Nur Sonne, gefunden ueber die
+    # Namen der Lademodi in Loxone; der aktive Modus ist markiert
+    modus = app._state(c, "mode")
+    ua = c.get("uuidAction")
+    knoepfe = []
+    for symbol, worte in (("blitz", ("max", "sofort", "voll", "schnell")),
+                          ("sonne", ("pv", "sonne", "solar", "überschuss", "ueberschuss"))):
+        m = next((m for m in _wallbox_modi((c.get("details") or {}).get("modes"), app._state(c, "modes"))
+                  if any(w in str(m.get("name", "")).lower() for w in worte)), None)
+        if m:
+            knoepfe.append({"icon": symbol, "cmd": {"uuid": ua, "cmd": f"setmode/{m['id']}"},
+                            "on": modus == m["id"]})
+    if len(knoepfe) == 2:
+        it["controls"] = knoepfe
+        # neben den Knoepfen nur eine Zustandszeile: die Tagesenergie steht auf der Wallbox-Seite
+        it["sublabel"] = it["sublabel"].split(" · heute ")[0]
+
+
+def _kw(v):
+    try:
+        return f"{float(v):.1f}".replace(".", ",") + " kW"
+    except (TypeError, ValueError):
+        return "–"
+
+
+def _wallbox_modi(det_modi, state_modi) -> list:
+    """Lademodi 1-5 mit Namen. Die Details nennen nur die IDs (ohne Namen,
+    setByLogic), Namen und Leistung stehen im State "modes" (JSON-Text).
+    Ohne Namen kein Knopf; 99 (Manuell) haengt der Aufrufer selbst an."""
+    if isinstance(state_modi, str):
+        try:
+            state_modi = json.loads(state_modi)
+        except ValueError:
+            state_modi = None
+    if isinstance(state_modi, dict):
+        state_modi = state_modi.get("modes") or list(state_modi.values())
+    namen = {m.get("id"): m for m in (state_modi or []) if isinstance(m, dict)}
+    ids = [m.get("id") for m in (det_modi or []) if isinstance(m, dict)] or list(namen)
+    raus = []
+    for i in ids:
+        m = {**next((d for d in (det_modi or []) if isinstance(d, dict) and d.get("id") == i), {}),
+             **namen.get(i, {})}
+        if i != 99 and i is not None and m.get("name"):
+            raus.append(m)
+    return raus
+
+
+@detail("Wallbox2")
+def detail_wallbox2(app, uuid, c, route):
+    """Wallbox (neue Generation; eigene Version): Laden erlauben/sperren, Lademodus,
+    manuelle Leistungsgrenze. Befehle laut Strukturdoku 17.0: allow/on|off,
+    setmode/<1-5|99>, manualLimit/<kW>."""
+    ua = c.get("uuidAction")
+    det = c.get("details") or {}
+    laedt = bool(app._state(c, "active"))
+    dran = bool(app._state(c, "connected"))
+    frei = bool(app._state(c, "enabled"))
+    status = ("Lädt mit " + _kw(app._state(c, "actual"))) if laedt else ("Angesteckt" if dran else "Nicht angesteckt")
+    if not frei:
+        status += " · Laden gesperrt"
+    blocks = [{"k": "hero", "icon": "central"}, {"k": "status", "text": status}]
+    werte = []
+    sitzung = app._state(c, "session")
+    if isinstance(sitzung, str):
+        try:
+            import json as _j
+            sitzung = _j.loads(sitzung)
+        except ValueError:
+            sitzung = None
+    if isinstance(sitzung, dict) and isinstance(sitzung.get("energy"), (int, float)):
+        werte.append("Dieser Ladevorgang " + f"{sitzung['energy']:.1f}".replace(".", ",") + " kWh")
+    for name, st in (("heute", "totalDay"), ("Monat", "totalMonth")):
+        v = app._state(c, st)
+        if isinstance(v, (int, float)):
+            werte.append(f"{name} " + f"{v:.1f}".replace(".", ",") + " kWh")
+    if werte:
+        blocks.append({"k": "value", "text": " · ".join(werte)})
+    blocks.append({"k": "row", "cells": [
+        {"label": "Laden erlauben", "on": frei, "cmd": {"uuid": ua, "cmd": "allow/on"}},
+        {"label": "Laden sperren", "on": not frei, "cmd": {"uuid": ua, "cmd": "allow/off"}}]})
+    modus = app._state(c, "mode")
+    zellen = []
+    for m in _wallbox_modi(det.get("modes"), app._state(c, "modes")):
+        wert = m.get("value")
+        label = _clean(m["name"]) + (f" ({_kw(wert)})" if isinstance(wert, (int, float)) and wert else "")
+        zellen.append({"label": label, "on": modus == m["id"], "cmd": {"uuid": ua, "cmd": f"setmode/{m['id']}"}})
+    zellen.append({"label": "Manuell", "on": modus == 99, "cmd": {"uuid": ua, "cmd": "setmode/99"}})
+    blocks.append({"k": "head", "text": "Lademodus"})
+    blocks.append({"k": "row", "wrap": True, "cells": zellen})
+    lim = app._state(c, "limit")
+    if isinstance(lim, (int, float)):
+        mn, mx = det.get("min"), det.get("max")
+        blocks.append({"k": "stepper", "label": "Ladeleistung (manuell)", "value": lim, "unit": "kW",
+                       "step": 0.5, **({"min": mn} if isinstance(mn, (int, float)) else {}),
+                       **({"max": mx} if isinstance(mx, (int, float)) else {}),
+                       "cmd": {"uuid": ua, "tmpl": "manualLimit/{v}"}})
+    return {"t": "view", "title": _clean(c.get("name")), "route": route, "blocks": blocks}
 
 
 @kachel("EFM")

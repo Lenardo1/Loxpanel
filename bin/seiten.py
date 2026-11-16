@@ -10,6 +10,7 @@ Zustand (self ist die App). Importiert webvisu nicht."""
 from __future__ import annotations
 
 import logging
+import re
 from urllib.parse import quote
 
 import bausteine
@@ -80,7 +81,7 @@ def _ohne_raum(name: str, raum: str) -> str:
 class Seiten:
     """Seiten, Kacheln und Detailseiten; Mixin der App (self ist die App)."""
 
-    def status_blocks(self, uuids) -> list:
+    def status_blocks(self, uuids, prof: dict | None = None) -> list:
         """Frei gewaehlte Bausteine als Nur-Lese-Kacheln fuer die rechte Spalte
         des Screensavers. Baut bewusst ueber _control_item() — damit stehen dort
         Name, Wert, Icon und Zustandsfarbe genau so wie auf einer Kachel, und ein
@@ -100,6 +101,20 @@ class Seiten:
             # kosten. Deshalb hier raus, statt sie im Panel zu ignorieren.
             for k in ("nav", "controls", "secured"):
                 it.pop(k, None)
+            # Kurzname (eigene Version): tiles[uuid].kurz, z. B. "Fenster" statt "Fensterueberwachung"
+            tov = (((prof or {}).get("tiles") or {}).get(u)) or {}
+            if (prof or {}).get("ohneRaum") or ((prof or {}).get("ui") or {}).get("ohneRaum"):
+                it.pop("room", None)                    # eigene Version: auch hier ohne Raumnamen
+            if tov.get("mit"):
+                self._sammelkachel(u, tov["mit"], it)   # z. B. Muell aus mehreren Abfall-Texten
+            if tov.get("nurAn") and not it.get("on"):
+                continue                                # nur zeigen, wenn aktuell (Muell heute/morgen)
+            if tov.get("frei"):
+                it["frei"] = True                       # ohne Rahmen, eingebautes Symbol (z. B. Paket)
+                it.pop("iconUrl", None)
+            kurz = tov.get("kurz")
+            if kurz:
+                it["label"] = kurz
             raus.append(it)
         return raus
 
@@ -185,6 +200,85 @@ class Seiten:
             return {}
         return {"leiste": [self._control_item(u, prof, **kw) for u in uuids]}
 
+    @staticmethod
+    def _abhol_tage(text: str) -> int | None:
+        """Text eines Abfall-Bausteins -> Tage bis zur Abholung ("heute" 0,
+        "morgen" 1, "in 7 Tagen" 7), sonst None ("Abholung Unbekannt")."""
+        t = str(text or "").lower()
+        if "heute" in t:
+            return 0
+        if "morgen" in t and "übermorgen" not in t:
+            return 1
+        m = re.search(r"in\s+(\d+)\s+tag", t)
+        return int(m.group(1)) if m else None
+
+    @staticmethod
+    def _tonne(name: str) -> str:
+        """Abfallart aus dem Bausteinnamen -> Symbol-Kennung fuer die Kopfzeile."""
+        n = (name or "").lower()
+        if "gewerbe" in n:
+            return "container-papier" if "papier" in n else "container"
+        if "bio" in n:
+            return "bio"
+        if "papier" in n:
+            return "papier"
+        if "gelb" in n or "wertstoff" in n or "plastik" in n:
+            return "gelb"
+        return "rest"
+
+    def _bewohner_kachel(self, personen: list, it: dict) -> None:
+        abwesend = bool(it.get("on"))
+        da = []
+        for u in personen:
+            if u in self.controls and self._control_item(u).get("on"):
+                n = _clean(self.controls[u].get("name"))
+                da.append(n.split(":", 1)[1].strip() if ":" in n else n)
+        it["label"] = "Bewohner"
+        if abwesend:
+            it.update(on=False, sublabel="Abwesend")
+        else:
+            it.update(on=bool(da), sublabel=("Alle da" if len(da) == len(personen) and len(da) > 1
+                                              else (", ".join(da) + " da") if da else "Niemand da"))
+        bild = next((self._control_icon_url(self.controls[u]) for u in personen if u in self.controls), None)
+        if bild:
+            it["iconUrl"] = bild
+
+    def _sammelkachel(self, uuid: str, mit: list, it: dict) -> None:
+        teile = [(uuid, it)] + [(m, self._control_item(m)) for m in mit if m in self.controls]
+        typen = {(self.controls.get(u) or {}).get("type") for u, _ in teile}
+        if typen <= {"TextState", "InfoOnlyText"}:
+            # Abfall (eigene Version): naechste Abholung aus "in N Tagen"-Texten
+            tage = [(self._abhol_tage(x.get("sublabel")), _clean((self.controls.get(u) or {}).get("name")))
+                    for u, x in teile]
+            tage = [(d, n) for d, n in tage if d is not None]
+            it["label"] = "Müll"
+            it.pop("nav", None)
+            it.pop("cmd", None)
+            if not tage:
+                it.update(on=False, sublabel="Kein Termin")
+                return
+            d = min(x[0] for x in tage)
+            namen = ", ".join(n for x, n in tage if x == d)
+            it["on"] = d <= 1
+            # Symbole statt Namen (Kopfzeile): Tonne bzw. Container in ihrer Farbe
+            it["tonnen"] = [self._tonne(n) for x, n in tage if x == d]
+            if d <= 1:
+                it["big"] = "Heute" if d == 0 else "Morgen"
+            it["sublabel"] = (f"Heute: {namen}" if d == 0 else f"Morgen: {namen}" if d == 1
+                              else f"{namen} in {d} Tagen")
+            return
+        def person(u):
+            n = _clean((self.controls.get(u) or {}).get("name"))
+            return n.split(":", 1)[1].strip() if ":" in n else n
+        kopf = _clean((self.controls.get(uuid) or {}).get("name"))
+        da = [person(u) for u, x in teile if x.get("on")]
+        it["label"] = kopf.split(":", 1)[0].strip() if ":" in kopf else kopf
+        it["on"] = bool(da)
+        it["sublabel"] = ("Alle da" if len(da) == len(teile) and len(da) > 1
+                          else (", ".join(da) + " da") if da else "Niemand da")
+        it.pop("nav", None)
+        it.pop("cmd", None)
+
     def _control_item(self, uuid: str, prof: dict | None = None,
                       show_room: bool = False, ohne_raum: str = "") -> dict:
         """Kachel eines Bausteins. show_room: Raum an der Kachel (Seite ueber
@@ -201,7 +295,7 @@ class Seiten:
         it: dict = {"id": uuid, "label": name, "on": False, "icon": "info"}
         # Raum-Kennzeichnung: nur wenn die Ansicht mehrere Raeume umfasst (z.B.
         # Kategorie Licht ueber alle Raeume). Zentralbausteine haben keinen Raum.
-        if show_room:
+        if show_room and not ((prof or {}).get("ohneRaum") or ((prof or {}).get("ui") or {}).get("ohneRaum")):   # eigene Version: Raumnamen aus
             rn = _clean((self.rooms.get(c.get("room")) or {}).get("name"))
             if rn:
                 it["room"] = rn
@@ -216,8 +310,57 @@ class Seiten:
         fn = bausteine.kachel_fuer(t)
         if fn:
             fn(self, uuid, c, it)
+        # Tore (eigene Version): statt des Loxone-Symbols "Tuer offen" ein Garagentor,
+        # offen bzw. geschlossen je nach Zustand
+        if t in ("Gate", "CentralGate") and "door-open" in str(it.get("iconUrl") or ""):
+            it.pop("iconUrl", None)
+            it.pop("pos", None)          # Ring um das Symbol: der Torzustand steht jetzt im Symbol
+            if t == "Gate":
+                p = round((self._state(c, "position") or 0) * 100)
+                it["icon"] = "torZu" if p <= 0 else ("torAuf" if p >= 100 else "torHalb")
+            else:
+                it["icon"] = "torAuf" if it.get("on") else "torZu"
+        # Warnen (eigene Version): Vorgaben ui.warnen {uuid: "an"|"aus"} -> rot, wenn der
+        # Baustein an (z. B. Fenster offen, Regenwarnung) bzw. aus ist (Alarmanlage unscharf)
+        wr = ((self.theme.get("ui") or {}).get("warnen") or {}).get(uuid)
+        if wr == "an" and it.get("on") or wr == "aus" and not it.get("on"):
+            it["tone"] = "crit"
+        elif wr == "ruhig" and it.get("tone") == "good":
+            it.pop("tone")   # "Alles ok" ohne Gruen: nur Abweichungen fallen auf
+        # Tor direkt (eigene Version): fahrend -> Stop, offen -> schliessen, zu -> oeffnen
+        tov = (((prof or {}).get("tiles") or {}).get(uuid)) or {}
+        if t == "Gate" and tov.get("direkt"):
+            ua = c.get("uuidAction")
+            fahrt = self._state(c, "active") or 0
+            it["cmd"] = {"uuid": ua, "cmd": "stop" if fahrt else ("close" if it.get("on") else "open")}
+            if fahrt:
+                it["sublabel"] = "öffnet …" if fahrt > 0 else "schließt …"
+            it.pop("nav", None)
+        # Sammelkachel (eigene Version): tiles[uuid].mit = weitere Ja/Nein-Bausteine,
+        # z. B. "Bewohner: Anna" + Ben + Clara -> eine Kachel "Bewohner" mit
+        # den Namen derer, die an sind. Name = Teil nach dem Doppelpunkt.
+        if tov.get("mit"):
+            self._sammelkachel(uuid, tov["mit"], it)
+        # Bewohner an einem Schalter (eigene Version, z. B. Abwesend): die Kachel zeigt,
+        # wer da ist, bzw. "Abwesend"; der Schalter bleibt (mit Schutz: lang druecken)
+        if tov.get("bewohner"):
+            self._bewohner_kachel(tov["bewohner"], it)
+        # Zentral-Licht als Knopf "alles aus" statt Raumliste (eigene Version)
+        if t == "CentralLightController" and tov.get("direkt"):
+            it["cmd"] = {"uuid": c.get("uuidAction"), "cmd": "off"}
+            it.pop("nav", None)
+        # Nur lang druecken schaltet (eigene Version): z. B. Abwesend
+        if prof and (((prof.get("tiles") or {}).get(uuid)) or {}).get("lang") and it.get("cmd"):
+            it["lang"] = True
+        # Lichtsteuerung mit Tipp-Stimmung (eigene Version): Tipp schaltet aus bzw.
+        # in die gewaehlte Stimmung, langer Druck oeffnet weiter das Menue (nav)
+        if t == "LightControllerV2" and prof:
+            lt = (((prof.get("tiles") or {}).get(uuid)) or {}).get("lichtTipp")
+            if isinstance(lt, int) and lt > 0:
+                it["tipp"] = {"uuid": c.get("uuidAction"),
+                              "cmd": "changeTo/778" if it.get("on") else f"changeTo/{lt}"}
         # Status-Bausteine antippbar machen -> grosse Wertseite
-        if t in STATUS_BIG and "nav" not in it and "cmd" not in it:
+        if t in STATUS_BIG and "nav" not in it and "cmd" not in it and not tov.get("mit"):
             it["nav"] = {"view": "control", "id": uuid}
         # Typ, den LoxPanel nicht kennt: sagen statt einer leeren Kachel. Der
         # Text beschreibt nur (subInfo); ausblenden wie jede Kachel ueber hide.

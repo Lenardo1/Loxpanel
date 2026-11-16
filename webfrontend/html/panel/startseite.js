@@ -166,8 +166,11 @@ function renderPlayer(blocks){
 // Nach Ruhe zurueck zur Startseite und zur Uhr. Ein gesetzter Filter der
 // Sprungmarken faellt dabei weg, sonst zeigte das Wandpanel dauerhaft nur
 // eine Gruppe.
-function nachRuhe(){ katFilter=null; goTab(tabsCfg[0]||'favoriten'); showSaver(); }
-function resetIdle(){ clearTimeout(idleTimer);
+function nachRuhe(){ katFilter=null; goTab(tabsCfg[0]||'favoriten');
+  // eigene Version: solange der Praesenzmelder jemanden meldet, bleibt die Startseite stehen (kein Schoner/Standby)
+  if(typeof DISP!=='undefined' && DISP.presence && saverAus){ resetIdle(); return; }
+  showSaver(); }
+function resetIdle(){ clearTimeout(idleTimer); letzteBedienung=Date.now();
   idleTimer=setTimeout(nachRuhe, SAVER_IDLE_MS);
   armDpms(); }
 // Der Finger, der die Uhr-Seite wegtippt, darf darunter nichts ausloesen. Sie

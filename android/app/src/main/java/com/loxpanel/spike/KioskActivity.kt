@@ -14,6 +14,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -81,6 +82,27 @@ class KioskActivity : Activity(), SensorEventListener {
     private val ui = Handler(Looper.getMainLooper())
     private var errored = false
     private var reloadPending = false
+    /** Letzter Zustand des Naeherungssensors, null bis zum ersten Wert (eigene Version). */
+    private var naheZuletzt: Boolean? = null
+    /** Display wurde per lockNow ausgeschaltet (echtes Standby, eigene Version). */
+    private var ausStandby = false
+    /** Wann die Seite zuletzt geladen wurde (elapsedRealtime), fuer Waechter.seiteNieGestartet. */
+    @Volatile private var seiteGeladen: Long? = null
+    /** Letzte Meldung der Seite (elapsedRealtime), null bis zur ersten. */
+    @Volatile private var herzschlag: Long? = null
+    private val seitePruefen = object : Runnable {
+        override fun run() {
+            if (destroyed) return
+            if (Waechter.seiteNieGestartet(SystemClock.elapsedRealtime(), seiteGeladen, herzschlag)) {
+                Log.w("LPANZEIGE", "Seite hat sich seit dem Laden nicht gemeldet, Anzeige wird neu aufgebaut")
+                anzeigeNeuAufbauen(web)
+            } else if (Waechter.seiteSteht(SystemClock.elapsedRealtime(), herzschlag)) {
+                Log.w("LPANZEIGE", "Seite meldet sich seit über ${Waechter.SEITE_STILL_MS / 1000} s nicht, Anzeige wird neu aufgebaut")
+                anzeigeNeuAufbauen(web)
+            }
+            ui.postDelayed(this, Waechter.SEITE_PRUEF_MS)
+        }
+    }
     // Basis-Adresse des Servers, für den show() zuletzt geladen hat: Nach
     // „Server ändern“ lädt die Anzeige beim Zurückkommen den neuen.
     private var geladenFuer: String? = null
@@ -108,6 +130,9 @@ class KioskActivity : Activity(), SensorEventListener {
     // im Nachtmodus der Visu, ein Teil davon (setDisplayBrightness).
     private var helligkeit = Helligkeit.SYSTEM
     private val goDark = Runnable { enterScreensaver() }
+    // Helligkeit nach Annaeherung (eigene Version): Einstellung per adb, siehe annaeherungLesen()
+    private val annaeherung = Annaeherung()
+    private val annaeherungTakt = Runnable { helligkeitAnwenden() }
     // Berührung im Schoner: ein Finger weckt, zwei Finger gehen als Geste an die
     // Visu (Gesten im Dunkeln). Das erste Ereignis hält die Anzeige zurück, bis
     // feststeht, ob ein zweiter Finger kommt (SchonerBeruehrung).
@@ -127,10 +152,18 @@ class KioskActivity : Activity(), SensorEventListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BlePresenceService.starten(this)   // BLE-Presence-Scanner, nur wenn eingerichtet (eigene Version)
+        WachDienst.starten(this)           // Weckdienst fuers echte Standby, nur wenn eingeschaltet (eigene Version)
+        // Nach echtem Standby (lockNow) ueber dem Sperrbildschirm erscheinen und das Display anschalten
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) { setShowWhenLocked(true); setTurnScreenOn(true) }
+        annaeherungLesen(intent)
 
         // Bildschirm anlassen: Wir dimmen im Screensaver selbst, damit die App
         // aktiv bleibt und den Näherungssensor auswerten kann (sofortiges Wecken).
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // eigene Version: Fenster schwarz statt weiss - beim Einschalten aus dem Standby
+        // blitzte sonst kurz ein weisses Viereck auf, bevor die Seite gezeichnet ist
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.BLACK))
 
         web = neueWebView()
 
@@ -143,7 +176,7 @@ class KioskActivity : Activity(), SensorEventListener {
 
         fehler = fehlerSeite()
 
-        root = FrameLayout(this)
+        root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         root.addView(web, vollbild())
         root.addView(fehler, vollbild())
         root.addView(saver, vollbild())
@@ -284,6 +317,7 @@ class KioskActivity : Activity(), SensorEventListener {
      *  Schleife auf. */
     private fun anzeigeNeuAufbauen(alt: WebView) {
         if (alt !== web) return
+        herzschlag = null
         intercomPage = false
         intercomCapability.clear()
         intercomPageCapability = null
@@ -356,6 +390,8 @@ class KioskActivity : Activity(), SensorEventListener {
     private fun show() {
         errored = false
         geladenFuer = Visu.basis(this)
+        herzschlag = null
+        seiteGeladen = SystemClock.elapsedRealtime()
         web.loadUrl(Visu.startAdresse(this))
     }
 
@@ -385,19 +421,39 @@ class KioskActivity : Activity(), SensorEventListener {
         ui.postDelayed({ reloadPending = false; if (!destroyed) show() }, 2000)
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        annaeherungLesen(intent)   // Einstellung per adb auch bei laufender App (singleTask)
+        if (intent.getBooleanExtra("wecken", false)) { ausStandby = false; userWake() }   // vom Weckdienst
+    }
+
     override fun onResume() {
         super.onResume()
+        // Begleit-Tablet (eigene Version): keine Anzeige, das App-Symbol führt zur Begleiter-Seite
+        if (!Visu.eingerichtet(this) && BegleiterDienst.gewaehlt(this)) {
+            startActivity(Intent(this, BegleiterEinrichtung::class.java)); finish(); return
+        }
+        annaeherungLesen(null)   // Werte aus der Einstellungsseite (DisplayEinstellung)
         intercom.onResume()
         enterImmersive()
         // Näherungssensor abonnieren (falls vorhanden) -> weckt aus dem Screensaver.
         // FASTEST für flottes Aufwecken bei Annäherung (Proximity ist on-change +
         // sparsam, daher unkritisch für den Verbrauch).
+        naheZuletzt = null   // erster Wert nach dem Anmelden ist der gespeicherte, kein echtes Herankommen
         proximity?.let { sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
         wake()
+        // aus echtem Standby: nur das Display (Overlay weg); ob die Visu ihre Uhr verlaesst,
+        // entscheidet der Weckgrund (onNewIntent "wecken") bzw. der Server
+        if (ausStandby) { ausStandby = false; wake() }
         serverUndSeite()
+        // Pause zählt nicht als Stille: ab jetzt neu messen
+        if (herzschlag != null) herzschlag = SystemClock.elapsedRealtime()
+        ui.removeCallbacks(seitePruefen)
+        ui.postDelayed(seitePruefen, Waechter.SEITE_PRUEF_MS)
     }
 
     override fun onPause() {
+        ui.removeCallbacks(seitePruefen)
         intercom.onPause()
         super.onPause()
         sensorManager?.unregisterListener(this)
@@ -439,6 +495,7 @@ class KioskActivity : Activity(), SensorEventListener {
         // in der das Display noch hell ist, auf den 1. Tab (statt nur aus dem
         // Dunkeln). Eine Berührung, die im Schoner begann, endet auch dort, sonst
         // bekäme die Visu Ereignisse ohne Anfang.
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) annaeherungNah()
         if (saverOn || visuSaver || beruehrung.laeuft) return imSchoner(ev)
         wake()
         return super.dispatchTouchEvent(ev)
@@ -521,7 +578,51 @@ class KioskActivity : Activity(), SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_PROXIMITY) return
         val near = event.values.isNotEmpty() &&
             event.values[0] < (proximity?.maximumRange ?: 5f)
-        if (near && (saverOn || visuSaver)) userWake()
+        // eigene Version: nur ein echter Wechsel fern -> nah weckt. Den ersten Wert nach dem
+        // Anmelden liefert Android aus dem Speicher (stand am Eingang noch auf "nah") - er
+        // holte nach jedem Aufwachen sofort die Startseite statt der Uhr.
+        val vorher = naheZuletzt
+        naheZuletzt = near
+        if (vorher == null || !near || vorher) return
+        annaeherungNah()
+        if (saverOn || visuSaver) userWake()
+    }
+
+    // ---- Helligkeit nach Annaeherung (eigene Version, Marco) ----
+    // Einrichten per adb (Werte bleiben in den App-Daten):
+    //   adb shell am start -n com.loxpanel.spike/.KioskActivity \
+    //     --ei annaeherung_ruhe 30 --ei annaeherung_halten 30
+    // ruhe = Prozent ohne Annaeherung (100 = aus), halten = Sekunden voll hell.
+    private fun annaeherungLesen(intent: Intent?) {
+        val p = getSharedPreferences(DisplayEinstellung.PREFS, Context.MODE_PRIVATE)
+        intent?.let {
+            val e = p.edit()
+            if (it.hasExtra("annaeherung_ruhe")) e.putInt("ruhe", it.getIntExtra("annaeherung_ruhe", 100).coerceIn(5, 100))
+            if (it.hasExtra("annaeherung_halten")) e.putInt("halten", it.getIntExtra("annaeherung_halten", 30).coerceIn(5, 3600))
+            e.apply()
+            // Echtes Standby (eigene Version): --ez standby true|false
+            if (it.hasExtra("standby")) WachDienst.setzen(this, it.getBooleanExtra("standby", false))
+        }
+        annaeherung.ruheProzent = p.getInt("ruhe", 100)
+        annaeherung.haltenSek = p.getInt("halten", 30)
+        annaeherungNah()
+    }
+
+    private fun annaeherungNah() {
+        annaeherung.nah(SystemClock.elapsedRealtime())
+        helligkeitAnwenden()
+    }
+
+    /** Fensterhelligkeit aus Nachtmodus (helligkeit) und Annaeherung; im Schoner bleibt es dunkel. */
+    private fun helligkeitAnwenden() {
+        ui.removeCallbacks(annaeherungTakt)
+        if (saverOn) return
+        val jetzt = SystemClock.elapsedRealtime()
+        if (!annaeherung.aktiv) { setBrightness(helligkeit); return }
+        val basis = if (helligkeit >= 0f) helligkeit else (systemHelligkeit() ?: 1f)
+        // basis 0 = nachts ganz schwarz (100 % abdunkeln); sonst nie ganz aus
+        setBrightness(if (basis <= 0f) 0f else (basis * annaeherung.faktor(jetzt)).coerceIn(0.01f, 1f))
+        annaeherung.naechsteAenderungMs(jetzt)?.let { ui.postDelayed(annaeherungTakt, it) }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { /* egal */ }
@@ -550,6 +651,13 @@ class KioskActivity : Activity(), SensorEventListener {
 
     /** JS-Brücke der Visu. */
     inner class KioskBridge {
+        /** Herzschlag der Seite (alle 10 s), siehe Waechter.seiteSteht. */
+        @JavascriptInterface
+        fun lebt() {
+            if (herzschlag == null) Log.i("LPANZEIGE", "Seite meldet sich (Herzschlag), Wächter aktiv")
+            herzschlag = SystemClock.elapsedRealtime()
+        }
+
         /** Nur die lokale Visu kann eine native Gegensprech-Sitzung beginnen. */
         @JavascriptInterface
         fun startIntercomNative(uuid: String, capability: String?): Boolean =
@@ -628,7 +736,7 @@ class KioskActivity : Activity(), SensorEventListener {
             val wert = Helligkeit.fensterwert(prozent, systemHelligkeit())
             ui.post {
                 helligkeit = wert ?: Helligkeit.SYSTEM
-                if (!saverOn) setBrightness(helligkeit)
+                helligkeitAnwenden()
             }
             return wert != null
         }
@@ -642,6 +750,14 @@ class KioskActivity : Activity(), SensorEventListener {
         saver.visibility = View.VISIBLE
         saver.bringToFront()
         setBrightness(0f)      // praktisch dunkel (LCD -> kein Einbrennen)
+        // Echtes Standby (eigene Version): Display wirklich aus; wecken WachDienst/Beruehrung
+        if (WachDienst.an(this)) {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as android.app.admin.DevicePolicyManager
+            if (dpm.isAdminActive(android.content.ComponentName(this, LockAdmin::class.java))) {
+                ausStandby = true
+                try { dpm.lockNow() } catch (e: Exception) { Log.w("LPSTANDBY", "lockNow: ${e.message}") }
+            }
+        }
     }
 
     /** Backlight zurück (Systemhelligkeit oder Nachtmodus), Overlay weg. */
@@ -650,7 +766,7 @@ class KioskActivity : Activity(), SensorEventListener {
             saverOn = false
             saver.visibility = View.GONE
         }
-        setBrightness(helligkeit)
+        helligkeitAnwenden()
     }
 
     private fun setBrightness(b: Float) {

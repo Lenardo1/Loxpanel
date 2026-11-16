@@ -408,7 +408,7 @@ KLINGELTON_WERTE = ("app", "alle")
 THEME_UI_KEYS = ("iconSize", "nameSize", "subSize", "roomSize", "bigSize", "font", "textColor",
                  "baseColor", "bold", "lang", "scale", "nightDim", "nightWake", "dpmsOff", "reloadHours",
                  "gesten", "gestenHinweis", "hausAus", "raumVerlassen", "nightClock", "nightClockBright",
-                 "klingelTon")
+                 "klingelTon", "grenzwerte", "warnen")
 
 # Groessen (px), wenn weder das Panel noch die globale Darstellung eine setzt,
 # je Kachel-Aufbau. Der neue stellt meist den Zustand gross und den Namen klein
@@ -964,9 +964,16 @@ def _intercom_config() -> dict:
     return cfg
 
 
+def night_controls(cfg: dict | None) -> list[str]:
+    """Nacht-Ausloeser aus `night.control`: eine UUID oder mehrere, durch Komma
+    getrennt (aeltere Konfigurationen haben genau eine)."""
+    roh = (cfg or {}).get("control") or ""
+    return [u.strip() for u in str(roh).split(",") if u.strip()]
+
+
 def _night_config() -> dict:
-    """Nachtmodus-Block aus loxpanel.cfg `night`: {"control": "<uuid>"}. Der
-    `active`-State dieses Bausteins schaltet den Nachtmodus. Leer = kein
+    """Nachtmodus-Block aus loxpanel.cfg `night`: {"control": "<uuid>[,<uuid>...]"}.
+    Ist einer dieser Bausteine `active`, ist Nacht (night_controls). Leer = kein
     Ausloeser, dann entscheiden die Sonnenzeiten."""
     base = Path(__file__).resolve().parent.parent / "config"
     f = base / "loxpanel.cfg"
@@ -1153,7 +1160,7 @@ def _sanitize_panels(panels: dict) -> dict:
         if isinstance(ui.get("reloadHours"), (int, float)):
             cui["reloadHours"] = max(0, min(168, float(ui["reloadHours"])))  # Auto-Neustart Std.
         if isinstance(ui.get("nightDim"), (int, float)):
-            cui["nightDim"] = max(0, min(90, int(ui["nightDim"])))    # Nachts abdunkeln in %
+            cui["nightDim"] = max(0, min(100, int(ui["nightDim"])))   # Nachts abdunkeln in %, 100 = schwarz
         if isinstance(ui.get("nightWake"), (int, float)):
             cui["nightWake"] = max(0, min(300, int(ui["nightWake"])))  # Aufhellen bei Beruehrung, Sek.
         if isinstance(ui.get("nightClock"), bool):
@@ -1182,6 +1189,14 @@ def _sanitize_panels(panels: dict) -> dict:
             cui["gestenRaum"] = _clean_kennung(ui["gestenRaum"])   # Raum der Gesten ausserhalb von Raumseiten
         if isinstance(ui.get("gestenHinweis"), bool):
             cui["gestenHinweis"] = ui["gestenHinweis"]   # Hinweis-Symbol an/aus; fehlt = wie Vorgaben
+        if ui.get("schirm") is True:
+            cui["schirm"] = True            # Schirm-Hinweis in der Kopfzeile (eigene Version)
+        if ui.get("kopfFrei") is True:
+            cui["kopfFrei"] = True          # Kopfzeile ohne Kaesten um die Werte (eigene Version)
+        if ui.get("ohneRaum") is True:
+            cui["ohneRaum"] = True          # Kacheln ohne Raumnamen (eigene Version)
+        if ui.get("saverAus") is True:
+            cui["saverAus"] = True          # Uhr-Seite schwarz statt Uhr/Wetter (eigene Version)
         if ui.get("tileLayout") == "classic":
             cui["tileLayout"] = "classic"   # bisheriger Kachel-Aufbau; fehlt = neuer
         if ui.get("hausAufbau") in HAUS_AUFBAUTEN and ui["hausAufbau"] != HAUS_AUFBAU_STANDARD:
@@ -1273,6 +1288,37 @@ def _sanitize_panels(panels: dict) -> dict:
                         e2["chartStyle"] = ov["chartStyle"]   # Tagesmuster / Tagesspanne
                 if _kachel_breite(ov.get("w")) is not None:
                     e2["w"] = _kachel_breite(ov["w"])   # Breite in Spalten (1 | 2); fehlt = nach Typ
+                # Lichtsteuerung: Tipp schaltet direkt in diese Stimmung, langer Druck oeffnet das Menue (eigene Version)
+                lt = ov.get("lichtTipp")
+                if isinstance(lt, int) and not isinstance(lt, bool) and 0 < lt < 1000:
+                    e2["lichtTipp"] = lt
+                # Schutz vor versehentlichem Schalten (eigene Version): nur lang druecken schaltet
+                if ov.get("lang") is True:
+                    e2["lang"] = True
+                # Tor direkt fahren statt Detailseite (eigene Version)
+                if ov.get("direkt") is True:
+                    e2["direkt"] = True
+                # Kopfzeile/Uhr-Seite: nur zeigen, wenn an (eigene Version, z. B. Muell heute/morgen)
+                if ov.get("nurAn") is True:
+                    e2["nurAn"] = True
+                if ov.get("frei") is True:
+                    e2["frei"] = True                   # Kopfzeile: ohne Rahmen (eigene Version)
+                # Kurzname fuer Kopfzeile und Uhr-Seite (eigene Version)
+                kz = ov.get("kurz")
+                if isinstance(kz, str) and kz.strip():
+                    e2["kurz"] = kz.strip()[:24]
+                # Bewohner-Anzeige an einem Schalter (eigene Version, z. B. Abwesend)
+                bw = ov.get("bewohner")
+                if isinstance(bw, list):
+                    bw = [m for m in bw if isinstance(m, str) and re.match(r"^[0-9a-f-]{20,40}$", m) and m != cu][:8]
+                    if bw:
+                        e2["bewohner"] = bw
+                # Sammelkachel (eigene Version): weitere Ja/Nein-Bausteine, z. B. Bewohner
+                mit = ov.get("mit")
+                if isinstance(mit, list):
+                    mit = [m for m in mit if isinstance(m, str) and re.match(r"^[0-9a-f-]{20,40}$", m) and m != cu][:8]
+                    if mit:
+                        e2["mit"] = mit
                 if e2:
                     ct[cu] = e2
             if ct:
@@ -1409,7 +1455,7 @@ def _sanitize_devices(devices: dict, panel_ids: set) -> dict:
         def _zahl(key, lo, hi):
             v = cfg.get(key)
             return max(lo, min(hi, int(v))) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-        dpms, dim, wake = _zahl("dpmsOff", 0, 3600), _zahl("nightDim", 0, 90), _zahl("nightWake", 0, 300)
+        dpms, dim, wake = _zahl("dpmsOff", 0, 3600), _zahl("nightDim", 0, 100), _zahl("nightWake", 0, 300)
         if not modes and not display and scale is None and ziel is None and not presence \
                 and not licht_start and not panel and dpms is None and dim is None and wake is None:
             continue
@@ -1494,7 +1540,7 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     # Verhalten); panel_night(), panel_dpms() und panel_reload() nehmen sie,
     # solange das Profil keine eigenen setzt. Grenzen wie dort.
     if isinstance(ui.get("nightDim"), (int, float)):
-        out["nightDim"] = max(0, min(90, int(ui["nightDim"])))
+        out["nightDim"] = max(0, min(100, int(ui["nightDim"])))
     if isinstance(ui.get("nightWake"), (int, float)):
         out["nightWake"] = max(0, min(300, int(ui["nightWake"])))
     if isinstance(ui.get("dpmsOff"), (int, float)):
@@ -1526,6 +1572,25 @@ def _sanitize_theme_ui(ui: dict) -> dict:
     # LoxPanel-App, "alle" auf jedem Display; fehlt = aus
     if ui.get("klingelTon") in KLINGELTON_WERTE:
         out["klingelTon"] = ui["klingelTon"]
+    # Grenzwerte je Baustein (eigene Version): {uuid: {"min": x, "max": y}}
+    gw = ui.get("grenzwerte")
+    if isinstance(gw, dict):
+        sauber = {}
+        for u, g in list(gw.items())[:50]:
+            if not isinstance(u, str) or not isinstance(g, dict):
+                continue
+            e = {k: float(g[k]) for k in ("min", "max")
+                 if isinstance(g.get(k), (int, float)) and not isinstance(g.get(k), bool)}
+            if e:
+                sauber[u[:64]] = e
+        if sauber:
+            out["grenzwerte"] = sauber
+    # Warn-Regeln je Baustein (eigene Version): {uuid: "an" | "aus"}
+    wn = ui.get("warnen")
+    if isinstance(wn, dict):
+        w = {u[:64]: v for u, v in list(wn.items())[:80] if isinstance(u, str) and v in ("an", "aus", "ruhig")}
+        if w:
+            out["warnen"] = w
     return out
 
 

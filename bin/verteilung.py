@@ -407,7 +407,7 @@ class Verteilung:
         _suu = self.conn_status.get(ws)
         if _suu:
             try:
-                status_msg = {"t": "svstatus", "items": self.status_blocks(_suu)}
+                status_msg = {"t": "svstatus", "items": self.status_blocks(_suu, self.conn_prof.get(ws))}
             except Exception:
                 log.exception("status_blocks fehlgeschlagen")
         return msg, player_msg, energy_msg, chart_msg, _chart, camera_msg, status_msg

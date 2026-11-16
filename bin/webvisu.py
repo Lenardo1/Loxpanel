@@ -63,7 +63,7 @@ from ansicht import Ansicht  # noqa: E402  # Profil, Theme, Export
 from seiten import Seiten  # noqa: E402  # Seiten, Kacheln, Detailseiten
 # Routen-Handler je Thema (routen/); main() traegt sie unten in die Routentabelle ein.
 from routen.oberflaeche import (  # noqa: E402
-    config_css, config_index, config_js, i18n_js, index, panel_teil, raster_js, settings_index)
+    config_css, config_index, config_js, i18n_js, index, panel_teil, raster_js, schrift, settings_index)
 from routen.visu import ws_handler  # noqa: E402
 from routen.konfigurator import (  # noqa: E402
     api_entwurf, api_kachelset, api_meta, api_save_panels, api_save_theme, api_types)
@@ -76,8 +76,9 @@ from routen.intercom import (  # noqa: E402
     api_sip_pruefen, mjpeg_handler)
 from routen.geraete import (  # noqa: E402
     api_agent_announce, api_agent_command, api_agents, api_device_name, api_device_switch, api_devices_get,
-    api_display, api_goto, api_mode, api_notify, api_reload, api_save_devices, api_testtone,
+    api_display, api_geraet_ble, api_goto, api_mode, api_notify, api_reload, api_save_devices, api_testtone,
     api_vorschau_beenden, install_script)
+from routen.begleiter import api_begleiter, api_begleiter_melden  # noqa: E402
 from routen.medien import bellimg_handler, cover_handler, icon_handler, loxicons_handler, loxlib_handler  # noqa: E402
 from routen.system import api_diagnose, api_health  # noqa: E402
 
@@ -288,6 +289,8 @@ class App(Statistik, Grafana, BausteinHelfer, Haus, Gesten, Miniserver,
         # (verteilt in _broadcast_tick).
         self.presence_map: dict[str, list[str]] = {}
         self._presence_on: dict[str, bool] = {}
+        # BLE-Presence-Scanner in der LoxPanel-App (eigene Version): Zustand je IP
+        self.ble_status: dict[str, dict] = {}
         self._pending_presence: list[dict] = []
         self._presence_quelle: tuple = (None, None)   # (devices, controls) hinter presence_map
         self.agents: dict[str, dict] = {}   # ip -> Panel-Agent (Fernstart)
@@ -430,6 +433,7 @@ def main() -> None:
     a.router.add_get("/config.css", config_css)
     a.router.add_get("/config/{name}", config_js)
     a.router.add_get("/panel/{name}", panel_teil)
+    a.router.add_get("/schrift/{name}", schrift)
     a.router.add_get("/install-agent.sh", install_script)
     a.router.add_get("/api/meta", api_meta)
     a.router.add_get("/api/kachelset", api_kachelset)
@@ -472,6 +476,10 @@ def main() -> None:
     a.router.add_get("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/mode/{mode}", api_mode)
     a.router.add_post("/api/testtone", api_testtone)
+    a.router.add_post("/api/geraet/ble", api_geraet_ble)   # BLE-Presence-Scanner der App (eigene Version)
+    a.router.add_post("/api/begleiter/melden", api_begleiter_melden)   # Begleit-Tablets (eigene Version)
+    a.router.add_get("/api/begleiter", api_begleiter)
+    a.router.add_post("/api/begleiter", api_begleiter)
     a.router.add_get("/api/reload", api_reload)
     a.router.add_post("/api/reload", api_reload)
     a.router.add_get("/api/goto", api_goto)

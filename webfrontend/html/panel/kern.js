@@ -18,6 +18,10 @@ const ICONS = {
   // Linien und ergaeben gefuellt nur flache Keile.
   triup:'<path d="M12 6.5 19.5 17h-15z"/>',
   tridown:'<path d="M12 17.5 4.5 7h15z"/>',
+  // Aufbau "zeile": duenner Winkel wie in der Loxone-App (svg, nicht svgF),
+  // dort ausgemessen - breit und flach, Auf etwas ueber, Ab etwas unter der Mitte
+  zauf:'<path d="M2.3 14.4 12 5.6l9.7 8.8"/>',
+  zab:'<path d="M2.3 7.4 12 16.5l9.7-9.1"/>',
   music:'<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
   // zwei Finger, daneben hoch/runter: Hinweis-Symbol der Gesten
   zweiFinger:'<path d="M7 21v-9.5a1.5 1.5 0 0 1 3 0V21"/><path d="M10 21V8.5a1.5 1.5 0 0 1 3 0V21"/><path d="M18 3v10M16 5l2-2 2 2M16 11l2 2 2-2"/>',
@@ -34,6 +38,14 @@ const ICONS = {
   // Hinweise der Hausseite (Server: _haus_hinweise, symbol): Fenster offen, Post da
   window:'<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M12 3v18M5 12h14"/>',
   mail:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m3 8 9 6 9-6"/>',
+  // eigene Version: Garagentor zu / offen / in Fahrt (halb)
+  torZu:'<path d="M2 10 12 4l10 6M4 9v12M20 9v12"/><rect x="7" y="11" width="10" height="10" rx=".6"/><path d="M7 14.3h10M7 17.6h10"/>',
+  torAuf:'<path d="M2 10 12 4l10 6M4 9v12M20 9v12"/><rect x="7" y="11" width="10" height="2.5" rx=".6"/>',
+  torHalb:'<path d="M2 10 12 4l10 6M4 9v12M20 9v12"/><rect x="7" y="11" width="10" height="5.5" rx=".6"/><path d="M7 13.8h10"/>',
+  // eigene Version: Wallbox-Schnellknoepfe und Paket
+  blitz:'<path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12z"/>',
+  sonne:'<circle cx="12" cy="12" r="4.5"/><circle cx="20.0" cy="12.0" r="1.5"/><circle cx="17.7" cy="17.7" r="1.5"/><circle cx="12.0" cy="20.0" r="1.5"/><circle cx="6.3" cy="17.7" r="1.5"/><circle cx="4.0" cy="12.0" r="1.5"/><circle cx="6.3" cy="6.3" r="1.5"/><circle cx="12.0" cy="4.0" r="1.5"/><circle cx="17.7" cy="6.3" r="1.5"/>',
+  paket:'<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9M7.5 5.2l9 4.5"/>',
   list:'<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>',
 };
 const TABS = [
@@ -97,8 +109,8 @@ let chartMode = 'stack';
 function abosVergessen(){ curEnergyUuid=''; curCameraUuid=''; curPlayerZone=''; curSvStatus=''; curChartKey=''; }
 let themeSplit = true;   // Split-Screen an/aus (aus = 4"-Panel: nur die Visu, keine Pane 2)
 let tileLayout = '';     // Kachel-Aufbau: '' = neu (Standard), 'classic' = der bisherige
-// Kachel-Set (theme-Nachricht): Art der Kachel ('lx'|'mitte'|'kreis') und der
-// Tab-Leiste ('pille'|'oben'|'links'), '' ohne Set. Als data-kachelset-aufbau
+// Kachel-Set (theme-Nachricht): Art der Kachel ('lx'|'mitte'|'kreis'|'zeile') und der
+// Tab-Leiste ('pille'|'oben'|'links'|'reiter'), '' ohne Set. Als data-kachelset-aufbau
 // und data-kachelset-leiste am <html>; daran haengen die Regeln im CSS.
 let kachelAufbau = '', kachelLeiste = '';
 let kachelMasse = {};   // Variablen der theme-Nachricht (Masse des Sets fuer raster.js leisteMass)
@@ -177,7 +189,9 @@ function playKlingelTon(test){
       const komp=_actx.createDynamicsCompressor();
       komp.threshold.value=-18; komp.knee.value=6; komp.ratio.value=12;
       komp.attack.value=0.003; komp.release.value=0.25;
-      const vor=_actx.createGain(); vor.gain.value=2.5;
+      // Nachts (Nacht-Ausloeser, z. B. Schlafen) leise statt laut (eigene Version)
+      const nachts=(typeof NIGHT!=='undefined' && NIGHT.on);
+      const vor=_actx.createGain(); vor.gain.value=nachts ? 0.35 : 2.5;
       vor.connect(komp); komp.connect(_actx.destination);
       const ton=(f,t,dauer)=>{
         // Grundton mit Obertoenen, weich abklingend wie ein Gong

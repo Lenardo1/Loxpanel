@@ -119,6 +119,16 @@ function bindAppearance(p){
       markDirty(); };
     document.querySelectorAll('.baseSw').forEach(b=>{ b.onclick=()=>setBase(b.dataset.base); });
     { const c=$('#fBaseClr'); if(c) c.onclick=()=>setBase(''); }
+    // Akzentfarbe (eigene Version) - nur im Editor einer Ansicht vorhanden
+    { const setAkz=v=>{ p.states=p.states||{};
+        if(v) p.states.active=v; else delete p.states.active;
+        const cv=$('#fAkzVal'); if(cv) cv.textContent=((AKZENT_FARBEN.find(c=>c.v===String(v||'').toLowerCase())||{}).n)||v||T('Standard');
+        document.querySelectorAll('.akzSw').forEach(b=>{ const an=b.dataset.akz===String(v||'').toLowerCase();
+          b.setAttribute('aria-pressed', an?'true':'false'); b.style.boxShadow=an?'0 0 0 2px var(--panel),0 0 0 4px var(--accent)':''; });
+        markDirty(); };
+      document.querySelectorAll('.akzSw').forEach(b=>{ b.onclick=()=>setAkz(b.dataset.akz); });
+      const ac=$('#fAkzCustom'); if(ac) ac.oninput=()=>setAkz(ac.value.toLowerCase());
+      const ax=$('#fAkzClr'); if(ax) ax.onclick=()=>setAkz(''); }
     { const c=$('#fBaseCustom'); if(c) c.oninput=()=>setBase(c.value); } }
 }
 // Grundfarben fuer das Panel-Theme. Aus jeder faellt der ganze Satz ab; der
@@ -228,6 +238,24 @@ function leisteMasse(setKey, vw, vh){
   if(art==='oben'){ lm.rahmenX=2*mass('--rahmen-seite',0); lm.rahmenY=mass('--rahmen-unten',0); }
   return lm;
 }
+// Akzentfarbe der Ansicht (eigene Version): Farbe aktiver Zustaende (states.active) -
+// Symbol und Zustandstext aktiver Kacheln, aktive Seite der Leiste, Kopfzeilen-Werte
+const AKZENT_FARBEN=[{n:'Kupfer',v:'#c8885a'},{n:'Gold',v:'#d6a84e'},{n:'Sand',v:'#d8c2a0'},
+  {n:'Eisblau',v:'#6fb0dc'},{n:'Warmweiß',v:'#f1e7d6'},{n:'Grün',v:'#52b881'}];
+function akzentField(p){
+  const cur=String(((p.states||{}).active)||'').toLowerCase();
+  return '<div class="field" style="max-width:none">'+
+    '<p class="note" style="margin:0 0 8px">'+T('Farbe für alles, was „an“ ist: Licht an, Fenster offen, Bewohner da, aktive Seite unten.')+'</p>'+
+    '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'+
+      AKZENT_FARBEN.map(c=>'<button type="button" class="akzSw" data-akz="'+esc(c.v)+'" title="'+esc(T(c.n))+'" '+
+        'aria-pressed="'+(cur===c.v?'true':'false')+'" style="width:46px;height:46px;border-radius:50%;padding:0;cursor:pointer;'+
+        'background:'+esc(c.v)+';border:1px solid var(--line);'+baseRing(cur===c.v)+'"></button>').join('')+
+      '<input type="color" id="fAkzCustom" title="'+esc(T('Eigene Farbe'))+'" value="'+esc(cur&&cur[0]==='#'?cur:'#d6a84e')+'" '+
+        'style="width:46px;height:46px;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--bg);cursor:pointer">'+
+      '<button type="button" class="minibtn" id="fAkzClr" style="height:46px">'+T('Standard')+'</button>'+
+    '</div><span class="cval" id="fAkzVal" style="display:block;margin-top:6px;font-size:13px">'+
+      esc(((AKZENT_FARBEN.find(c=>c.v===cur)||{}).n)||cur||T('Standard'))+'</span></div>';
+}
 function baseRing(an){ return an?'box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--accent);':''; }
 function baseField(ui){
   const cur=String(ui.baseColor||'').toLowerCase();
@@ -309,6 +337,7 @@ function renderGlobalEditor(p){
     '<section class="spane" data-sub="verhalten"><div class="card"><h3>'+T('Nacht')+'</h3>'+
       '<p class="note">'+T('Wann die Geräte abdunkeln. Ohne Auslöser entscheidet der Sonnenuntergang — die Zeiten kommen vom Miniserver, ersatzweise vom Wetterdienst. Als Auslöser lässt sich jeder Baustein mit Ein/Aus-Zustand wählen; sein Ein-Zustand bedeutet Nacht. Damit auch ein Loxone-Betriebsmodus, sobald er in Loxone Config auf einen Status-Baustein mit Raum und Kategorie gelegt ist — der Modus selbst steht nicht in der Visu.')+'</p>'+
       '<div class="row2"><div class="field" style="max-width:460px"><label class="lbl">'+T('Auslöser (optional)')+'</label><select id="nt_control"></select></div></div>'+
+      '<div class="picked" id="nt_chips" style="margin:6px 0 2px"></div>'+
       '<div class="grph">'+T('Abdunkelung')+'</div>'+
       '<div class="sizes">'+nachtFelder(ui, nstd.nightDim, nstd.nightWake)+'</div>'+
       '<p class="note">'+T('Nacht-Uhr: Nachts zeigt die Uhr-Seite nur die Uhrzeit, gedimmt auf Schwarz, wie die Nachtanzeige der Loxone-Taster. Sind Gesten an, stehen oben die Symbole ihrer Spalten. „Nachts abdunkeln“ wirkt zusätzlich.')+'</p>'+
@@ -320,7 +349,8 @@ function renderGlobalEditor(p){
     '</div>'+klingelVorgabenKarte(ui)+gestenVorgabenKarte(ui)+'</section>';
   bindAppearance(p);
   nachtZeichnen();
-  { const s=$('#nt_control'); if(s) s.onchange=()=>{ NACHT.control=s.value; bereichOffen('nacht'); }; }
+  { const s=$('#nt_control'); if(s) s.onchange=()=>{ const u=s.value; s.value='';
+      if(u && nachtListe().indexOf(u)<0){ NACHT.control=nachtListe().concat([u]).join(','); bereichOffen('nacht'); nachtZeichnen(); } }; }
   aufhellenZeigen(nstd.nightDim);
   altEintragBinden(p);
   renderCatColors(p);
@@ -420,7 +450,7 @@ function nachtPlatzhalter(k,v){
 function nachtFelder(ui, dimLeer, wakeLeer){
   const wert=k=>(ui[k]==null)?'':ui[k];
   return '<div class="field" style="max-width:180px"><label class="lbl">'+T('Nachts abdunkeln (%)')+'</label>'+
-      '<input type="number" min="0" max="90" step="5" data-ui="nightDim" value="'+esc(wert('nightDim'))+'" placeholder="'+esc(nachtPlatzhalter('nightDim',dimLeer))+'">'+erbtFeld('nightDim')+'</div>'+
+      '<input type="number" min="0" max="100" step="5" data-ui="nightDim" value="'+esc(wert('nightDim'))+'" placeholder="'+esc(nachtPlatzhalter('nightDim',dimLeer))+'">'+erbtFeld('nightDim')+'</div>'+
     '<div class="field" style="max-width:180px" id="nightWakeField"><label class="lbl">'+T('Aufhellen bei Berührung (Sek.)')+'</label>'+
       '<input type="number" min="0" max="300" step="5" data-ui="nightWake" value="'+esc(wert('nightWake'))+'" placeholder="'+esc(nachtPlatzhalter('nightWake',wakeLeer))+'">'+erbtFeld('nightWake')+'</div>'+
     nachtUhrFelder(ui);

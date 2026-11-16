@@ -89,7 +89,7 @@ def kachel_postkasten(app, uuid, c, it):
     mail = bool(app._state(c, "mailReceived"))
     pk = bool(app._state(c, "packetReceived"))
     sub = " · ".join(x for x, f in (("Post da", mail), ("Paket da", pk)) if f) or "Leer"
-    it.update(icon="mail", on=(mail or pk), nav={"view": "control", "id": uuid}, sublabel=sub)
+    it.update(icon="paket" if pk else "mail", on=(mail or pk), nav={"view": "control", "id": uuid}, sublabel=sub)
     if mail or pk:
         it["hinweis"] = {"stufe": "an", "symbol": "mail"}
 
@@ -142,6 +142,29 @@ def detail_fensterueberwachung(app, uuid, c, route):
     items = [{"id": f"{uuid}:{i}", "icon": "blind", "on": bool(b & FENSTER_OFFEN),
               "label": _clean(w.get("name") or f"Fenster {i + 1}"), "sublabel": wtext(b)}
              for i, (w, b) in enumerate(zip(windows, _fenster_bits(app, c)))]
+    # Sammel-Ueberwachung (eigene Version): ist ein Eintrag selbst eine
+    # Fensterueberwachung (z. B. "Fensterueberwachung OG"), stehen hier gleich
+    # deren Fenster, mit der Etage dahinter; offene zuerst
+    unter = {_clean(x.get("name")): x for u, x in app.controls.items()
+             if x.get("type") == "WindowMonitor" and u != uuid}
+    if any(it["label"] in unter for it in items):
+        neu = []
+        for i, it in enumerate(items):
+            uc = unter.get(it["label"])
+            if not uc:
+                neu.append(it)
+                continue
+            kurz = it["label"].replace("Fensterüberwachung", "").strip() or it["label"]
+            for j, (w2, b2) in enumerate(zip((uc.get("details") or {}).get("windows") or [],
+                                             _fenster_bits(app, uc))):
+                neu.append({"id": f"{uuid}:{i}:{j}", "icon": "blind", "on": bool(b2 & FENSTER_OFFEN),
+                            "label": _clean(w2.get("name") or f"Fenster {j + 1}"),
+                            "sublabel": f"{wtext(b2)} · {kurz}"})
+        # nur was offen ist; alles zu -> eine Zeile
+        neu = [x for x in neu if x["on"]] or [{"id": f"{uuid}:zu", "icon": "blind", "on": False,
+                                              "label": "Alle Fenster und Türen geschlossen", "sublabel": ""}]
+        return {"t": "view", "title": "Offen", "route": route,
+                "layout": "list", "items": neu}
     # Offene zuerst, in der Reihenfolge beim Aufruf der Seite (route reihe,
     # Seiten.aufruf_route): schliesst jemand ein Fenster, springt keine Zeile
     reihe = route.get("reihe")

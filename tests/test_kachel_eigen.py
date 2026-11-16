@@ -1,0 +1,139 @@
+"""Eigene Version: Sammelkachel (tiles[uuid].mit).
+
+Start im Repo:  python -m pytest tests/test_kachel_eigen.py"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "bin"))
+
+import konfig  # noqa: E402
+from seiten import Seiten  # noqa: E402
+
+U1, U2, U3 = ("aaaaaaa1-0001-0001-ffff000000000001", "aaaaaaa2-0002-0002-ffff000000000002",
+              "aaaaaaa3-0003-0003-ffff000000000003")
+
+
+class _App(Seiten):
+    def __init__(self, an):
+        self.controls = {U1: {"name": "Bewohner: Anna"}, U2: {"name": "Bewohner: Ben"},
+                         U3: {"name": "Bewohner: Clara"}}
+        self.an = an
+
+    def _control_item(self, uuid, prof=None, **kw):
+        return {"id": uuid, "on": uuid in self.an}
+
+
+def test_sammelkachel_nennt_wer_da_ist():
+    it = {"on": True, "nav": {"view": "control", "id": U1}}
+    _App({U1, U3})._sammelkachel(U1, [U2, U3], it)
+    assert it["label"] == "Bewohner" and it["on"] is True
+    assert it["sublabel"] == "Anna, Clara da"
+    it = {"on": True}
+    _App({U1, U2, U3})._sammelkachel(U1, [U2, U3], it)
+    assert it["sublabel"] == "Alle da"
+    assert "nav" not in it
+
+
+def test_sammelkachel_niemand():
+    it = {"on": False}
+    _App(set())._sammelkachel(U1, [U2, U3], it)
+    assert it["on"] is False and it["sublabel"] == "Niemand da"
+
+
+def test_konfig_mit():
+    roh = {"p": {"tiles": {U1: {"mit": [U2, U3, U1, "x", 5]}}}}
+    assert konfig._sanitize_panels(roh)["p"]["tiles"][U1] == {"mit": [U2, U3]}
+
+
+def test_konfig_kurz():
+    roh = {"p": {"tiles": {U1: {"kurz": "  Fenster  "}, U2: {"kurz": ""}, U3: {"kurz": 5}}}}
+    tiles = konfig._sanitize_panels(roh)["p"]["tiles"]
+    assert tiles == {U1: {"kurz": "Fenster"}}
+
+
+def test_warnen_ruhig_erlaubt():
+    out = konfig._sanitize_theme_ui({"warnen": {U1: "ruhig", U2: "bunt"}})
+    assert out["warnen"] == {U1: "ruhig"}
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("text,tage", [("in 7 Tagen", 7), ("in 1 Tag", 1), ("Morgen", 1),
+                                       ("Heute", 0), ("Abholung Unbekannt", None), ("übermorgen", None)])
+def test_abhol_tage(text, tage):
+    assert Seiten._abhol_tage(text) == tage
+
+
+class _Muell(Seiten):
+    def __init__(self, texte):
+        self.controls = {u: {"name": n, "type": "TextState"} for u, (n, _) in texte.items()}
+        self.texte = texte
+
+    def _control_item(self, uuid, prof=None, **kw):
+        return {"id": uuid, "sublabel": self.texte[uuid][1]}
+
+
+def test_muell_morgen():
+    app = _Muell({U1: ("Restmüll", "in 7 Tagen"), U2: ("Gelbe Tonne", "morgen"), U3: ("Altpapier", "Abholung Unbekannt")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2, U3], it)
+    assert it["label"] == "Müll" and it["on"] is True and it["sublabel"] == "Morgen: Gelbe Tonne"
+
+
+def test_muell_spaeter_nicht_an():
+    app = _Muell({U1: ("Restmüll", "in 7 Tagen"), U2: ("Biotonne", "in 14 Tagen")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2], it)
+    assert it["on"] is False and it["sublabel"] == "Restmüll in 7 Tagen"
+
+
+def test_muell_symbole():
+    app = _Muell({U1: ("Biotonne", "morgen"), U2: ("Gewerbemüll Papier", "morgen"), U3: ("Restmüll", "in 3 Tagen")})
+    it = app._control_item(U1)
+    app._sammelkachel(U1, [U2, U3], it)
+    assert it["tonnen"] == ["bio", "container-papier"] and it["big"] == "Morgen"
+
+
+def test_konfig_frei():
+    roh = {"p": {"tiles": {U1: {"frei": True, "nurAn": True}, U2: {"frei": "ja"}}}}
+    assert konfig._sanitize_panels(roh)["p"]["tiles"] == {U1: {"frei": True, "nurAn": True}}
+
+
+
+def test_wallbox_schnellknoepfe():
+    from bausteine.energie import kachel_wallbox2
+
+    class _WB:
+        def __init__(self):
+            self.s = {"mode": 3, "modes": '[{"id":1,"name":"Max. Ladeleistung","value":11},'
+                                          '{"id":2,"name":"Eco"},{"id":3,"name":"PV-Überschuss"}]'}
+
+        def _state(self, c, n):
+            return self.s.get(n)
+
+    c = {"uuidAction": "wb", "details": {"modes": [{"id": i} for i in (1, 2, 3, 99)]}}
+    it = {}
+    kachel_wallbox2(_WB(), "u", c, it)
+    assert [(k["icon"], k["cmd"]["cmd"], k["on"]) for k in it["controls"]] == \
+        [("blitz", "setmode/1", False), ("sonne", "setmode/3", True)]
+
+
+def test_bewohner_an_abwesend():
+    app = _App({U2, U3})
+    app.controls[U2]["name"] = "Bewohner: Ben"
+    app._control_icon_url = lambda c: None
+    it = {"on": False, "cmd": {"uuid": "abw", "cmd": "on"}}
+    app._bewohner_kachel([U2, U3], it)
+    assert it["label"] == "Bewohner" and it["sublabel"] == "Alle da" and it["cmd"]
+    it = {"on": True, "cmd": {"uuid": "abw", "cmd": "off"}}
+    app._bewohner_kachel([U2, U3], it)
+    assert it["sublabel"] == "Abwesend" and it["on"] is False
+
+
+def test_konfig_bewohner():
+    roh = {"p": {"tiles": {U1: {"bewohner": [U2, U3, "x"], "lang": True}}}}
+    assert konfig._sanitize_panels(roh)["p"]["tiles"][U1] == {"bewohner": [U2, U3], "lang": True}
+

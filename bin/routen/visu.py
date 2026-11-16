@@ -84,8 +84,8 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         "catFilter": prof["catFilter"],   # Leiste filtert statt zu springen
                         "tileLayout": prof["tileLayout"],  # Kachel-Aufbau ("" = neu, "classic")
                         "tileSet": prof["tileSet"],        # Kachel-Set ("" = Standard)
-                        "tileSetAufbau": prof["tileSetAufbau"],   # ... seine Kachel-Art ("lx"|"mitte"|"kreis")
-                        "tileSetLeiste": prof["tileSetLeiste"],   # ... seine Tab-Leiste ("pille"|"oben"|"links")
+                        "tileSetAufbau": prof["tileSetAufbau"],   # ... seine Kachel-Art ("lx"|"mitte"|"kreis"|"zeile")
+                        "tileSetLeiste": prof["tileSetLeiste"],   # ... seine Tab-Leiste ("pille"|"oben"|"links"|"reiter")
                         "gridAuto": app.effective_grid_auto(prof, dev),   # automatisches Raster: Zielkachel px (Geraet vor Profil), 0 = fest
                         "gridGrow": KACHEL_WACHSEN,   # ... Kacheln wachsen bis dahin, wenn alle auf eine Seite passen
                         "paneCols": prof["paneCols"],   # Widget-Breite in Kachelspalten (0 = Automatik)
@@ -99,6 +99,9 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                         "gesten": prof["gesten"],         # Zwei-Finger-Gesten (Loxone-Standard) an
                         # ... mit Hinweis-Symbol (reserviert die Fusszeile unter dem Kachelfeld)
                         "gestenHinweis": prof["gesten"] and prof["gestenHinweis"],
+                        "schirm": prof.get("schirm", False),   # Schirm-Hinweis (eigene Version)
+                        "kopfFrei": prof.get("kopfFrei", False),   # Kopfzeile ohne Kaesten (eigene Version)
+                        "saverAus": prof.get("saverAus", False),   # Uhr-Seite schwarz (eigene Version)
                         # Klingelton bei einer Klingel: "" aus, "app" nur LoxPanel-App, "alle"
                         "klingelTon": (app.theme.get("ui") or {}).get("klingelTon") or "",
                         "reloadHours": app.panel_reload(prof["id"], roh),
@@ -268,7 +271,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
                 if _uu:
                     app.conn_status[ws] = _uu
                     try:
-                        sb = app.status_blocks(_uu)
+                        sb = app.status_blocks(_uu, app.conn_prof.get(ws))
                         _sm = {"t": "svstatus", "items": sb}
                         await ws.send_json(_sm)
                         app._last_sent.setdefault(ws, {})["svstatus"] = _sm

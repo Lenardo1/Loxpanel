@@ -53,6 +53,7 @@ function ansichtName(id){ return (PANELS[id]||{}).title||id; }
 // Was in einer Ansicht ohne ihren eigenen Eintrag gilt: Vorgabe, sonst Standard
 function wasGiltOhneEigenen(k, ui){
   const g=((PANELS.__global__||{}).ui)||{};
+  if(setGroesse(k,(ui||{}).tileSet)!=null) return {v:setGroesse(k,ui.tileSet), quelle:T('vom Kachel-Set')};
   if(hatVorgabe(k) && gesetzt(g[k])) return {v:g[k], quelle:T('aus den Vorgaben')};
   return {v:standardWert(k,ui), quelle:T('Standard')};
 }
@@ -99,11 +100,13 @@ function erbtZeichnen(){
     let knopf='';
     if(p.__global){
       const ids=ansichtIds(), eigene=ids.filter(id=>gesetzt(((PANELS[id]||{}).ui||{})[k]));
+      const vomSet=ids.filter(id=>eigene.indexOf(id)<0 && setGroesse(k,((PANELS[id]||{}).ui||{}).tileSet)!=null);
       const std=giltText(k,{v:standardWert(k,{}), quelle:T('Standard')});
       if(gesetzt(ui[k])) knopf=zurueckKnopf('data-erbt-zurueck',k,std);
       else teile.push(std);
-      teile.push(T('gilt für {n} von {m} Ansichten').replace('{n}',ids.length-eigene.length).replace('{m}',ids.length));
+      teile.push(T('gilt für {n} von {m} Ansichten').replace('{n}',ids.length-eigene.length-vomSet.length).replace('{m}',ids.length));
       if(eigene.length) teile.push(T('eigener Wert in {liste}').replace('{liste}',eigene.map(ansichtName).join(', ')));
+      if(vomSet.length) teile.push(T('vom Kachel-Set in {liste}').replace('{liste}',vomSet.map(ansichtName).join(', ')));
       const gk=GERAET_SCHLUESSEL[k];   // Geraete mit eigenem Wert (Display aus, Nacht, Skalierung, Zielkachel)
       if(gk) alleGeraeteNamen().forEach(n=>{ const v=(DEV[n]||{})[gk];
         if(gesetzt(v)) teile.push(T('am Gerät {g}: {w}').replace('{g}',n).replace('{w}',wertText(k,v))); });
@@ -303,6 +306,7 @@ function renderEditor(){
    '<section class="spane" data-sub="aussehen"><div class="card"><h3>'+T('Aussehen')+'</h3>'+
      '<p class="note">'+T('Überschreibt die Vorgaben nur für diese Ansicht. Leer = Vorgabe.')+'</p>'+
      aussehenGruppe(T('Kachel-Set'), kachelSetKarten(p.ui||{})+'<div id="fKsExtra">'+kachelSetExtraHtml(p.ui||{})+'</div>')+
+     aussehenGruppe(T('Akzentfarbe'), akzentField(p))+
      aussehenGruppe(T('Farbe und Aufbau'), baseField(p.ui||{})+
        '<div class="sizes"><div class="field" style="max-width:none;min-width:280px"><label class="lbl">'+T('Kachel-Aufbau')+'</label>'+
          '<select id="fTileLayout" style="width:100%;max-width:none"'+((p.ui||{}).tileSet?' disabled':'')+'>'+
@@ -484,7 +488,8 @@ function sizeField(label,key,ui,std){
     '<input type="number" min="8" max="80" data-ui="'+key+'" value="'+(v==null?'':v)+'" placeholder="'+(ph==null?'—':esc(String(ph)))+'">'+erbtFeld(key)+'</div>';
 }
 // Groessen, die bei leerem Feld gelten: der Standard des Kachel-Aufbaus vom
-// Server (/api/meta sizeDefaults), fuer ein Panel davor die globale Einstellung
+// Server (/api/meta sizeDefaults), fuer ein Panel davor die globale Einstellung,
+// davor die Groessen seines Kachel-Sets
 const SIZE_KEYS=['iconSize','nameSize','subSize','roomSize','bigSize'];
 // Auto-Neustart ohne Eintrag: Die Visu laedt jede Nacht um diese Stunde neu,
 // sie kommt vom Server (/api/meta reloadAt = NEULADEN_STUNDE).
@@ -500,8 +505,13 @@ function sizeStd(layout,mitGlobal,tileSet){
   const ks=kachelSetMeta(tileSet);
   const std=Object.assign({},((META||{}).sizeDefaults||{})[(layout==='classic'&&!ks)?'classic':'neu'], (ks&&ks.groessen)||{});
   const g=mitGlobal?(((PANELS.__global__||{}).ui)||{}):{};
-  SIZE_KEYS.forEach(k=>{ if(g[k]!=null&&g[k]!=='') std[k]=g[k]; });
+  SIZE_KEYS.forEach(k=>{ if(g[k]!=null&&g[k]!==''&&setGroesse(k,tileSet)==null) std[k]=g[k]; });
   return std;
+}
+// Groesse, die ein Kachel-Set mitbringt: sie geht vor die der Vorgaben (ansicht.py _ui_mit_vorgaben)
+function setGroesse(k,tileSet){
+  const ks=kachelSetMeta(tileSet), v=ks&&ks.groessen ? ks.groessen[k] : null;
+  return SIZE_KEYS.indexOf(k)>=0 && v!=null ? v : null;
 }
 // Nach einem Wechsel des Kachel-Aufbaus: leere Felder zeigen den neuen Standard
 function sizePlatzhalter(std){

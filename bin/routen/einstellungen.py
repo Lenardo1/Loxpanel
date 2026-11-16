@@ -22,7 +22,7 @@ from bausteine.gemeinsam import _clean, INTERCOM_TYPES
 from diagnosedaten import VERSION
 from konfig import (
     _audiometa_config, _calendar_config, _CFGDIR, _config, _load_cfg, _ms_zugang, _night_config,
-    _write_cfg)
+    _write_cfg, night_controls)
 from grafana import gf_url
 from miniserver import _ms_unerreichbar
 from routen.gemeinsam import _NOCACHE
@@ -212,16 +212,18 @@ async def api_settings_ms(request: web.Request) -> web.Response:
 
 
 async def api_settings_night(request: web.Request) -> web.Response:
-    """Nacht-Ausloeser: Baustein, dessen `active`-State den Nachtmodus schaltet.
-    Leer = keiner, dann entscheiden die Sonnenzeiten."""
+    """Nacht-Ausloeser: Bausteine, deren `active`-State den Nachtmodus schaltet
+    (Nacht, sobald einer an ist). `control` ist eine UUID oder mehrere, durch
+    Komma getrennt. Leer = keiner, dann entscheiden die Sonnenzeiten."""
     app: App = request.app["app"]
     try:
         data = await request.json()
     except (ValueError, aiohttp.ContentTypeError):
         return web.json_response({"ok": False, "error": "kein gültiges JSON"}, status=400)
-    u = str(data.get("control") or "").strip()
-    if u and u not in app.controls:
+    liste = night_controls({"control": data.get("control")})
+    if any(x not in app.controls for x in liste):
         return web.json_response({"ok": False, "error": "Baustein nicht gefunden"}, status=400)
+    u = ",".join(dict.fromkeys(liste))
     cfg = _load_cfg()
     night = dict(cfg.get("night", {}) if isinstance(cfg.get("night"), dict) else {})
     night["control"] = u
